@@ -12,6 +12,8 @@ Arquivos .txt são alternativas para copiar; não são arquivos adicionais do pr
 Mantenha o HTML com o nome Index no editor. Os outros scripts existentes no projeto não estão neste pacote e devem ser preservados.
 
 Inclui correção da colagem e do tratamento de capturas idênticas da Conferência, além das otimizações locais documentadas.
-47 testes locais passaram. Os tempos no Google ainda não foram validados.
+50 testes locais passaram. Os tempos no Google ainda não foram validados.
 A falha de colagem de Vistorias permanece pendente. Arquivamento de 15 dias e sincronização após lançamento ainda não estão implementados.
 Nenhum dado da planilha enviada está incluído neste pacote.
+
+Correção de interface: botão Alterar vistoriadores selecionados movido para Vistorias do Dia. Para essa correção, basta substituir Index.html e atualizar a implantação; backend inalterado.
