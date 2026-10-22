@@ -16,20 +16,19 @@ A rotina confere a cópia gravada antes de excluir blocos da origem. Também rel
 
 ## Consulta e recuperação
 
-Na tela Roteiros, junto de Limpar lista inteira: Rascunhos arquivados. Somente Conferência e Gestor, também validados no servidor. Selecione antes a data original do roteiro. A consulta mostra até os últimos 100 registros dessa data. Recuperar devolve o registro como RASCUNHO, renova SALVO_EM e marca a cópia como recuperada. Não sobrescreve outro rascunho ativo do mesmo protocolo/data. A cópia arquivada permanece. Uma lista local com trabalho em andamento não é recarregada automaticamente.
+No Painel do Gestor → Controle de dados. Somente Gestor, também validado no servidor. Selecione a data original do roteiro. A consulta mostra até os últimos 100 registros dessa data. Recuperar devolve o registro como RASCUNHO, renova SALVO_EM e marca a cópia como recuperada. Não sobrescreve outro rascunho ativo do mesmo protocolo/data. A cópia arquivada permanece. A lista de trabalho de Roteiros não é recarregada nem sobrescrita pela recuperação.
 
 A planilha separada não recebe compartilhamento automático. A implantação deve executar como a conta responsável que tem acesso às duas planilhas. Caso execute como usuário acessando, esse usuário precisará das permissões correspondentes no Google, além do perfil no aplicativo.
 
 ## Ativação no Google
 
-1. Faça backup e atualize WebApp.gs e Index.html, inicialmente na cópia de teste. Preserve os demais scripts.
-2. No editor vinculado à planilha correta, execute simularArquivamentoRascunhos_: apenas informa contagens, não move dados.
-3. Com a conta responsável, execute instalarArquivamentoRascunhos_ uma vez e autorize as permissões solicitadas pelo Google. O log mostra o link da planilha de arquivo. Se o projeto não estiver vinculado, configure antes a propriedade RASCUNHO_ORIGEM_ID com o ID da base correta.
-4. Publique uma nova versão da implantação para disponibilizar a interface. A instalação do gatilho é uma etapa separada da publicação.
-5. Confira a nova planilha e as execuções do gatilho. Para interromper: desativarArquivamentoRascunhos_. Isso não apaga nenhuma cópia.
+1. Atualize WebApp.gs e Index.html, salve e publique uma nova versão da implantação.
+2. Acesse como Gestor. O sistema configura o arquivo e o agendamento automaticamente na primeira instalação; autorize as permissões se o Google solicitar.
+3. Abra Controle de dados para verificar o estado, consultar contagens, pausar/reativar, arquivar um lote ou recuperar. Não é necessário executar funções pelo editor para uso normal.
+4. Confira o link do arquivo no próprio painel e as execuções no Google. Pausar não remove dados e é respeitado nos próximos acessos.
 
-Não reutilize as propriedades RASCUNHO_ORIGEM_ID e RASCUNHO_ARQUIVO_ID do teste na produção: cada origem deve ter seu próprio arquivo. Reexecutar o instalador na mesma conta não duplica o gatilho dessa conta. Contas diferentes têm seus próprios gatilhos: use uma única responsável.
+As funções privadas de simular/instalar/desativar continuam disponíveis ao administrador pelo editor para diagnóstico. Se o projeto não estiver vinculado, configure antes RASCUNHO_ORIGEM_ID com o ID correto. Não reutilize os IDs do teste na produção: cada origem deve ter seu próprio arquivo. Prefira uma única conta responsável com acesso às duas bases.
 
 ## Validação
 
-66 testes locais passaram, incluindo retenção, preservação de lançados, cópia divergente, falha e repetição, concorrência simulada, limite de lote, recuperação repetida, colisão de rascunho ativo, novo ciclo e instalação repetida. Verificação de sintaxe do backend e dos scripts HTML. Testes usam serviços Google simulados; não houve execução, medição de tempo, instalação de gatilho ou alteração de planilhas no Google neste ambiente.
+86 testes locais e 10 cenários de navegador com a ponte Google simulada passaram, incluindo retenção, preservação de lançados, cópia divergente, falha e repetição, concorrência simulada, limite de lote, recuperação repetida, colisão de rascunho ativo, novo ciclo e instalação repetida. Verificação de sintaxe do backend e dos scripts HTML. Testes usam serviços Google simulados; não houve execução, medição de tempo, instalação de gatilho ou alteração de planilhas no Google neste ambiente.

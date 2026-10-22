@@ -87,8 +87,10 @@ test('instalação repetida mantém um único gatilho; desativação preserva da
  f.context.instalarArquivamentoRascunhos_();f.context.instalarArquivamentoRascunhos_();assert.equal(triggers.length,1);
  f.context.desativarArquivamentoRascunhos_();assert.equal(triggers.length,0);assert.equal(f.context.executarArquivamentoRascunhos_().ativo,false);assert.equal(f.bases.origem.cells.length,2);
 });
-test('interface oferece consulta e recuperação sem sobrescrever lista local em andamento',()=>{
+test('interface concentra arquivo no controle do Gestor e preserva a lista de Roteiros',()=>{
  const html=fs.readFileSync('Index_APLICACAO_CREDENCIAMENTO_V94_PRODUTIVIDADE.html','utf8');
- assert.match(html,/id="btn-arquivo-rascunhos"/);assert.match(html,/\['GESTOR','CONFERENCIA'\]\.indexOf\(perfil\)/);
- assert.match(html,/restaurarRascunhoArquivado\(item.id,sessaoToken\)/);assert.match(html,/!dadosSiapiRoteiro.length\) carregarRascunhosRoteiro/);
+ assert.match(html,/id="gestor-controle-dados"/);assert.doesNotMatch(html,/id="btn-arquivo-rascunhos"/);
+ assert.match(html,/restaurarRascunhoArquivado\(item.id,sessaoToken\)/);
+ const recuperar=html.slice(html.indexOf('    function recuperarRascunhoArquivadoTela('),html.indexOf('    function carregarRascunhosRoteiro('));
+ assert.doesNotMatch(recuperar,/carregarRascunhosRoteiro\(/);
 });

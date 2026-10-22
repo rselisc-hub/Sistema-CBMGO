@@ -1,5 +1,7 @@
 # Revisão de desempenho do Sistema-CBMGO
 
+Este documento descreve a primeira rodada. A atualização mais recente está em [Controle de dados e fluidez](controle-dados-e-fluidez.md), incluindo o arquivamento em planilha separada e sua coluna de identificação.
+
 As alterações preservam as abas, colunas e formatos de dados existentes. Não há migração de banco, novo serviço externo ou cache persistente dos dados dos usuários. A referência de comparação é o commit `7f5300f0f89b31286fc4e08e91db5d2ab082b609`.
 
 ## Cobertura da revisão

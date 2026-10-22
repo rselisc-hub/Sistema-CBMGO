@@ -1,18 +1,19 @@
-SISTEMA-CBMGO — ARQUIVAMENTO DE RASCUNHOS
+SISTEMA-CBMGO — CONTROLE DE DADOS NO GESTOR E FLUIDEZ
 
 1. Extraia o ZIP. Abra WebApp.txt no Bloco de Notas e substitua TODO o conteúdo de WebApp.gs no Apps Script.
 2. Abra Index.txt e substitua TODO o conteúdo de Index.html. O nome do HTML no editor deve continuar Index.
-3. Não duplique estes códigos em outros arquivos. Preserve os demais scripts do projeto. Salve e teste primeiro numa cópia da base.
-4. Para a rotina de 15 dias, execute simularArquivamentoRascunhos_ no editor: informa as contagens sem mover dados.
-5. Na conta responsável e no projeto vinculado à planilha correta, execute instalarArquivamentoRascunhos_ e autorize no Google. O log mostra o link da nova planilha ARQUIVO_RASCUNHOS_DIC.
-6. Publique uma nova versão da implantação. Atualizar o código não instala automaticamente o gatilho.
+3. Não duplique os códigos em outros arquivos. Preserve os demais scripts do projeto. Salve os dois arquivos e publique uma NOVA VERSÃO da implantação.
+4. Acesse como GESTOR. Na primeira instalação, o aplicativo configura automaticamente a planilha de arquivo e o agendamento. Autorize as permissões caso o Google solicite.
+5. Abra Painel do Gestor > Controle de dados. Lá ficam as contagens, ativar/pausar, arquivar um lote e consultar/recuperar pela data original do roteiro. Não precisa escolher funções no editor para uso normal.
 
-WebApp.gs e WebApp.txt têm conteúdo idêntico; Index.html e Index.txt também. Use somente um de cada par para copiar.
+WebApp.gs e WebApp.txt são idênticos; Index.html e Index.txt também. Use somente um de cada par para copiar. Os .txt não são arquivos adicionais do projeto Apps Script.
 
 ARQUIVAMENTO: somente RASCUNHO ou REMOVIDO, há 15 dias sem atividade, com data do roteiro anterior a hoje. Abrir/retomar ou remover renova o prazo. LANÇADO e bases estatísticas são mantidos. Datas inválidas são preservadas.
-Uma planilha separada recebe a cópia verificada antes da exclusão na origem. A origem ganha a coluna 24 ARQUIVO_RASCUNHO_ID. Até 50 linhas por dia, por volta das 03h de São Paulo.
-Consulta/recuperação: tela Roteiros, botão Rascunhos arquivados, pela data original, para Conferência/Gestor. A cópia permanece no arquivo após recuperar. Não há compartilhamento automático da nova planilha.
-Se o projeto não for vinculado, configure RASCUNHO_ORIGEM_ID nas propriedades antes de instalar. Não reutilize os IDs do arquivo de teste na produção. Use uma única conta responsável, com acesso às duas planilhas; preferencialmente, implantação executando como essa conta.
-Para interromper o agendamento: executar desativarArquivamentoRascunhos_. Nenhum arquivo é apagado.
+Uma planilha separada recebe a cópia verificada antes da exclusão. A origem ganha a coluna 24 ARQUIVO_RASCUNHO_ID. Até 50 linhas por execução diária, por volta das 03h de São Paulo. Uma pausa feita pelo Gestor é respeitada nos próximos acessos.
+Consulta/recuperação: exclusivamente no Controle de dados do Gestor. A cópia permanece no arquivo após recuperar. Não há compartilhamento automático da nova planilha.
+Se o projeto não for vinculado, configure RASCUNHO_ORIGEM_ID nas propriedades. Não reutilize os IDs do teste na produção. A conta executora deve ter acesso às duas planilhas; prefira a implantação executando como a responsável. Erros de configuração/autorização aparecem no Controle de dados.
 
-Mantém as otimizações de Vistorias/Conferência e o tratamento de Vistoriado por. 66 testes locais passaram; nenhuma ativação ou medição no Google foi feita neste ambiente. Nenhum dado da planilha enviada está incluído no pacote.
+CONFERÊNCIA: ao concluir, a tela responde imediatamente com Salvando na planilha. Só mostra salvo e atualiza contadores após confirmação do servidor. Se falhar, o protocolo volta e a anotação pode ser reaberta durante a sessão. Confira a fila antes de repetir se houver falha de comunicação. A anotação local não sobrevive ao fechamento da página. Reservas continuam confirmadas no servidor para evitar conflito entre usuários.
+
+Assumir lotes, históricos, resumos, indicadores, filtros e listas receberam otimizações adicionais. O tratamento de Vistoriado por foi preservado.
+86 testes locais e 10 cenários no Chromium passaram, com serviços Google simulados. Nenhuma ativação ou medição real no Google foi feita neste ambiente. Nenhum dado da planilha enviada está incluído no pacote.

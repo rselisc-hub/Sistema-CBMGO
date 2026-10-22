@@ -1492,6 +1492,8 @@
 
     <!-- TELA 2 — FILA COMUM DA CONFERÊNCIA -->
     <div id="conf-pane-fila">
+      <div id="conf-gravacao-status" class="alert alert-info" style="display:none" role="status"></div>
+      <div id="conf-gravacao-recuperar" style="display:none" class="mb-3"><button class="btn btn-outline-primary" onclick="retomarConclusaoNaoConfirmada()">Reabrir anotação</button> <button class="btn btn-outline-secondary" onclick="descartarConclusaoNaoConfirmada()">Descartar anotação</button></div>
       <div class="row g-3 mb-4">
         <div class="col-md-3">
           <div class="card card-custom p-4 h-100 border-primary">
@@ -2363,7 +2365,6 @@
         <button class="btn btn-outline-danger" onclick="limparImportacaoSiapi()">
           Limpar lista inteira
         </button>
-        <button class="btn btn-outline-secondary" id="btn-arquivo-rascunhos" style="display:none" onclick="abrirRascunhosArquivados()">Rascunhos arquivados</button>
       </div>
     </div>
 
@@ -2451,17 +2452,6 @@
 
 
   <!-- Modal de confirmação da distribuição -->
-<div class="modal fade" id="modal-rascunhos-arquivados" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg"><div class="modal-content">
-    <div class="modal-header"><h5 class="modal-title">Rascunhos arquivados</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
-    <div class="modal-body"><p>Consulta pela data selecionada no roteiro. A recuperação mantém os dados salvos no arquivo.</p>
-      <div id="arquivo-rascunhos-status" role="status"></div>
-      <div class="table-responsive"><table class="table"><thead><tr><th>Protocolo</th><th>Situação original</th><th>Arquivado em</th><th>Ação</th></tr></thead><tbody id="arquivo-rascunhos-tbody"></tbody></table></div>
-    </div>
-    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button></div>
-  </div></div>
-</div>
-
   <div class="modal fade" id="modal-distribuicao-roteiro" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
@@ -2681,6 +2671,26 @@
       <div class="col-md-6 col-xl-4"><button class="card home-card w-100 h-100 text-start p-4 bg-white" onclick="abrirIsencoesTaxa()"><div class="home-icon text-warning mb-3"><i class="bi bi-cash-stack"></i></div><h4 class="fw-bold">Isenção de Taxas</h4><p class="text-muted mb-0">Acompanhar e decidir os pedidos originados nos DOCs para Despacho.</p></button></div>
       <div class="col-md-6 col-xl-4"><button class="card home-card w-100 h-100 text-start p-4 bg-white" onclick="abrirGestaoTacs()"><div class="home-icon text-danger mb-3"><i class="bi bi-file-earmark-check-fill"></i></div><h4 class="fw-bold">Gestão dos TACs</h4><p class="text-muted mb-0">Cadastrar e acompanhar termos, prazos, responsáveis e situação.</p></button></div>
       <div class="col-md-6 col-xl-4"><button class="card home-card w-100 h-100 text-start p-4 bg-white" onclick="abrirGestorIndicadores()"><div class="home-icon text-primary mb-3"><i class="bi bi-bar-chart-fill"></i></div><h4 class="fw-bold">Indicadores</h4><p class="text-muted mb-0">Painel resumido para consultas rápidas e apresentação de dados gerenciais.</p></button></div>
+      <div class="col-md-6 col-xl-4"><button class="card home-card w-100 h-100 text-start p-4 bg-white" onclick="abrirControleDadosGestor()"><div class="home-icon text-secondary mb-3"><i class="bi bi-database-gear"></i></div><h4 class="fw-bold">Controle de dados</h4><p class="text-muted mb-0">Arquivamento de rascunhos, consulta e recuperação.</p></button></div>
+    </div>
+
+    <div id="gestor-controle-dados" style="display:none" class="mb-4">
+      <div class="card card-custom p-4">
+        <div class="d-flex justify-content-between align-items-center gap-2 mb-3"><h5 class="fw-bold mb-0">Controle de dados</h5><button class="btn btn-outline-secondary" onclick="voltarMenuGestor()">Voltar</button></div>
+        <p>Rascunhos sem atividade por 15 dias são copiados para uma planilha de arquivo antes de sair da base de trabalho. Lançamentos e dados estatísticos são mantidos.</p>
+        <div id="controle-dados-status" class="alert alert-light border" role="status">Carregando...</div>
+        <div class="d-flex flex-wrap gap-2 mb-4" id="controle-dados-acoes">
+          <button class="btn btn-outline-primary" onclick="carregarControleDadosGestor()">Atualizar contagens</button>
+          <button class="btn btn-success" onclick="alterarArquivoGestor('ativar')">Ativar arquivamento diário</button>
+          <button class="btn btn-outline-secondary" onclick="alterarArquivoGestor('pausar')">Pausar arquivamento</button>
+          <button class="btn btn-outline-primary" onclick="alterarArquivoGestor('executar')">Arquivar lote agora</button>
+          <a id="controle-dados-link" class="btn btn-outline-secondary" target="_blank" rel="noopener" style="display:none">Abrir planilha de arquivo</a>
+        </div>
+        <h6 class="fw-bold">Consultar e recuperar rascunhos</h6>
+        <div class="d-flex flex-wrap align-items-end gap-2 mb-3"><div><label class="form-label" for="arquivo-rascunhos-data">Data original do roteiro</label><input type="date" class="form-control" id="arquivo-rascunhos-data"></div><button class="btn btn-primary" onclick="consultarRascunhosArquivadosTela()">Consultar</button></div>
+        <div id="arquivo-rascunhos-status" role="status"></div>
+        <div class="table-responsive"><table class="table"><thead><tr><th>Protocolo</th><th>Situação original</th><th>Arquivado em</th><th>Ação</th></tr></thead><tbody id="arquivo-rascunhos-tbody"></tbody></table></div>
+      </div>
     </div>
 
     <div id="gestor-indicadores" style="display:none;" class="mb-4">
@@ -3251,9 +3261,6 @@
       var login = document.getElementById('login-screen');
       if (login) login.style.display = 'flex';
 
-      var arquivoBtn = document.getElementById('btn-arquivo-rascunhos');
-      if (arquivoBtn) arquivoBtn.style.display = ['GESTOR','CONFERENCIA'].indexOf(perfil) >= 0 ? 'inline-block' : 'none';
-
       var userInfo = document.getElementById('user-info');
       if (userInfo) userInfo.innerHTML = '<i class="bi bi-person-circle me-1"></i> Acesso não identificado';
 
@@ -3443,6 +3450,16 @@
         'Olá, ' + nome + '. Selecione o módulo desejado.';
 
       document.getElementById('home-perfil').textContent = perfil;
+      if (permissoes.gestor) {
+        var tokenConfiguracaoDados=sessaoToken;
+        function podeApresentarConfiguracaoDados(){return sessaoToken===tokenConfiguracaoDados && document.getElementById('gestor-controle-dados').style.display==='none';}
+        google.script.run.withSuccessHandler(function(r) { if(podeApresentarConfiguracaoDados())apresentarControleDadosGestor(r); })
+          .withFailureHandler(function(err) {
+            var el=document.getElementById('controle-dados-status');
+            if(el && podeApresentarConfiguracaoDados()) el.textContent='Arquivamento ainda não ativado: '+(err.message||String(err))+'. Abra Controle de dados para tentar novamente.';
+          }).inicializarControleDadosGestor(sessaoToken);
+      }
+
 
       document.getElementById('card-modulo-gestor').style.display =
         permissoes.gestor ? 'block' : 'none';
@@ -3660,7 +3677,7 @@
     function estiloPrazoDoc(x){return x==='LARANJA'?'background:#f0a23a;color:white;':'';}
     function carregarDocsDespacho(){var st=(document.getElementById('docs-filtro-status')||{}).value||'ABERTOS',t=document.getElementById('docs-tbody');if(t)t.innerHTML='<tr><td colspan="10" class="text-muted py-4 text-center"><span class="spinner-border spinner-border-sm me-2"></span>Carregando DOCs...</td></tr>';google.script.run.withSuccessHandler(function(r){docsCache=(r&&r.registros)||[];var z=(r&&r.resumo)||{};var a=document.getElementById('docs-resumo-abertos'),g=document.getElementById('docs-resumo-aguardando'),c=document.getElementById('docs-resumo-concluidos');if(a)a.textContent='Em aberto: '+(z.abertos||0);if(g)g.textContent='Aguardando resposta: '+(z.aguardandoResposta||0);if(c)c.textContent='Concluídos: '+(z.concluidos||0);renderizarDocsDespacho();}).withFailureHandler(function(err){if(t)t.innerHTML='<tr><td colspan="10" class="text-danger py-4 text-center">Não foi possível carregar os DOCs. Tente novamente.</td></tr>';capturarErroServidor(err);}).listarDocsDespacho({situacao:st},sessaoToken);}
     function copiarProtocoloDoc(texto){texto=String(texto||'').trim();if(!texto)return;function ok(){var el=document.getElementById('docs-copia-aviso');if(el){el.textContent='Protocolo '+texto+' copiado.';el.style.display='inline';setTimeout(function(){el.style.display='none';},1800);}}function fallback(){var ta=document.createElement('textarea');ta.value=texto;ta.setAttribute('readonly','');ta.style.position='absolute';ta.style.left='-9999px';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');ok();}catch(e){alert('Protocolo: '+texto);}document.body.removeChild(ta);}if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(texto).then(ok).catch(fallback);}else{fallback();}}
-    function renderizarDocsDespacho(){var t=document.getElementById('docs-tbody');if(!t)return;var gestor=docsOrigemTela==='gestor';var busca=String((document.getElementById('docs-pesquisa-protocolo')||{}).value||'').trim().toUpperCase();var lista=docsCache.filter(function(x){return !busca||String(x.protocolo||'').toUpperCase().indexOf(busca)!==-1;});if(!lista.length){t.innerHTML='<tr><td colspan="10" class="text-muted">'+(busca?'Nenhum protocolo encontrado para a pesquisa informada.':'Nenhum documento encontrado.')+'</td></tr>';return;}t.innerHTML=lista.map(function(x){var i=docsCache.indexOf(x);var finalizado=(x.status==='CONCLUÍDO'||x.status==='ARQUIVADO');var prazo=finalizado?'<span class="text-muted">—</span>':'<span class="badge docs-prazo-badge '+classePrazoDoc(x.faixaPrazo)+'" style="'+estiloPrazoDoc(x.faixaPrazo)+'">'+((x.diasDocumento===null||x.diasDocumento===undefined)?'—':x.diasDocumento+' d')+'</span>';var protocolo=escaparHtmlRoteiro(x.protocolo||'');var protocoloJs=String(x.protocolo||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");var celProtocolo='<div class="d-flex align-items-center gap-2 flex-wrap"><span class="fw-semibold">'+protocolo+'</span><button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="copiarProtocoloDoc(\''+protocoloJs+'\')" title="Copiar protocolo"><i class="bi bi-copy"></i></button><button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="abrirHistoricoDocDespacho('+i+')" title="Histórico de trâmites"><i class="bi bi-clock-history"></i></button></div>';var andamento=String(x.andamento||'').trim();if(!andamento){if(x.status==='CONCLUÍDO')andamento='CONCLUÍDO';else if(x.status==='ARQUIVADO')andamento='ARQUIVADO';else if(x.status==='AGUARDANDO RESPOSTA')andamento='AGUARDANDO RESPOSTA';else if(x.status==='EM ANDAMENTO')andamento='EM ANÁLISE';else andamento='AGUARDANDO ANÁLISE';}var gestao=gestor?'<div class="d-flex flex-wrap gap-1"><button class="btn btn-sm btn-outline-warning" onclick="editarDadosDocGestao('+i+')"><i class="bi bi-pencil-square me-1"></i>Editar</button><button class="btn btn-sm btn-outline-primary" onclick="editarDocGestao('+i+')">Atualizar</button></div>':'';return '<tr><td>'+prazo+'</td><td>'+escaparHtmlRoteiro(x.tipoDocumento||'')+'</td><td>'+celProtocolo+'</td><td>'+escaparHtmlRoteiro(x.vistoriador||'')+'</td><td>'+escaparHtmlRoteiro(x.dataDocumento||'')+'</td><td>'+escaparHtmlRoteiro(x.preenchidoPor||'')+'</td><td>'+escaparHtmlRoteiro(x.razaoSocial||'')+'</td><td>'+escaparHtmlRoteiro(x.origem||'')+'</td><td><span class="fw-semibold">'+escaparHtmlRoteiro(andamento)+'</span></td><td'+(gestor?'':' style="display:none;"')+'>'+gestao+'</td></tr>';}).join('');}
+    function renderizarDocsDespacho(){var t=document.getElementById('docs-tbody');if(!t)return;var gestor=docsOrigemTela==='gestor';var busca=String((document.getElementById('docs-pesquisa-protocolo')||{}).value||'').trim().toUpperCase();var indicesDocs=new Map();docsCache.forEach(function(x,i){if(!indicesDocs.has(x))indicesDocs.set(x,i);});var lista=docsCache.filter(function(x){return !busca||String(x.protocolo||'').toUpperCase().indexOf(busca)!==-1;});if(!lista.length){t.innerHTML='<tr><td colspan="10" class="text-muted">'+(busca?'Nenhum protocolo encontrado para a pesquisa informada.':'Nenhum documento encontrado.')+'</td></tr>';return;}t.innerHTML=lista.map(function(x){var i=indicesDocs.get(x);var finalizado=(x.status==='CONCLUÍDO'||x.status==='ARQUIVADO');var prazo=finalizado?'<span class="text-muted">—</span>':'<span class="badge docs-prazo-badge '+classePrazoDoc(x.faixaPrazo)+'" style="'+estiloPrazoDoc(x.faixaPrazo)+'">'+((x.diasDocumento===null||x.diasDocumento===undefined)?'—':x.diasDocumento+' d')+'</span>';var protocolo=escaparHtmlRoteiro(x.protocolo||'');var protocoloJs=String(x.protocolo||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");var celProtocolo='<div class="d-flex align-items-center gap-2 flex-wrap"><span class="fw-semibold">'+protocolo+'</span><button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="copiarProtocoloDoc(\''+protocoloJs+'\')" title="Copiar protocolo"><i class="bi bi-copy"></i></button><button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="abrirHistoricoDocDespacho('+i+')" title="Histórico de trâmites"><i class="bi bi-clock-history"></i></button></div>';var andamento=String(x.andamento||'').trim();if(!andamento){if(x.status==='CONCLUÍDO')andamento='CONCLUÍDO';else if(x.status==='ARQUIVADO')andamento='ARQUIVADO';else if(x.status==='AGUARDANDO RESPOSTA')andamento='AGUARDANDO RESPOSTA';else if(x.status==='EM ANDAMENTO')andamento='EM ANÁLISE';else andamento='AGUARDANDO ANÁLISE';}var gestao=gestor?'<div class="d-flex flex-wrap gap-1"><button class="btn btn-sm btn-outline-warning" onclick="editarDadosDocGestao('+i+')"><i class="bi bi-pencil-square me-1"></i>Editar</button><button class="btn btn-sm btn-outline-primary" onclick="editarDocGestao('+i+')">Atualizar</button></div>':'';return '<tr><td>'+prazo+'</td><td>'+escaparHtmlRoteiro(x.tipoDocumento||'')+'</td><td>'+celProtocolo+'</td><td>'+escaparHtmlRoteiro(x.vistoriador||'')+'</td><td>'+escaparHtmlRoteiro(x.dataDocumento||'')+'</td><td>'+escaparHtmlRoteiro(x.preenchidoPor||'')+'</td><td>'+escaparHtmlRoteiro(x.razaoSocial||'')+'</td><td>'+escaparHtmlRoteiro(x.origem||'')+'</td><td><span class="fw-semibold">'+escaparHtmlRoteiro(andamento)+'</span></td><td'+(gestor?'':' style="display:none;"')+'>'+gestao+'</td></tr>';}).join('');}
     function abrirHistoricoDocDespacho(i){
       var x=docsCache[i];if(!x)return;
       var titulo=document.getElementById('doc-historico-titulo');
@@ -3715,7 +3732,7 @@
     function inicializarMesAfastamento(){var el=document.getElementById('afast-mes');if(el&&!el.value){var d=new Date();el.value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}atualizarLabelMesAfastamento();}
     function toggleFiltroMesAfastamento(){var b=document.getElementById('afast-filtro-mes-box');if(b)b.style.display=b.style.display==='none'?'block':'none';}
     function atualizarLabelMesAfastamento(){var el=document.getElementById('afast-mes'),lab=document.getElementById('afast-mes-label');if(!el||!lab)return;var p=(el.value||'').split('-');if(p.length===2){var nomes=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];lab.textContent='Exibindo: '+nomes[Number(p[1])-1]+' de '+p[0];}}
-    function renderizarTabelaAfastamentos(){var t=document.getElementById('afast-tbody');if(!t)return;inicializarMesAfastamento();var f=String((document.getElementById('afast-filtro')||{}).value||'').trim().toUpperCase(),mes=(document.getElementById('afast-mes')||{}).value||'',hoje=new Date();hoje.setHours(0,0,0,0);var l=afastamentosCache.filter(function(x){var di=parseDataBrAfastamento_(x.dataInicial),df=parseDataBrAfastamento_(x.dataFinal);var noMes=true;if(mes&&di&&df){var p=mes.split('-'),ini=new Date(Number(p[0]),Number(p[1])-1,1),fim=new Date(Number(p[0]),Number(p[1]),0,23,59,59);noMes=df>=ini&&di<=fim;}if(!noMes)return false;if(!f)return true;return [x.militar,x.motivo,x.observacao,x.dataInicial,x.dataFinal].join(' ').toUpperCase().indexOf(f)!==-1;});var prioridade=function(m){m=String(m||'').toUpperCase();if(['FÉRIAS','FERIAS','OPERAÇÃO','OPERACAO','LICENÇA','LICENCA'].indexOf(m)!==-1)return 0;if(m==='ATESTADO')return 1;return 2;};l.sort(function(a,b){var pa=prioridade(a.motivo),pb=prioridade(b.motivo);if(pa!==pb)return pa-pb;var da=parseDataBrAfastamento_(a.dataInicial),db=parseDataBrAfastamento_(b.dataInicial);return (db?db.getTime():0)-(da?da.getTime():0);});atualizarLabelMesAfastamento();if(!l.length){t.innerHTML='<tr><td colspan="6" class="text-muted">Nenhum afastamento encontrado no mês selecionado.</td></tr>';return;}t.innerHTML=l.map(function(x){var idx=afastamentosCache.indexOf(x),df=parseDataBrAfastamento_(x.dataFinal),cls=(df&&df.getTime()<hoje.getTime())?' afastamento-row-passado':'',acoes='';if(afastamentosPodeEditar)acoes='<button class="btn btn-sm btn-outline-primary me-1" onclick="editarAfastamentoTela('+idx+')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-danger" onclick="excluirAfastamentoTela('+idx+')"><i class="bi bi-trash"></i></button>';return '<tr class="'+cls+'"><td class="fw-semibold">'+escaparHtmlRoteiro(x.militar||'')+'</td><td>'+escaparHtmlRoteiro(x.dataInicial||'')+'</td><td>'+escaparHtmlRoteiro(x.dataFinal||'')+'</td><td><span class="badge" style="background:#e9d8fd;color:#54237c;">'+escaparHtmlRoteiro(x.motivo||'')+'</span></td><td>'+escaparHtmlRoteiro(x.observacao||'')+'</td><td'+(afastamentosPodeEditar?'':' style="display:none;"')+'>'+acoes+'</td></tr>';}).join('');}
+    function renderizarTabelaAfastamentos(){var t=document.getElementById('afast-tbody');if(!t)return;inicializarMesAfastamento();var f=String((document.getElementById('afast-filtro')||{}).value||'').trim().toUpperCase(),mes=(document.getElementById('afast-mes')||{}).value||'',hoje=new Date();hoje.setHours(0,0,0,0);var indicesAfastamentos=new Map();afastamentosCache.forEach(function(x,i){if(!indicesAfastamentos.has(x))indicesAfastamentos.set(x,i);});var l=afastamentosCache.filter(function(x){var di=parseDataBrAfastamento_(x.dataInicial),df=parseDataBrAfastamento_(x.dataFinal);var noMes=true;if(mes&&di&&df){var p=mes.split('-'),ini=new Date(Number(p[0]),Number(p[1])-1,1),fim=new Date(Number(p[0]),Number(p[1]),0,23,59,59);noMes=df>=ini&&di<=fim;}if(!noMes)return false;if(!f)return true;return [x.militar,x.motivo,x.observacao,x.dataInicial,x.dataFinal].join(' ').toUpperCase().indexOf(f)!==-1;});var prioridade=function(m){m=String(m||'').toUpperCase();if(['FÉRIAS','FERIAS','OPERAÇÃO','OPERACAO','LICENÇA','LICENCA'].indexOf(m)!==-1)return 0;if(m==='ATESTADO')return 1;return 2;};l.sort(function(a,b){var pa=prioridade(a.motivo),pb=prioridade(b.motivo);if(pa!==pb)return pa-pb;var da=parseDataBrAfastamento_(a.dataInicial),db=parseDataBrAfastamento_(b.dataInicial);return (db?db.getTime():0)-(da?da.getTime():0);});atualizarLabelMesAfastamento();if(!l.length){t.innerHTML='<tr><td colspan="6" class="text-muted">Nenhum afastamento encontrado no mês selecionado.</td></tr>';return;}t.innerHTML=l.map(function(x){var idx=indicesAfastamentos.get(x),df=parseDataBrAfastamento_(x.dataFinal),cls=(df&&df.getTime()<hoje.getTime())?' afastamento-row-passado':'',acoes='';if(afastamentosPodeEditar)acoes='<button class="btn btn-sm btn-outline-primary me-1" onclick="editarAfastamentoTela('+idx+')"><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-danger" onclick="excluirAfastamentoTela('+idx+')"><i class="bi bi-trash"></i></button>';return '<tr class="'+cls+'"><td class="fw-semibold">'+escaparHtmlRoteiro(x.militar||'')+'</td><td>'+escaparHtmlRoteiro(x.dataInicial||'')+'</td><td>'+escaparHtmlRoteiro(x.dataFinal||'')+'</td><td><span class="badge" style="background:#e9d8fd;color:#54237c;">'+escaparHtmlRoteiro(x.motivo||'')+'</span></td><td>'+escaparHtmlRoteiro(x.observacao||'')+'</td><td'+(afastamentosPodeEditar?'':' style="display:none;"')+'>'+acoes+'</td></tr>';}).join('');}
     function limparFormularioAfastamento(){['afast-id','afast-data-inicial','afast-data-final','afast-observacao'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});var m=document.getElementById('afast-militar'),mo=document.getElementById('afast-motivo');if(m)m.value='';if(mo)mo.value='';}
     function salvarAfastamentoTela(){if(!afastamentosPodeEditar){alert('Seu acesso é somente para visualização.');return;}var s=document.getElementById('afast-militar'),raw=s?s.value:'';if(!raw){alert('Selecione o militar.');return;}var obj;try{obj=JSON.parse(decodeURIComponent(raw));}catch(e){alert('Não foi possível identificar o militar selecionado.');return;}var d={id:(document.getElementById('afast-id')||{}).value||'',rg:obj.rg||'',militar:obj.militar||'',dataInicial:(document.getElementById('afast-data-inicial')||{}).value||'',dataFinal:(document.getElementById('afast-data-final')||{}).value||'',motivo:(document.getElementById('afast-motivo')||{}).value||'',observacao:(document.getElementById('afast-observacao')||{}).value||''};google.script.run.withSuccessHandler(function(r){alert((r&&r.mensagem)||'Afastamento salvo.');limparFormularioAfastamento();carregarAfastamentos();}).withFailureHandler(capturarErroServidor).salvarAfastamento(d,sessaoToken);}
     function editarAfastamentoTela(idx){var x=afastamentosCache[idx];if(!x||!afastamentosPodeEditar)return;document.getElementById('afast-id').value=x.id||'';document.getElementById('afast-data-inicial').value=dataBrParaInputAfastamento_(x.dataInicial);document.getElementById('afast-data-final').value=dataBrParaInputAfastamento_(x.dataFinal);document.getElementById('afast-motivo').value=x.motivo||'';document.getElementById('afast-observacao').value=x.observacao||'';var s=document.getElementById('afast-militar');if(s){for(var i=0;i<s.options.length;i++){if(!s.options[i].value)continue;try{var o=JSON.parse(decodeURIComponent(s.options[i].value));if(String(o.rg||'')===String(x.rg||'')){s.selectedIndex=i;break;}}catch(e){}}}window.scrollTo({top:0,behavior:'smooth'});}
@@ -3764,6 +3781,7 @@
 
 
     function voltarMenuGestor() {
+      var dados=document.getElementById('gestor-controle-dados');if(dados)dados.style.display='none';
       var menu=document.getElementById('gestor-menu-principal');
       var ind=document.getElementById('gestor-indicadores');
       var esc=document.getElementById('gestor-escala-area');
@@ -3773,6 +3791,7 @@
     }
 
     function abrirGestorEscala() {
+      var dados=document.getElementById('gestor-controle-dados');if(dados)dados.style.display='none';
       var menu=document.getElementById('gestor-menu-principal');
       var ind=document.getElementById('gestor-indicadores');
       var esc=document.getElementById('gestor-escala-area');
@@ -3785,6 +3804,7 @@
     }
 
     function abrirGestorIndicadores() {
+      var dados=document.getElementById('gestor-controle-dados');if(dados)dados.style.display='none';
       var menu=document.getElementById('gestor-menu-principal');
       var ind=document.getElementById('gestor-indicadores');
       var esc=document.getElementById('gestor-escala-area');
@@ -3891,10 +3911,9 @@
         .withSuccessHandler(function(r) {
           var regioes = (r && r.regioes) ? r.regioes : [];
           var select = document.getElementById('sol-setor');
-          select.innerHTML = '<option value="">-- Selecione --</option>';
-          regioes.forEach(function(x) {
-            select.innerHTML += '<option value="' + escaparHtmlRoteiro(x) + '">' + escaparHtmlRoteiro(x) + '</option>';
-          });
+          select.innerHTML = '<option value="">-- Selecione --</option>'+regioes.map(function(x) {
+            return '<option value="' + escaparHtmlRoteiro(x) + '">' + escaparHtmlRoteiro(x) + '</option>';
+          }).join('');
         })
         .withFailureHandler(capturarErroServidor)
         .listarRegioesRoteiro(sessaoToken);
@@ -6963,6 +6982,25 @@
     }
 
 
+    function aplicarItensConfirmadosFilaConferencia(itens) {
+      conferenciaFilaUltimaAplicada=++conferenciaFilaSequencia;
+      var indices=new Map();
+      conferenciaFilaCache.forEach(function(x,i){indices.set(String(x.protocolo),i);});
+      itens.forEach(function(x){var chave=String(x.protocolo),i=indices.get(chave);
+        if(i===undefined){indices.set(chave,conferenciaFilaCache.length);conferenciaFilaCache.push(x);}
+        else conferenciaFilaCache[i]=x;
+      });
+      var disponiveis=0,verificacao=0,meus=0,rg=String(usuarioLogado&&usuarioLogado.rg||'');
+      conferenciaFilaCache.forEach(function(x){
+        if(x.estadoInterno==='DISPONÍVEL')disponiveis++;
+        if(x.estadoInterno==='EM VERIFICAÇÃO'){verificacao++;if(String(x.rgConferente||'')===rg)meus++;}
+      });
+      document.getElementById('conf-count-disponivel').textContent=disponiveis;
+      document.getElementById('conf-count-verificacao').textContent=verificacao;
+      document.getElementById('conf-count-meus').textContent=meus;
+      renderizarFilaConferencia();
+    }
+
     function assumirSelecionadosConferencia() {
       var checks = [].slice.call(document.querySelectorAll('.conf-fila-check:checked'));
       var protocolos = checks.map(function(c) {
@@ -6992,7 +7030,8 @@
           var qtd = Number((r && r.assumidos) || 0);
           var conflitos = (r && r.conflitos) ? r.conflitos : [];
 
-          carregarFilaConferencia();
+          if(r && Array.isArray(r.itens)) aplicarItensConfirmadosFilaConferencia(r.itens);
+          else carregarFilaConferencia();
 
           var msg = qtd + ' protocolo(s) assumido(s) com sucesso.';
           if (conflitos.length) {
@@ -7018,6 +7057,7 @@
 
     function carregarFilaConferencia(silencioso) {
       var tb = document.getElementById('conf-fila-tbody');
+      if (conferenciaConclusaoEmAndamento) { conferenciaFilaAtualizacaoPendente=true;return; }
 
       // Se já existe uma leitura em andamento, não dispara outra.
       // Apenas registra que deverá atualizar novamente ao terminar.
@@ -7031,7 +7071,7 @@
 
       var minhaSequencia = ++conferenciaFilaSequencia;
 
-      if (!silencioso) {
+      if (!silencioso && !conferenciaFilaCache.length) {
         tb.innerHTML = '<tr><td colspan="10" class="text-center py-4"><div class="spinner-border spinner-border-sm"></div></td></tr>';
       }
 
@@ -7040,7 +7080,7 @@
           conferenciaFilaCarregando = false;
 
           // Uma resposta antiga nunca pode substituir dados mais novos na tela.
-          if (minhaSequencia < conferenciaFilaUltimaAplicada) {
+          if (conferenciaConclusaoEmAndamento || minhaSequencia < conferenciaFilaUltimaAplicada) {
             if (conferenciaFilaAtualizacaoPendente) {
               conferenciaFilaAtualizacaoPendente = false;
               carregarFilaConferencia(true);
@@ -7110,16 +7150,8 @@
 
       google.script.run
         .withSuccessHandler(function(r) {
-          carregarFilaConferencia(true);
-
           var atualizado = (r && r.item) ? r.item : x;
-          var pos = conferenciaFilaCache.findIndex(function(i) {
-            return i.protocolo === atualizado.protocolo;
-          });
-
-          if (pos >= 0) conferenciaFilaCache[pos] = atualizado;
-          else conferenciaFilaCache.push(atualizado);
-
+          aplicarItensConfirmadosFilaConferencia([atualizado]);
           abrirTrabalhoComItemConferencia(atualizado);
         })
         .withFailureHandler(capturarErroServidor)
@@ -7172,16 +7204,18 @@
 
 
     function liberarProtocoloConferenciaAtual() {
+      if(conferenciaConclusaoEmAndamento)return;
       var protocolo = document.getElementById('conf-trab-protocolo').value || '';
       if (!protocolo) return;
 
       if (!confirm('Liberar o protocolo ' + protocolo + ' para a fila comum?')) return;
 
       google.script.run
-        .withSuccessHandler(function() {
+        .withSuccessHandler(function(r) {
           var modal = bootstrap.Modal.getInstance(document.getElementById('modal-conferencia-trabalho'));
           if (modal) modal.hide();
-          carregarFilaConferencia();
+          if(r && r.item) aplicarItensConfirmadosFilaConferencia([r.item]);
+          else carregarFilaConferencia();
         })
         .withFailureHandler(capturarErroServidor)
         .liberarProtocoloConferencia(protocolo, sessaoToken);
@@ -7189,6 +7223,31 @@
 
 
     var conferenciaConclusaoEmAndamento = false;
+    var conferenciaConclusaoNaoConfirmada = null;
+    window.addEventListener('beforeunload',function(event){
+      if(conferenciaConclusaoEmAndamento || conferenciaConclusaoNaoConfirmada){event.preventDefault();event.returnValue='';}
+    });
+    function informarGravacaoConferencia(texto,erro) {
+      var el=document.getElementById('conf-gravacao-status');
+      if(el){el.style.display='block';el.className='alert '+(erro?'alert-warning':'alert-info');el.textContent=texto;}
+      var recuperar=document.getElementById('conf-gravacao-recuperar');
+      if(recuperar)recuperar.style.display=erro?'block':'none';
+    }
+    function retomarConclusaoNaoConfirmada() {
+      var d=conferenciaConclusaoNaoConfirmada;if(!d||conferenciaConclusaoEmAndamento)return;
+      abrirTrabalhoComItemConferencia(d.item);
+      document.getElementById('conf-trab-status').value=d.status;
+      document.getElementById('conf-trab-observacao').value=d.observacao;
+    }
+    function descartarConclusaoNaoConfirmada() {
+      if(!conferenciaConclusaoEmAndamento && confirm('Descartar a anotação local não confirmada?')) {
+        conferenciaConclusaoNaoConfirmada=null;
+        document.getElementById('conf-gravacao-recuperar').style.display='none';
+        document.getElementById('conf-gravacao-status').style.display='none';
+        carregarFilaConferencia(true);
+      }
+    }
+
 
     function concluirProtocoloConferenciaAtual() {
       if (conferenciaConclusaoEmAndamento) return;
@@ -7214,7 +7273,26 @@
         )
       ) return;
 
+      if(conferenciaConclusaoNaoConfirmada && conferenciaConclusaoNaoConfirmada.item.protocolo!==protocolo) {
+        alert('Reabra ou descarte a anotação não confirmada antes de concluir outro protocolo.');return;
+      }
+      var indiceAnterior=conferenciaFilaCache.findIndex(function(x){return String(x.protocolo)===String(protocolo);});
+      var itemAnterior=indiceAnterior>=0?Object.assign({},conferenciaFilaCache[indiceAnterior]):null;
+      if(!itemAnterior){alert('Atualize a fila antes de concluir este protocolo.');return;}
       conferenciaConclusaoEmAndamento = true;
+      // A tela reage já; somente a resposta do servidor confirma a gravação.
+      conferenciaFilaUltimaAplicada=++conferenciaFilaSequencia;
+      conferenciaFilaCache.splice(indiceAnterior,1);
+      renderizarFilaConferencia();
+      var modalPendente=bootstrap.Modal.getInstance(document.getElementById('modal-conferencia-trabalho'));
+      if(modalPendente){
+        var elementoModal=document.getElementById('modal-conferencia-trabalho');
+        // Bootstrap 5.3 ignora hide durante a abertura, inclusive antes de
+        // adicionar a classe show (animação do fundo). Fecha ao terminar.
+        if(modalPendente._isShown && modalPendente._isTransitioning)elementoModal.addEventListener('shown.bs.modal',function(){modalPendente.hide();},{once:true});
+        modalPendente.hide();
+      }
+      informarGravacaoConferencia('Salvando protocolo '+protocolo+' na planilha. Aguarde a confirmação antes de fechar.',false);
       var botao = document.getElementById('conf-btn-concluir');
       if (botao) botao.disabled = true;
       function finalizarConclusao() {
@@ -7225,6 +7303,8 @@
       google.script.run
         .withSuccessHandler(function(r) {
           finalizarConclusao();
+          conferenciaConclusaoNaoConfirmada=null;
+          informarGravacaoConferencia('Protocolo '+protocolo+' salvo na planilha.',false);
           r = r || {};
           // Uma fila solicitada antes desta gravação não pode desfazer o resultado local.
           conferenciaFilaUltimaAplicada = ++conferenciaFilaSequencia;
@@ -7295,17 +7375,24 @@
             alert(r.mensagem);
           }
 
-          // Depois da resposta rápida, busca silenciosamente qualquer protocolo
-          // novo/importado por outra pessoa. Não mostra spinner nem bloqueia.
-          setTimeout(function() {
+          // Reconsulta apenas se houve solicitação durante a gravação. O timer
+          // normal mantém a atualização entre usuários, sem uma leitura por conclusão.
+          if(conferenciaFilaAtualizacaoPendente) {
+            conferenciaFilaAtualizacaoPendente=false;
             carregarFilaConferencia(true);
-          }, 50);
+          }
 
           // Não recarrega automaticamente a tela de Atribuição.
           // Ela será atualizada quando o usuário abrir/atualizar essa aba.
         })
         .withFailureHandler(function(err) {
           finalizarConclusao();
+          conferenciaFilaUltimaAplicada=++conferenciaFilaSequencia;
+          if(!conferenciaFilaCache.some(function(x){return String(x.protocolo)===String(protocolo);})) conferenciaFilaCache.splice(Math.min(indiceAnterior,conferenciaFilaCache.length),0,itemAnterior);
+          conferenciaConclusaoNaoConfirmada={item:itemAnterior,status:status,observacao:observacao};
+          renderizarFilaConferencia();
+          informarGravacaoConferencia('Gravação de '+protocolo+' não confirmada. Sua anotação foi mantida nesta sessão. Atualize a fila para conferir a situação antes de tentar novamente.',true);
+          conferenciaFilaAtualizacaoPendente=false;
           capturarErroServidor(err);
         })
         .concluirProtocoloConferencia(
@@ -7522,12 +7609,10 @@
           if (!select) return;
 
           var atual = select.value || '';
-          select.innerHTML = '<option value="">-- Opcional --</option>';
-
-          regioes.forEach(function(x) {
-            select.innerHTML += '<option value="' + escaparHtmlRoteiro(x) + '">' +
+          select.innerHTML = '<option value="">-- Opcional --</option>'+regioes.map(function(x) {
+            return '<option value="' + escaparHtmlRoteiro(x) + '">' +
               escaparHtmlRoteiro(x) + '</option>';
-          });
+          }).join('');
 
           if (atual) select.value = atual;
         })
@@ -9307,40 +9392,70 @@
 
 
     var rascunhosArquivadosTela = [];
-    var dataConsultaArquivoRascunhos = '';
-    function abrirRascunhosArquivados() {
-      var data = document.getElementById('rot-data-roteiro').value;
-      if (!data) { alert('Selecione a data do roteiro.'); return; }
-      dataConsultaArquivoRascunhos = data;
-      bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-rascunhos-arquivados')).show();
-      consultarRascunhosArquivadosTela();
+    var arquivoConsultaSequencia = 0;
+    var controleDadosOcupado = false;
+    function abrirControleDadosGestor() {
+      if (!usuarioLogado || !usuarioLogado.permissoes || !usuarioLogado.permissoes.gestor) return;
+      voltarMenuGestor();
+      document.getElementById('gestor-menu-principal').style.display='none';
+      document.getElementById('gestor-controle-dados').style.display='block';
+      carregarControleDadosGestor();
+    }
+    function apresentarControleDadosGestor(c) {
+      var el=document.getElementById('controle-dados-status');
+      el.textContent=(c.ativo?'Arquivamento diário ativo.':'Arquivamento pausado.')+' Prazo: 15 dias sem atividade. Até 50 rascunhos por execução, por volta das 03h de São Paulo.';
+      var link=document.getElementById('controle-dados-link');
+      link.style.display=c.arquivoUrl?'inline-block':'none';
+      if(c.arquivoUrl)link.href=c.arquivoUrl;
+    }
+    function bloquearControleDadosGestor(ocupado) {
+      controleDadosOcupado=ocupado;
+      document.querySelectorAll('#controle-dados-acoes button').forEach(function(b){b.disabled=ocupado;});
+    }
+    function carregarControleDadosGestor() {
+      if(controleDadosOcupado)return;
+      bloquearControleDadosGestor(true);
+      google.script.run.withSuccessHandler(function(r){
+        bloquearControleDadosGestor(false);apresentarControleDadosGestor(r.controle);
+        document.getElementById('controle-dados-status').textContent+=' Elegíveis agora: '+r.resumo.elegiveis+'. Datas inválidas preservadas: '+r.resumo.datasInvalidasPreservadas+'.';
+      }).withFailureHandler(function(err){
+        bloquearControleDadosGestor(false);document.getElementById('controle-dados-status').textContent='Não foi possível consultar/ativar: '+(err.message||String(err));
+      }).obterControleDadosGestor(sessaoToken);
+    }
+    function alterarArquivoGestor(acao) {
+      if(controleDadosOcupado)return;
+      bloquearControleDadosGestor(true);
+      document.getElementById('controle-dados-status').textContent='Processando '+(acao==='executar'?'o lote de até 50 rascunhos':'a configuração')+'...';
+      google.script.run.withSuccessHandler(function(r){
+        bloquearControleDadosGestor(false);apresentarControleDadosGestor(r.controle);
+        if(acao==='executar') document.getElementById('controle-dados-status').textContent+=' Arquivados neste lote: '+Number(r.resultado.arquivados||0)+(r.resultado.ocupado?' — sistema ocupado, tente novamente mais tarde.':'.');
+      }).withFailureHandler(function(err){
+        bloquearControleDadosGestor(false);document.getElementById('controle-dados-status').textContent=err.message||String(err);
+      }).gerenciarArquivoRascunhosGestor(acao,sessaoToken);
     }
     function consultarRascunhosArquivadosTela() {
-      var status = document.getElementById('arquivo-rascunhos-status');
-      var tbody = document.getElementById('arquivo-rascunhos-tbody');
-      status.textContent = 'Consultando rascunhos arquivados...'; tbody.innerHTML = '';
-      google.script.run.withSuccessHandler(function(r) {
-        rascunhosArquivadosTela = r.itens || [];
-        status.textContent = !r.configurado ? 'O arquivamento ainda não foi ativado pelo responsável.' :
-          'Data: ' + dataConsultaArquivoRascunhos.split('-').reverse().join('/') + ' — ' + (r.total || 0) + ' registro(s). Exibindo os últimos 100, no máximo.';
-        tbody.innerHTML = rascunhosArquivadosTela.map(function(x, i) {
-          return '<tr><td>'+escaparHtmlRoteiro(x.protocolo)+'</td><td>'+escaparHtmlRoteiro(x.status)+'</td><td>'+escaparHtmlRoteiro(x.arquivadoEm)+'</td><td>' +
-            (x.restauradoEm ? 'Recuperado em '+escaparHtmlRoteiro(x.restauradoEm) : '<button class="btn btn-sm btn-primary" onclick="recuperarRascunhoArquivadoTela('+i+',this)">Recuperar</button>') + '</td></tr>';
+      var data=document.getElementById('arquivo-rascunhos-data').value;
+      var status=document.getElementById('arquivo-rascunhos-status');
+      if(!data){status.textContent='Selecione a data original do roteiro.';return;}
+      var sequencia=++arquivoConsultaSequencia;
+      var tbody=document.getElementById('arquivo-rascunhos-tbody');
+      status.textContent='Consultando...';tbody.innerHTML='';
+      google.script.run.withSuccessHandler(function(r){
+        if(sequencia!==arquivoConsultaSequencia)return;
+        rascunhosArquivadosTela=r.itens||[];
+        status.textContent=!r.configurado?'Arquivo ainda não configurado.':data.split('-').reverse().join('/')+' — '+(r.total||0)+' registro(s). Até os 100 mais recentes.';
+        tbody.innerHTML=rascunhosArquivadosTela.map(function(x,i){
+          return '<tr><td>'+escaparHtmlRoteiro(x.protocolo)+'</td><td>'+escaparHtmlRoteiro(x.status)+'</td><td>'+escaparHtmlRoteiro(x.arquivadoEm)+'</td><td>'+
+            (x.restauradoEm?'Recuperado em '+escaparHtmlRoteiro(x.restauradoEm):'<button class="btn btn-sm btn-primary" onclick="recuperarRascunhoArquivadoTela('+i+',this)">Recuperar</button>')+'</td></tr>';
         }).join('');
-      }).withFailureHandler(function(err) { status.textContent = err.message || String(err); }).listarRascunhosArquivados(dataConsultaArquivoRascunhos,sessaoToken);
+      }).withFailureHandler(function(err){if(sequencia===arquivoConsultaSequencia)status.textContent=err.message||String(err);}).listarRascunhosArquivados(data,sessaoToken);
     }
-    function recuperarRascunhoArquivadoTela(indice, botao) {
-      var item = rascunhosArquivadosTela[indice];
-      if (!item) return;
-      botao.disabled = true;
-      google.script.run.withSuccessHandler(function() {
-        consultarRascunhosArquivadosTela();
-        if (document.getElementById('rot-data-roteiro').value === dataConsultaArquivoRascunhos && !dadosSiapiRoteiro.length) carregarRascunhosRoteiro();
-        else alert('Rascunho recuperado. Reabra a data após concluir o trabalho da lista atual para consultá-lo.');
-      }).withFailureHandler(function(err) {
-        botao.disabled = false;
-        document.getElementById('arquivo-rascunhos-status').textContent = err.message || String(err);
-      }).restaurarRascunhoArquivado(item.id,sessaoToken);
+    function recuperarRascunhoArquivadoTela(indice,botao) {
+      var item=rascunhosArquivadosTela[indice];if(!item)return;
+      botao.disabled=true;
+      google.script.run.withSuccessHandler(function(){consultarRascunhosArquivadosTela();})
+        .withFailureHandler(function(err){botao.disabled=false;document.getElementById('arquivo-rascunhos-status').textContent=err.message||String(err);})
+        .restaurarRascunhoArquivado(item.id,sessaoToken);
     }
 
     function carregarRascunhosRoteiro() {
@@ -9389,6 +9504,10 @@
 
 
     function sairDoSistema() {
+      if(conferenciaConclusaoEmAndamento){alert('Aguarde a confirmação da gravação antes de sair.');return;}
+      if(conferenciaConclusaoNaoConfirmada && !confirm('Há uma anotação de Conferência não confirmada. Sair e descartá-la?'))return;
+      conferenciaConclusaoNaoConfirmada=null;
+      conferenciaFilaCache=[];
       var tokenAtual = sessaoToken;
 
       limparSessaoLocal();
@@ -9504,9 +9623,7 @@
 
           var select = document.getElementById('extra-militar-select'); if (!select) return;
 
-          select.innerHTML = '<option value="">-- Selecione um Militar Cadastrado --</option>';
-
-          lista.forEach(function(m, idx) { select.innerHTML += '<option value="' + idx + '">RG ' + m.rg + ' - ' + m.nome + '</option>'; });
+          select.innerHTML = '<option value="">-- Selecione um Militar Cadastrado --</option>'+lista.map(function(m,idx){return '<option value="'+idx+'">RG '+escaparHtmlRoteiro(m.rg)+' - '+escaparHtmlRoteiro(m.nome)+'</option>';}).join('');
 
         })
 

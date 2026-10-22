@@ -1162,18 +1162,18 @@ function obterIndicadoresGestor(token) {
   var pendentesVistoria = 0;
   var pend = ss.getSheetByName("PENDENCIAS_VISTORIAS");
   if (pend && pend.getLastRow() >= 2) {
-    var pv = pend.getRange(2,1,pend.getLastRow()-1,Math.min(pend.getLastColumn(),22)).getDisplayValues();
+    var pv = pend.getRange(2,5,pend.getLastRow()-1,1).getDisplayValues();
     pv.forEach(function(r) {
-      if (String(r[4] || "").trim().toUpperCase() === "PENDENTE") pendentesVistoria++;
+      if (String(r[0] || "").trim().toUpperCase() === "PENDENTE") pendentesVistoria++;
     });
   }
 
   var solicitacoesAtendimento = 0;
   var sol = ss.getSheetByName("SOLICITACOES_VISTORIA");
   if (sol && sol.getLastRow() >= 2) {
-    var sv = sol.getRange(2,1,sol.getLastRow()-1,Math.min(sol.getLastColumn(),12)).getDisplayValues();
+    var sv = sol.getRange(2,10,sol.getLastRow()-1,1).getDisplayValues();
     sv.forEach(function(r) {
-      if (String(r[9] || "").trim().toUpperCase() === "PENDENTE") solicitacoesAtendimento++;
+      if (String(r[0] || "").trim().toUpperCase() === "PENDENTE") solicitacoesAtendimento++;
     });
   }
 
@@ -1181,9 +1181,9 @@ function obterIndicadoresGestor(token) {
   var conferenciaVerificacao = 0;
   var conf = ss.getSheetByName("CONFERENCIA_PROTOCOLOS");
   if (conf && conf.getLastRow() >= 2) {
-    var cv = conf.getRange(2,1,conf.getLastRow()-1,Math.min(conf.getLastColumn(),27)).getDisplayValues();
+    var cv = conf.getRange(2,10,conf.getLastRow()-1,1).getDisplayValues();
     cv.forEach(function(r) {
-      var estado = String(r[9] || "").trim().toUpperCase();
+      var estado = String(r[0] || "").trim().toUpperCase();
       if (estado === "DISPONÍVEL" || estado === "DISPONIVEL") conferenciaDisponivel++;
       if (estado === "EM VERIFICAÇÃO" || estado === "EM VERIFICACAO") conferenciaVerificacao++;
     });
@@ -1191,9 +1191,9 @@ function obterIndicadoresGestor(token) {
 
   var docsPendentes=0, isencoesPendentes=0, tacsVigentes=0;
   var docs=garantirEstruturaDocsDespacho_();
-  if(docs.getLastRow()>=2){docs.getRange(2,1,docs.getLastRow()-1,23).getDisplayValues().forEach(function(r){var st=String(r[2]||"").trim().toUpperCase(),tp=String(r[3]||"").trim().toUpperCase();if(st!=="CONCLUÍDO"&&st!=="ARQUIVADO")docsPendentes++;if(tp==="ISENÇÃO DE TAXA"&&!String(r[17]||"").trim())isencoesPendentes++;});}
+  if(docs.getLastRow()>=2){docs.getRange(2,3,docs.getLastRow()-1,16).getDisplayValues().forEach(function(r){var st=String(r[0]||"").trim().toUpperCase(),tp=String(r[1]||"").trim().toUpperCase();if(st!=="CONCLUÍDO"&&st!=="ARQUIVADO")docsPendentes++;if(tp==="ISENÇÃO DE TAXA"&&!String(r[15]||"").trim())isencoesPendentes++;});}
   var tacs=garantirEstruturaTacs_();
-  if(tacs.getLastRow()>=2)tacs.getRange(2,1,tacs.getLastRow()-1,12).getDisplayValues().forEach(function(r){if(String(r[8]||"").trim().toUpperCase()==="VIGENTE")tacsVigentes++;});
+  if(tacs.getLastRow()>=2)tacs.getRange(2,9,tacs.getLastRow()-1,1).getDisplayValues().forEach(function(r){if(String(r[0]||"").trim().toUpperCase()==="VIGENTE")tacsVigentes++;});
 
   return {
     sucesso:true,
@@ -1712,7 +1712,12 @@ function obterHistoricoDocDespacho(docId, token) {
   var aba=garantirHistoricoDocsDespacho_(), eventos=[];
   if(aba.getLastRow()<2) return {sucesso:true,eventos:eventos};
 
-  var vals=aba.getRange(2,1,aba.getLastRow()-1,10).getDisplayValues();
+  var linhasDoc=[];
+  aba.getRange(2,2,aba.getLastRow()-1,1).getDisplayValues().forEach(function(r,i){
+    if(String(r[0]||'').trim()===docId)linhasDoc.push(i+2);
+  });
+  var dadosDoc=lerLinhasProtocolosRoteiro_(aba,{doc:linhasDoc},10);
+  var vals=linhasDoc.map(function(linha){return dadosDoc[linha];});
   vals.forEach(function(r){
     if(String(r[1]||"").trim()!==docId) return;
     eventos.push({
@@ -1933,7 +1938,7 @@ function obterResumoAtendimentoHoje(token) {
   var aba = garantirEstruturaAtendimentos_();
   var totalHoje = 0, totalUsuarioHoje = 0;
   if (aba.getLastRow() >= 2) {
-    var dados = aba.getRange(2,1,aba.getLastRow()-1,9).getValues();
+    var dados = aba.getRange(2,1,aba.getLastRow()-1,2).getValues();
     var hoje = new Date(); hoje.setHours(0,0,0,0);
     dados.forEach(function(r){
       var d = r[0] instanceof Date ? new Date(r[0].getTime()) : new Date(r[0]);
@@ -2630,7 +2635,7 @@ function obterResumoCredenciamento(token) {
   var exigencia = 0;
 
   if (proc.getLastRow() >= 2) {
-    proc.getRange(2,1,proc.getLastRow()-1,15).getDisplayValues().forEach(function(r) {
+    proc.getRange(2,1,proc.getLastRow()-1,12).getDisplayValues().forEach(function(r) {
       var x = objetoCredenciamentoLinha_(r);
       var estado = normalizarTextoCredenciamento_(x.estadoInterno);
       var despacho = normalizarTextoCredenciamento_(x.despacho);
@@ -2647,7 +2652,13 @@ function obterResumoCredenciamento(token) {
   var meuNome = normalizarTextoCredenciamento_(sessao.nome || sessao.nomeGuerra || "");
 
   if (hist.getLastRow() >= 2) {
-    hist.getRange(2,1,hist.getLastRow()-1,13).getDisplayValues().forEach(function(r) {
+    var linhasHoje=[];
+    hist.getRange(2,1,hist.getLastRow()-1,1).getDisplayValues().forEach(function(r,i){
+      if(String(r[0]||'').trim().indexOf(hoje)===0)linhasHoje.push(i+2);
+    });
+    var historicoHoje=lerLinhasProtocolosRoteiro_(hist,{hoje:linhasHoje},10);
+    linhasHoje.forEach(function(linha) {
+      var r=historicoHoje[linha];
       var dataHora = String(r[0] || "").trim();
       var evento = normalizarTextoCredenciamento_(r[2]);
       if (dataHora.indexOf(hoje) !== 0) return;
@@ -2775,7 +2786,7 @@ function mapaProtocolosConferencia_(aba) {
   var mapa = {};
   if (!aba || aba.getLastRow() < 2) return mapa;
 
-  var vals = aba.getRange(2,1,aba.getLastRow()-1,23).getDisplayValues();
+  var vals = aba.getRange(2,1,aba.getLastRow()-1,27).getDisplayValues();
   vals.forEach(function(r, i) {
     var p = normalizarTextoConferencia_(r[0]).replace(/\u00A0/g, " ").trim();
     if (p) mapa[p] = {linha:i+2, r:r};
@@ -3351,7 +3362,7 @@ function listarAtribuicaoConferencia(filtros, token) {
   var aba = garantirEstruturaConferenciaProtocolos_();
   if (aba.getLastRow() < 2) return {itens:[]};
 
-  var vals = aba.getRange(2,1,aba.getLastRow()-1,23).getDisplayValues();
+  var vals = aba.getRange(2,1,aba.getLastRow()-1,27).getDisplayValues();
   var itens = [];
 
   vals.forEach(function(r) {
@@ -3646,7 +3657,7 @@ function listarFilaConferencia(token) {
   }
 
   if (aba.getLastRow() >= 2) {
-    var vals = aba.getRange(2,1,aba.getLastRow()-1,23).getDisplayValues();
+    var vals = aba.getRange(2,1,aba.getLastRow()-1,27).getDisplayValues();
 
     vals.forEach(function(r) {
       var estado = normalizarMaiusculoConferencia_(r[9]);
@@ -3739,6 +3750,9 @@ function assumirProtocolosSelecionadosConferencia(protocolos, token) {
 
     var assumidos = 0;
     var conflitos = [];
+    var alteradas = [];
+    var historicos = [];
+    var itens = [];
 
     unicos.forEach(function(protocolo) {
       var achado = mapa[protocolo];
@@ -3764,11 +3778,7 @@ function assumirProtocolosSelecionadosConferencia(protocolos, token) {
         return;
       }
 
-      aba.getRange(achado.linha,10).setValue("EM VERIFICAÇÃO");
-      aba.getRange(achado.linha,11).setValue(meuRg);
-      aba.getRange(achado.linha,12).setValue(nome);
-      aba.getRange(achado.linha,16).setValue(agora);
-      aba.getRange(achado.linha,18).setValue(agora);
+      alteradas.push(achado.linha);
 
       var novo = JSON.parse(JSON.stringify(anterior));
       novo.estadoInterno = "EM VERIFICAÇÃO";
@@ -3777,25 +3787,30 @@ function assumirProtocolosSelecionadosConferencia(protocolos, token) {
       novo.assumidoEm = agora;
       novo.atualizadoEm = agora;
 
-      registrarHistoricoConferencia_(
-        protocolo,
-        novo.ciclo,
-        "ASSUMIDO",
-        sessao,
-        anterior,
-        novo,
-        "Protocolo assumido em seleção múltipla."
-      );
+      historicos.push([agora,protocolo,novo.ciclo||0,'ASSUMIDO',sessao.rg,nome,
+        anterior.estadoInterno||'',novo.estadoInterno||'',anterior.statusSiapi||'',novo.statusSiapi||'',
+        'Protocolo assumido em seleção múltipla.',snapshotConferencia_(novo)]);
+      itens.push(novo);
 
       assumidos++;
     });
 
+    if (alteradas.length) {
+      aba.getRangeList(alteradas.map(function(l){return 'J'+l;})).setValue('EM VERIFICAÇÃO');
+      aba.getRangeList(alteradas.map(function(l){return 'K'+l;})).setValue(meuRg);
+      aba.getRangeList(alteradas.map(function(l){return 'L'+l;})).setValue(nome);
+      aba.getRangeList(alteradas.map(function(l){return 'P'+l;})).setValue(agora);
+      aba.getRangeList(alteradas.map(function(l){return 'R'+l;})).setValue(agora);
+      var hist=garantirEstruturaHistoricoConferencia_();
+      hist.getRange(hist.getLastRow()+1,1,historicos.length,12).setValues(historicos);
+    }
     SpreadsheetApp.flush();
 
     return {
       sucesso:true,
       assumidos:assumidos,
-      conflitos:conflitos
+      conflitos:conflitos,
+      itens:itens
     };
   } finally {
     try { lock.releaseLock(); } catch (e) {}
@@ -3812,9 +3827,9 @@ function assumirProtocoloConferencia(protocolo, token) {
   lock.waitLock(15000);
 
   try {
-    var aba = garantirEstruturaConferenciaProtocolos_();
-    var mapa = mapaProtocolosConferencia_(aba);
-    var achado = mapa[protocolo];
+    var loc=localizarConferenciaPorProtocolo_(protocolo);
+    var aba=loc.aba;
+    var achado=loc.achado;
     if (!achado) throw new Error("Protocolo não encontrado.");
 
     var anterior = objetoConferenciaDaLinha_(achado.r);
@@ -3838,9 +3853,7 @@ function assumirProtocoloConferencia(protocolo, token) {
     var agora = dataHoraSaoPauloTexto_();
     var nome = sessao.nomeGuerra || sessao.nome || ("RG " + sessao.rg);
 
-    aba.getRange(achado.linha,10).setValue("EM VERIFICAÇÃO");
-    aba.getRange(achado.linha,11).setValue(meuRg);
-    aba.getRange(achado.linha,12).setValue(nome);
+    aba.getRange(achado.linha,10,1,3).setValues([["EM VERIFICAÇÃO",meuRg,nome]]);
     aba.getRange(achado.linha,16).setValue(agora);
     aba.getRange(achado.linha,18).setValue(agora);
 
@@ -3893,9 +3906,14 @@ function localizarConferenciaPorProtocoloRapido_(protocolo) {
 
 
 function localizarConferenciaPorProtocolo_(protocolo) {
-  var aba = garantirEstruturaConferenciaProtocolos_();
-  var mapa = mapaProtocolosConferencia_(aba);
-  return {aba:aba, achado:mapa[normalizarTextoConferencia_(protocolo)] || null};
+  var aba=garantirEstruturaConferenciaProtocolos_();
+  var alvo=normalizarTextoConferencia_(protocolo),linha=0;
+  if(alvo && aba.getLastRow()>=2) {
+    aba.getRange(2,1,aba.getLastRow()-1,1).getDisplayValues().forEach(function(r,i){
+      if(normalizarTextoConferencia_(r[0]).replace(/\u00A0/g,' ').trim()===alvo)linha=i+2;
+    });
+  }
+  return {aba:aba,achado:linha?{linha:linha,r:aba.getRange(linha,1,1,27).getDisplayValues()[0]}:null};
 }
 
 
@@ -4062,8 +4080,7 @@ function liberarProtocoloConferencia(protocolo, token) {
 
     var agora = dataHoraSaoPauloTexto_();
 
-    loc.aba.getRange(loc.achado.linha,10).setValue("DISPONÍVEL");
-    loc.aba.getRange(loc.achado.linha,11,1,2).clearContent();
+    loc.aba.getRange(loc.achado.linha,10,1,3).setValues([["DISPONÍVEL","",""]]);
     loc.aba.getRange(loc.achado.linha,16).clearContent();
     loc.aba.getRange(loc.achado.linha,18).setValue(agora);
 
@@ -4077,7 +4094,7 @@ function liberarProtocoloConferencia(protocolo, token) {
     registrarHistoricoConferencia_(protocolo,novo.ciclo,"LIBERADO",sessao,anterior,novo,"Retornado para a fila comum.");
 
     SpreadsheetApp.flush();
-    return {sucesso:true};
+    return {sucesso:true,item:novo};
   } finally {
     try { lock.releaseLock(); } catch (e) {}
   }
@@ -4216,7 +4233,7 @@ function consultarProtocolosConferencia(filtros, token) {
   var aba = garantirEstruturaConferenciaProtocolos_();
   if (aba.getLastRow() < 2) return {itens:[]};
 
-  var vals = aba.getRange(2,1,aba.getLastRow()-1,23).getDisplayValues();
+  var vals = aba.getRange(2,1,aba.getLastRow()-1,27).getDisplayValues();
   var modo = normalizarMaiusculoConferencia_(filtros.modo || "TODOS");
   var status = normalizarMaiusculoConferencia_(filtros.status);
   var dataIni = dataTextoConferencia_(filtros.dataIni);
@@ -4271,7 +4288,12 @@ function obterHistoricoConferencia(protocolo, token) {
   var aba = garantirEstruturaHistoricoConferencia_();
   if (aba.getLastRow() < 2) return {eventos:[]};
 
-  var vals = aba.getRange(2,1,aba.getLastRow()-1,12).getDisplayValues();
+  var selecionadas=[];
+  aba.getRange(2,2,aba.getLastRow()-1,1).getDisplayValues().forEach(function(r,i){
+    if(normalizarTextoConferencia_(r[0])===protocolo)selecionadas.push(i+2);
+  });
+  var valores=lerLinhasProtocolosRoteiro_(aba,{protocolo:selecionadas},12);
+  var vals=selecionadas.map(function(linha){return valores[linha];});
   var eventos = [];
 
   vals.forEach(function(r) {
@@ -12384,10 +12406,11 @@ function configuracaoArquivoRascunhos_() {
   return {origem:p.getProperty('RASCUNHO_ORIGEM_ID'),destino:p.getProperty('RASCUNHO_ARQUIVO_ID'),ativo:p.getProperty('RASCUNHO_ARQUIVAMENTO_ATIVO') === 'SIM'};
 }
 
-function instalarArquivamentoRascunhos_() {
+function instalarArquivamentoRascunhos_(somenteSeNovo) {
   var lockInstalacao=LockService.getScriptLock();lockInstalacao.waitLock(15000);
   try {
   var props = PropertiesService.getScriptProperties();
+  if(somenteSeNovo && props.getProperty('RASCUNHO_ARQUIVAMENTO_ATIVO')) return {ativo:props.getProperty('RASCUNHO_ARQUIVAMENTO_ATIVO')==='SIM'};
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var config = configuracaoArquivoRascunhos_();
   if (!ss && config.origem) ss = SpreadsheetApp.openById(config.origem);
@@ -12512,7 +12535,7 @@ function moverLoteRascunhosArquivo_(bases, agora, limite) {
 }
 
 function listarRascunhosArquivados(dataRoteiro,token) {
-  exigirPerfil_(token,['CONFERENCIA']);
+  exigirPerfil_(token,['GESTOR']);
   var config=configuracaoArquivoRascunhos_();
   if(!config.destino) return {configurado:false,itens:[]};
   var data=dataRascunhoArquivo_(dataRoteiro),chave=data && Utilities.formatDate(data,'America/Sao_Paulo','yyyy-MM-dd');
@@ -12529,7 +12552,7 @@ function listarRascunhosArquivados(dataRoteiro,token) {
 }
 
 function restaurarRascunhoArquivado(id,token) {
-  var sessao=exigirPerfil_(token,['CONFERENCIA']);
+  var sessao=exigirPerfil_(token,['GESTOR']);
   id=String(id||'').trim();if(!/^[A-Za-z0-9-]{1,100}$/.test(id)) throw new Error('Identificador inválido.');
   var lock=LockService.getScriptLock();lock.waitLock(15000);
   try {
@@ -12567,4 +12590,33 @@ function assinaturaDataRascunhoArquivo_(valor) {
 
 function garantirLinhasArquivoRascunhos_(aba,ultima) {
   if (ultima>aba.getMaxRows()) aba.insertRowsAfter(aba.getMaxRows(),ultima-aba.getMaxRows());
+}
+
+// Controle administrativo: autenticação sempre antes de abrir ou alterar o arquivo.
+function inicializarControleDadosGestor(token) {
+  exigirPerfil_(token,['GESTOR']);
+  var props=PropertiesService.getScriptProperties();
+  // Ausência da propriedade indica primeira instalação. Pausa explícita é respeitada.
+  if (!props.getProperty('RASCUNHO_ARQUIVAMENTO_ATIVO')) instalarArquivamentoRascunhos_(true);
+  var c=configuracaoArquivoRascunhos_();
+  var ativa=SpreadsheetApp.getActiveSpreadsheet();
+  if(ativa && c.origem && ativa.getId()!==c.origem)throw new Error('O arquivo configurado pertence a outra planilha. Confira as propriedades de origem e arquivo antes de ativar.');
+  return {ativo:c.ativo,configurado:!!(c.origem&&c.destino),retencaoDias:15,
+    limitePorExecucao:50,arquivoUrl:c.destino?'https://docs.google.com/spreadsheets/d/'+encodeURIComponent(c.destino)+'/edit':''};
+}
+
+function obterControleDadosGestor(token) {
+  var controle=inicializarControleDadosGestor(token);
+  var resumo=simularArquivamentoRascunhos_();
+  return {controle:controle,resumo:resumo};
+}
+
+function gerenciarArquivoRascunhosGestor(acao,token) {
+  exigirPerfil_(token,['GESTOR']);
+  var resultado;
+  if(acao==='ativar') resultado=instalarArquivamentoRascunhos_();
+  else if(acao==='pausar') resultado=desativarArquivamentoRascunhos_();
+  else if(acao==='executar') resultado=executarArquivamentoRascunhos_();
+  else throw new Error('Ação inválida.');
+  return {resultado:resultado,controle:inicializarControleDadosGestor(token)};
 }
