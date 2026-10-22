@@ -3649,8 +3649,9 @@ function listarFilaConferencia(token) {
     var vals = aba.getRange(2,1,aba.getLastRow()-1,23).getDisplayValues();
 
     vals.forEach(function(r) {
+      var estado = normalizarMaiusculoConferencia_(r[9]);
+      if (estado !== 'DISPONÍVEL' && estado !== 'EM VERIFICAÇÃO') return;
       var x = objetoConferenciaDaLinha_(r);
-      var estado = normalizarMaiusculoConferencia_(x.estadoInterno);
 
       // Só contam registros operacionais válidos.
       if (estado === "DISPONÍVEL") {
@@ -3666,31 +3667,34 @@ function listarFilaConferencia(token) {
   }
 
   var agoraOrdenacao = new Date();
-  itens.sort(function(a,b) {
-    function prioridade(x) {
-      var estado = normalizarMaiusculoConferencia_(x.estadoInterno);
-      var rg = normalizarRgCadastro_(x.rgConferente);
-      var divisao = normalizarMaiusculoConferencia_(x.divisao);
+  function prioridade(x) {
+    var estado = normalizarMaiusculoConferencia_(x.estadoInterno);
+    var rg = normalizarRgCadastro_(x.rgConferente);
+    var divisao = normalizarMaiusculoConferencia_(x.divisao);
 
-      if (divisao === "F-7") return 0;
-      if (estado === "EM VERIFICAÇÃO" && rg === meuRg) return 1;
-      if (estado === "EM VERIFICAÇÃO") return 2;
-      if (estado === "DISPONÍVEL") return 3;
-      return 4;
-    }
+    if (divisao === "F-7") return 0;
+    if (estado === "EM VERIFICAÇÃO" && rg === meuRg) return 1;
+    if (estado === "EM VERIFICAÇÃO") return 2;
+    if (estado === "DISPONÍVEL") return 3;
+    return 4;
+  }
 
-    var pa = prioridade(a);
-    var pb = prioridade(b);
+  itens = itens.map(function(item) {
+    return {item:item, prioridade:prioridade(item),
+      data:chaveDataFilaConferenciaServidor_(item, agoraOrdenacao)};
+  }).sort(function(a,b) {
+    var pa = a.prioridade;
+    var pb = b.prioridade;
     if (pa !== pb) return pa - pb;
 
-    var ka = chaveDataFilaConferenciaServidor_(a, agoraOrdenacao);
-    var kb = chaveDataFilaConferenciaServidor_(b, agoraOrdenacao);
+    var ka = a.data;
+    var kb = b.data;
     if (ka.grupo !== kb.grupo) return ka.grupo - kb.grupo;
     if (ka.mes !== kb.mes) return ka.mes - kb.mes;
     if (ka.ordem !== kb.ordem) return ka.ordem - kb.ordem;
 
-    return String(a.protocolo || "").localeCompare(String(b.protocolo || ""));
-  });
+    return String(a.item.protocolo || "").localeCompare(String(b.item.protocolo || ""));
+  }).map(function(registro) { return registro.item; });
 
   return {
     itens:itens,

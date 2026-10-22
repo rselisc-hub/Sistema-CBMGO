@@ -6104,28 +6104,22 @@
 
       popularStatusConferencia();
 
-      google.script.run
-        .withSuccessHandler(function(r) {
-          var podeAtribuir = !!(r && r.podeAtribuir);
-          usuarioLogado.permissoes.conferenciaAtribuir = podeAtribuir;
+      // As permissões vieram do login/validação de sessão. Cada consulta valida o token
+      // e inicializa suas próprias estruturas no servidor, sem uma viagem preliminar.
+      var podeAtribuir = !!usuarioLogado.permissoes.conferenciaAtribuir;
+      var navAtrib = document.getElementById('conf-nav-atribuicao');
+      if (navAtrib) navAtrib.style.display = podeAtribuir ? 'inline-block' : 'none';
+      var navAfast = document.getElementById('conf-nav-afastamentos');
+      if (navAfast) navAfast.style.display = podeAtribuir ? 'inline-block' : 'none';
 
-          var navAtrib = document.getElementById('conf-nav-atribuicao');
-          if (navAtrib) navAtrib.style.display = podeAtribuir ? 'inline-block' : 'none';
-          var navAfast = document.getElementById('conf-nav-afastamentos');
-          if (navAfast) navAfast.style.display = podeAtribuir ? 'inline-block' : 'none';
-
-          iniciarAtualizacaoAutomaticaConferencia();
-
-          if (podeAtribuir && conferenciaTelaAtual === 'atribuicao') {
-            abrirTelaAtribuicaoConferencia();
-          } else if (conferenciaTelaAtual === 'consulta') {
-            abrirTelaConsultaConferencia();
-          } else {
-            abrirTelaFilaConferencia();
-          }
-        })
-        .withFailureHandler(capturarErroServidor)
-        .prepararModuloConferencia(sessaoToken);
+      iniciarAtualizacaoAutomaticaConferencia();
+      if (podeAtribuir && conferenciaTelaAtual === 'atribuicao') {
+        abrirTelaAtribuicaoConferencia();
+      } else if (conferenciaTelaAtual === 'consulta') {
+        abrirTelaConsultaConferencia();
+      } else {
+        abrirTelaFilaConferencia();
+      }
     }
 
 
@@ -6828,32 +6822,35 @@
       var meuRg = String(usuarioLogado && usuarioLogado.rg || '');
       var agora = new Date();
 
-      return itens.slice().sort(function(a,b) {
-        function prioridadeOperacional(x) {
-          var estado = String(x.estadoInterno || '');
-          var rg = String(x.rgConferente || '');
-          var divisao = String(x.divisao || '').toUpperCase();
+      function prioridadeOperacional(x) {
+        var estado = String(x.estadoInterno || '');
+        var rg = String(x.rgConferente || '');
+        var divisao = String(x.divisao || '').toUpperCase();
 
-          // DIVISÃO F-7 é prioridade máxima na Conferência.
-          if (divisao === 'F-7') return 0;
-          if (estado === 'EM VERIFICAÇÃO' && rg === meuRg) return 1;
-          if (estado === 'EM VERIFICAÇÃO') return 2;
-          if (estado === 'DISPONÍVEL') return 3;
-          return 4;
-        }
+        // DIVISÃO F-7 é prioridade máxima na Conferência.
+        if (divisao === 'F-7') return 0;
+        if (estado === 'EM VERIFICAÇÃO' && rg === meuRg) return 1;
+        if (estado === 'EM VERIFICAÇÃO') return 2;
+        if (estado === 'DISPONÍVEL') return 3;
+        return 4;
+      }
 
-        var pa = prioridadeOperacional(a);
-        var pb = prioridadeOperacional(b);
+      return itens.map(function(item) {
+        return {item:item, prioridade:prioridadeOperacional(item),
+          data:chaveDataFilaConferencia_(item, agora)};
+      }).sort(function(a,b) {
+        var pa = a.prioridade;
+        var pb = b.prioridade;
         if (pa !== pb) return pa - pb;
 
-        var ka = chaveDataFilaConferencia_(a, agora);
-        var kb = chaveDataFilaConferencia_(b, agora);
+        var ka = a.data;
+        var kb = b.data;
         if (ka.grupo !== kb.grupo) return ka.grupo - kb.grupo;
         if (ka.mes !== kb.mes) return ka.mes - kb.mes;
         if (ka.ordem !== kb.ordem) return ka.ordem - kb.ordem;
 
-        return String(a.protocolo || '').localeCompare(String(b.protocolo || ''));
-      });
+        return String(a.item.protocolo || '').localeCompare(String(b.item.protocolo || ''));
+      }).map(function(registro) { return registro.item; });
     }
 
     function renderizarFilaConferencia() {
@@ -6885,10 +6882,16 @@
         return;
       }
 
+      var indicesPorProtocolo = Object.create(null);
+      conferenciaFilaCache.forEach(function(item, i) {
+        var chave = String(item.protocolo || '');
+        if (!Object.prototype.hasOwnProperty.call(indicesPorProtocolo, chave)) {
+          indicesPorProtocolo[chave] = i;
+        }
+      });
+
       tb.innerHTML = itens.map(function(x) {
-        var idx = conferenciaFilaCache.findIndex(function(item) {
-          return item.protocolo === x.protocolo;
-        });
+        var idx = indicesPorProtocolo[String(x.protocolo || '')];
 
         var meu = String(x.rgConferente || '') === meuRg;
         var emVer = x.estadoInterno === 'EM VERIFICAÇÃO';
