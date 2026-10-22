@@ -4563,6 +4563,7 @@ function salvarRascunhosRoteiro(itens, dataRoteiro, token) {
     var novos = 0;
     var reativados = 0;
     var jaRascunho = 0;
+    var retomados = [];
     var bloqueadosMesmoDia = 0;
 
     protocolos.forEach(function(protocolo) {
@@ -4612,6 +4613,7 @@ function salvarRascunhosRoteiro(itens, dataRoteiro, token) {
       // não duplica, mas devolve para a tela e sinaliza.
       if (linhaAtiva) {
         jaRascunho++;
+        retomados.push('T'+linhaAtiva);
         itensTela.push(itemRascunhoRoteiroDaLinha_(dadosAtivos));
         return;
       }
@@ -4676,6 +4678,8 @@ function salvarRascunhosRoteiro(itens, dataRoteiro, token) {
       }
     });
 
+    if (retomados.length) aba.getRangeList(retomados).setValue(agora);
+
     // Somente as linhas realmente novas são acrescentadas ao final.
     if (linhasNovas.length) {
       aba.getRange(
@@ -4705,6 +4709,9 @@ function salvarRascunhosRoteiro(itens, dataRoteiro, token) {
 
 function obterRascunhosRoteiro(dataRoteiro, token) {
   exigirPerfil_(token, ["CONFERENCIA"]);
+  var lockArquivo = LockService.getScriptLock();
+  lockArquivo.waitLock(15000);
+  try {
 
   var dataObj = criarDataSegura(dataRoteiro);
 
@@ -4720,6 +4727,7 @@ function obterRascunhosRoteiro(dataRoteiro, token) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var aba = garantirEstruturaRascunhoRoteiro_();
   var itens = [];
+  var retomados = [];
 
   // Protocolos já efetivamente distribuídos nesta data.
   // Esta proteção impede que um rascunho antigo/stale volte para a tela.
@@ -4771,6 +4779,7 @@ function obterRascunhosRoteiro(dataRoteiro, token) {
         return;
       }
 
+      retomados.push('T'+(idx+2));
       itens.push({
         protocolo:r[1],
         servico:r[2],
@@ -4800,6 +4809,8 @@ function obterRascunhosRoteiro(dataRoteiro, token) {
     }
   }
 
+  if (retomados.length) aba.getRangeList(retomados).setValue(dataHoraSaoPauloTexto_());
+
   return {
     sucesso:true,
     itens:itens,
@@ -4810,6 +4821,7 @@ function obterRascunhosRoteiro(dataRoteiro, token) {
         "dd/MM/yyyy"
       )
   };
+  } finally { lockArquivo.releaseLock(); }
 }
 
 
@@ -4849,7 +4861,7 @@ function removerRascunhosSelecionadosRoteiro(protocolos, dataRoteiro, token) {
           mapaProtocolos[protocolo] &&
           String(vals[i][20] || "").trim().toUpperCase() === "RASCUNHO"
         ) {
-          aba.getRange(i+2,21).setValue("REMOVIDO");
+          aba.getRange(i+2,20,1,2).setValues([[dataHoraSaoPauloTexto_(),"REMOVIDO"]]);
           removidos++;
         }
       }
@@ -4873,6 +4885,7 @@ function limparRascunhosRoteiroData(dataRoteiro, token) {
   try {
     var aba = garantirEstruturaRascunhoRoteiro_();
     var removidos = 0;
+    var tocados = [];
     if (aba.getLastRow() >= 2) {
       var qtd = aba.getLastRow() - 1;
       var vals = aba.getRange(2,1,qtd,23).getDisplayValues();
@@ -4880,11 +4893,13 @@ function limparRascunhosRoteiroData(dataRoteiro, token) {
       vals.forEach(function(r, i) {
         if (String(r[0] || "").trim() === dataTxt && String(r[20] || "").trim().toUpperCase() === "RASCUNHO") {
           status[i][0] = "REMOVIDO";
+          tocados.push("T"+(i+2));
           removidos++;
         }
       });
       if (removidos) {
         aba.getRange(2,21,qtd,1).setValues(status);
+        aba.getRangeList(tocados).setValue(dataHoraSaoPauloTexto_());
         SpreadsheetApp.flush();
       }
     }
@@ -4897,6 +4912,9 @@ function limparRascunhosRoteiroData(dataRoteiro, token) {
 
 function removerRascunhoRoteiro(protocolo, dataRoteiro, token) {
   exigirPerfil_(token, ["CONFERENCIA"]);
+  var lockArquivo = LockService.getScriptLock();
+  lockArquivo.waitLock(15000);
+  try {
 
   protocolo = normalizarProtocoloRoteiro_(protocolo);
   var dataObj = criarDataSegura(dataRoteiro);
@@ -4913,12 +4931,13 @@ function removerRascunhoRoteiro(protocolo, dataRoteiro, token) {
         normalizarProtocoloRoteiro_(vals[i][1]) === protocolo &&
         String(vals[i][20] || "").trim().toUpperCase() === "RASCUNHO"
       ) {
-        aba.getRange(i+2,21).setValue("REMOVIDO");
+        aba.getRange(i+2,20,1,2).setValues([[dataHoraSaoPauloTexto_(),"REMOVIDO"]]);
       }
     }
   }
 
   return {sucesso:true};
+  } finally { lockArquivo.releaseLock(); }
 }
 
 
@@ -12313,4 +12332,239 @@ function lancarEscalaSEI_(dataInicio, dataFim) {
 
   return { sucesso: true, mensagem: "Escala SEI processada com sucesso! Total de " + dadosSEI.total + " militar(es) escalados.", dados: dadosSEI };
 
+}
+
+// Arquivamento exclusivo de rascunhos. Instalar uma vez pelo editor, com a conta responsável.
+function dataRascunhoArquivo_(valor) {
+  if (valor instanceof Date) return isNaN(valor.getTime()) ? null : valor;
+  var s = String(valor || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) s = s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4);
+  if (!/^\d{2}\/\d{2}\/\d{4}(?: \d{2}:\d{2}(?::\d{2})?)?$/.test(s)) return null;
+  var formato = s.length === 10 ? 'dd/MM/yyyy' : (s.length === 16 ? 'dd/MM/yyyy HH:mm' : 'dd/MM/yyyy HH:mm:ss');
+  try {
+    var d = Utilities.parseDate(s, 'America/Sao_Paulo', formato);
+    return Utilities.formatDate(d, 'America/Sao_Paulo', formato) === s ? d : null;
+  } catch (e) { return null; }
+}
+
+function planejarArquivamentoRascunhos_(linhas, agora) {
+  var corte = agora.getTime() - 15 * 24 * 60 * 60 * 1000;
+  var hoje = Utilities.formatDate(agora, 'America/Sao_Paulo', 'yyyy-MM-dd');
+  var elegiveis = [], datasInvalidas = 0;
+  linhas.forEach(function(r, i) {
+    var status = String(r[20] || '').trim().toUpperCase();
+    if (status !== 'RASCUNHO' && status !== 'REMOVIDO') return;
+    if (!String(r[1] || '').trim()) return;
+    var salvo = dataRascunhoArquivo_(r[19]), data = dataRascunhoArquivo_(r[0]);
+    if (!salvo || !data) { datasInvalidas++; return; }
+    if (salvo.getTime() <= corte &&
+        Utilities.formatDate(data, 'America/Sao_Paulo', 'yyyy-MM-dd') < hoje) elegiveis.push(i);
+  });
+  return {indices:elegiveis, datasInvalidas:datasInvalidas};
+}
+
+function configurarColunasArquivoRascunhos_(origem, destino) {
+  if (origem.getMaxColumns() < 24) origem.insertColumnsAfter(origem.getMaxColumns(), 24-origem.getMaxColumns());
+  var cabId = String(origem.getRange(1,24).getDisplayValue() || '').trim();
+  if (cabId && cabId !== 'ARQUIVO_RASCUNHO_ID') throw new Error('Coluna 24 do rascunho já está ocupada. Arquivamento não ativado.');
+  if (!cabId) origem.getRange(1,24).setValue('ARQUIVO_RASCUNHO_ID');
+  if (destino.getMaxColumns() < 30) destino.insertColumnsAfter(destino.getMaxColumns(),30-destino.getMaxColumns());
+  var cab = origem.getRange(1,1,1,23).getDisplayValues()[0].concat([
+    'ARQUIVO_RASCUNHO_ID','ARQUIVADO_EM','ARQUIVADO_POR','ORIGEM_PLANILHA_ID','ORIGEM_LINHA','RESTAURADO_EM','RESTAURADO_POR'
+  ]);
+  if (destino.getLastRow() === 0) destino.getRange(1,1,1,30).setValues([cab]);
+  else {
+    var atual = destino.getRange(1,1,1,30).getDisplayValues()[0];
+    if (JSON.stringify(atual) !== JSON.stringify(cab)) throw new Error('Cabeçalho do arquivo incompatível. Nenhum rascunho foi excluído.');
+  }
+}
+
+function configuracaoArquivoRascunhos_() {
+  var p = PropertiesService.getScriptProperties();
+  return {origem:p.getProperty('RASCUNHO_ORIGEM_ID'),destino:p.getProperty('RASCUNHO_ARQUIVO_ID'),ativo:p.getProperty('RASCUNHO_ARQUIVAMENTO_ATIVO') === 'SIM'};
+}
+
+function instalarArquivamentoRascunhos_() {
+  var lockInstalacao=LockService.getScriptLock();lockInstalacao.waitLock(15000);
+  try {
+  var props = PropertiesService.getScriptProperties();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var config = configuracaoArquivoRascunhos_();
+  if (!ss && config.origem) ss = SpreadsheetApp.openById(config.origem);
+  if (!ss) throw new Error('Abra o projeto pela planilha correta ou configure RASCUNHO_ORIGEM_ID nas propriedades do script.');
+  if (config.origem && config.origem !== ss.getId()) throw new Error('A origem configurada é diferente da planilha aberta. Confira RASCUNHO_ORIGEM_ID.');
+  var origem = ss.getSheetByName('RASCUNHO_ROTEIRO');
+  if (!origem || origem.getLastRow() < 1) throw new Error('A planilha precisa ter a aba RASCUNHO_ROTEIRO com cabeçalhos.');
+  if (config.destino === ss.getId()) throw new Error('O arquivo deve ser uma planilha separada da origem.');
+  var arquivo;
+  if (config.destino) arquivo = SpreadsheetApp.openById(config.destino);
+  else {
+    arquivo = SpreadsheetApp.create('ARQUIVO_RASCUNHOS_DIC');
+    arquivo.setSpreadsheetLocale('pt_BR');
+    arquivo.setSpreadsheetTimeZone('America/Sao_Paulo');
+    arquivo.getSheets()[0].setName('RASCUNHOS_ARQUIVADOS');
+    props.setProperty('RASCUNHO_ARQUIVO_ID',arquivo.getId());
+  }
+  var destino = arquivo.getSheetByName('RASCUNHOS_ARQUIVADOS') || arquivo.insertSheet('RASCUNHOS_ARQUIVADOS');
+  configurarColunasArquivoRascunhos_(origem,destino);
+  props.setProperty('RASCUNHO_ORIGEM_ID',ss.getId());
+  var existe = ScriptApp.getProjectTriggers().some(function(t) { return t.getHandlerFunction() === 'executarArquivamentoRascunhos_'; });
+  if (!existe) ScriptApp.newTrigger('executarArquivamentoRascunhos_').timeBased().everyDays(1).atHour(3).inTimezone('America/Sao_Paulo').create();
+  props.setProperty('RASCUNHO_ARQUIVAMENTO_ATIVO','SIM');
+  console.log('Arquivamento diário ativado, por volta das 03h de São Paulo. Arquivo: ' + arquivo.getUrl());
+  return {ativo:true,arquivoUrl:arquivo.getUrl()};
+  } finally { lockInstalacao.releaseLock(); }
+}
+
+function desativarArquivamentoRascunhos_() {
+  PropertiesService.getScriptProperties().setProperty('RASCUNHO_ARQUIVAMENTO_ATIVO','NÃO');
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'executarArquivamentoRascunhos_') ScriptApp.deleteTrigger(t);
+  });
+  return 'Arquivamento desativado. Nenhum dado foi removido.';
+}
+
+function abrirBasesArquivoRascunhos_() {
+  var c = configuracaoArquivoRascunhos_();
+  if (!c.origem || !c.destino || c.origem === c.destino) throw new Error('Arquivamento não configurado ou origem/destino inválidos.');
+  var ativa = SpreadsheetApp.getActiveSpreadsheet();
+  if (ativa && ativa.getId() !== c.origem) throw new Error('O arquivo configurado pertence a outra planilha de origem.');
+  var ss = SpreadsheetApp.openById(c.origem), arquivo = SpreadsheetApp.openById(c.destino);
+  var origem = ss.getSheetByName('RASCUNHO_ROTEIRO'), destino = arquivo.getSheetByName('RASCUNHOS_ARQUIVADOS');
+  if (!origem || !destino) throw new Error('Aba de rascunhos ou de arquivo não localizada.');
+  return {origem:origem,destino:destino,origemId:c.origem};
+}
+
+function assinaturaLinhaArquivoRascunho_(linha) {
+  return JSON.stringify(linha.map(function(v) { return v === null || v === undefined ? '' : v; }));
+}
+
+function simularArquivamentoRascunhos_() {
+  var c = configuracaoArquivoRascunhos_();
+  var ss = c.origem ? SpreadsheetApp.openById(c.origem) : SpreadsheetApp.getActiveSpreadsheet();
+  var aba = ss && ss.getSheetByName('RASCUNHO_ROTEIRO');
+  if (!aba) throw new Error('Aba RASCUNHO_ROTEIRO não encontrada.');
+  var vals = aba.getLastRow() < 2 ? [] : aba.getRange(2,1,aba.getLastRow()-1,23).getValues();
+  var plano = planejarArquivamentoRascunhos_(vals,new Date());
+  var resumo = {elegiveis:plano.indices.length,datasInvalidasPreservadas:plano.datasInvalidas,limitePorExecucao:50};
+  console.log(JSON.stringify(resumo));
+  return resumo;
+}
+
+function executarArquivamentoRascunhos_() {
+  if (!configuracaoArquivoRascunhos_().ativo) return {ativo:false,arquivados:0};
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) return {ocupado:true,arquivados:0};
+  try {
+    var bases = abrirBasesArquivoRascunhos_();
+    var resultado = moverLoteRascunhosArquivo_(bases,new Date(),50);
+    console.log(JSON.stringify(resultado));
+    return resultado;
+  } finally { lock.releaseLock(); }
+}
+
+function moverLoteRascunhosArquivo_(bases, agora, limite) {
+  var origem=bases.origem,destino=bases.destino;
+  configurarColunasArquivoRascunhos_(origem,destino);
+  var vals = origem.getLastRow() < 2 ? [] : origem.getRange(2,1,origem.getLastRow()-1,24).getValues();
+  var plano = planejarArquivamentoRascunhos_(vals,agora);
+  var idsOrigem=Object.create(null),mapaArquivo=Object.create(null);
+  vals.forEach(function(r) { if(r[23]) idsOrigem[String(r[23])]=(idsOrigem[String(r[23])]||0)+1; });
+  if (destino.getLastRow()>=2) destino.getRange(2,24,destino.getLastRow()-1,1).getDisplayValues().forEach(function(r,i) {
+    if(r[0]) { if(mapaArquivo[r[0]]) throw new Error('Identificador duplicado no arquivo. Nenhuma exclusão iniciada.'); mapaArquivo[r[0]]=i+2; }
+  });
+  var selecionados=[],novas=[],verificadas=0,colisoes=0;
+  for(var k=0;k<plano.indices.length && selecionados.length<limite;k++) {
+    var i=plano.indices[k],r=vals[i],id=String(r[23]||''),anterior=null;
+    if(id && idsOrigem[id]>1) { colisoes++;continue; }
+    if(id && mapaArquivo[id]) {
+      anterior=destino.getRange(mapaArquivo[id],1,1,30).getValues()[0];
+      if(anterior[28]) { id='';anterior=null; }
+    }
+    if(!id) { id=Utilities.getUuid();origem.getRange(i+2,24).setValue(id);r[23]=id; }
+    if(anterior) {
+      if(String(anterior[26])!==bases.origemId || assinaturaLinhaArquivoRascunho_(anterior.slice(0,24))!==assinaturaLinhaArquivoRascunho_(r)) throw new Error('Cópia arquivada diverge da origem. Nenhuma exclusão iniciada.');
+      verificadas++;
+    } else novas.push(r.slice(0,24).concat([Utilities.formatDate(agora,'America/Sao_Paulo','dd/MM/yyyy HH:mm:ss'),'AUTOMÁTICO',bases.origemId,i+2,'','']));
+    selecionados.push({linha:i+2,valores:r.slice(0,24)});
+  }
+  if(novas.length) {
+    var inicio=destino.getLastRow()+1;
+    garantirLinhasArquivoRascunhos_(destino,inicio+novas.length-1);
+    destino.getRange(inicio,1,novas.length,30).setValues(novas);
+    SpreadsheetApp.flush();
+    var conferidas=destino.getRange(inicio,1,novas.length,30).getValues();
+    if(assinaturaLinhaArquivoRascunho_(conferidas)!==assinaturaLinhaArquivoRascunho_(novas)) throw new Error('Falha ao verificar o arquivo. Nenhum rascunho foi excluído.');
+    verificadas+=novas.length;
+  }
+  if(verificadas!==selecionados.length) throw new Error('Lote incompleto. Nenhuma exclusão iniciada.');
+  // Exclui blocos de baixo para cima, rechecando os dados antes de cada exclusão.
+  var n=selecionados.length-1,removidos=0;
+  while(n>=0) {
+    var fim=n,inicioGrupo=n;
+    while(inicioGrupo>0 && selecionados[inicioGrupo-1].linha===selecionados[inicioGrupo].linha-1) inicioGrupo--;
+    var grupo=selecionados.slice(inicioGrupo,fim+1),primeira=grupo[0].linha;
+    var atuais=origem.getRange(primeira,1,grupo.length,24).getValues();
+    if(assinaturaLinhaArquivoRascunho_(atuais)!==assinaturaLinhaArquivoRascunho_(grupo.map(function(x){return x.valores;}))) throw new Error('Os rascunhos mudaram durante a operação. As cópias foram preservadas; confira antes de repetir.');
+    origem.deleteRows(primeira,grupo.length);removidos+=grupo.length;n=inicioGrupo-1;
+  }
+  return {arquivados:removidos,elegiveisAntes:plano.indices.length,datasInvalidasPreservadas:plano.datasInvalidas,idsDuplicadosPreservados:colisoes};
+}
+
+function listarRascunhosArquivados(dataRoteiro,token) {
+  exigirPerfil_(token,['CONFERENCIA']);
+  var config=configuracaoArquivoRascunhos_();
+  if(!config.destino) return {configurado:false,itens:[]};
+  var data=dataRascunhoArquivo_(dataRoteiro),chave=data && Utilities.formatDate(data,'America/Sao_Paulo','yyyy-MM-dd');
+  if(!chave) throw new Error('Selecione a data do roteiro para consultar o arquivo.');
+  var bases=abrirBasesArquivoRascunhos_(),aba=bases.destino,linhas=[];
+  if(aba.getLastRow()>=2) aba.getRange(2,1,aba.getLastRow()-1,1).getValues().forEach(function(r,i) {
+    var d=dataRascunhoArquivo_(r[0]);if(d && Utilities.formatDate(d,'America/Sao_Paulo','yyyy-MM-dd')===chave) linhas.push(i+2);
+  });
+  var mapa={data:linhas.slice(-100)},valores=lerLinhasProtocolosRoteiro_(aba,mapa,30);
+  var itens=mapa.data.map(function(linha) {
+    var r=valores[linha];return {id:String(r[26])===bases.origemId?r[23]:'',protocolo:r[1],status:r[20],arquivadoEm:r[24],restauradoEm:r[28]||''};
+  }).filter(function(item) { return !!item.id; }).reverse();
+  return {configurado:true,total:linhas.length,itens:itens};
+}
+
+function restaurarRascunhoArquivado(id,token) {
+  var sessao=exigirPerfil_(token,['CONFERENCIA']);
+  id=String(id||'').trim();if(!/^[A-Za-z0-9-]{1,100}$/.test(id)) throw new Error('Identificador inválido.');
+  var lock=LockService.getScriptLock();lock.waitLock(15000);
+  try {
+    var bases=abrirBasesArquivoRascunhos_(),origem=bases.origem,arquivo=bases.destino;
+    configurarColunasArquivoRascunhos_(origem,arquivo);
+    if(arquivo.getLastRow()<2) throw new Error('Rascunho não encontrado.');
+    var achados=arquivo.getRange(2,24,arquivo.getLastRow()-1,1).createTextFinder(id).matchEntireCell(true).findAll();
+    if(achados.length!==1) throw new Error('Rascunho não encontrado ou identificador duplicado.');
+    var linha=achados[0].getRow(),r=arquivo.getRange(linha,1,1,30).getValues()[0];
+    if(String(r[26])!==bases.origemId) throw new Error('O rascunho pertence a outra origem.');
+    if(r[28]) return {restaurado:false,jaRestaurado:true};
+    var ativos=origem.getLastRow()<2?[]:origem.getRange(2,1,origem.getLastRow()-1,24).getValues();
+    var existentes=ativos.filter(function(x){return String(x[23]||'')===id;});
+    if(existentes.length>1) throw new Error('Identificador duplicado na origem.');
+    if(!existentes.length && ativos.some(function(x){return assinaturaDataRascunhoArquivo_(x[0])===assinaturaDataRascunhoArquivo_(r[0])&&String(x[1])===String(r[1])&&String(x[20]).toUpperCase()==='RASCUNHO';})) throw new Error('Já existe rascunho ativo desse protocolo na mesma data. Nenhum dado foi sobrescrito.');
+    var agora=dataHoraSaoPauloTexto_(),volta=r.slice(0,24);
+    volta[17]=sessao.rg;volta[18]=sessao.nomeGuerra||sessao.nome||sessao.rg;volta[19]=agora;volta[20]='RASCUNHO';
+    if(existentes.length) {
+      if(String(existentes[0][20]).trim().toUpperCase()!=='RASCUNHO') throw new Error('O registro na origem já mudou de situação. Nenhum dado foi sobrescrito.');
+      var ok=existentes[0].every(function(v,i){return [17,18,19,20].indexOf(i)>=0 || assinaturaLinhaArquivoRascunho_([v])===assinaturaLinhaArquivoRascunho_([volta[i]]);});
+      if(!ok) throw new Error('O rascunho recuperado já foi editado. Nenhum dado foi sobrescrito.');
+    } else {
+      var novaLinha=origem.getLastRow()+1;garantirLinhasArquivoRascunhos_(origem,novaLinha);origem.getRange(novaLinha,1,1,24).setValues([volta]);SpreadsheetApp.flush();
+      if(assinaturaLinhaArquivoRascunho_(origem.getRange(novaLinha,1,1,24).getValues()[0])!==assinaturaLinhaArquivoRascunho_(volta)) throw new Error('Recuperação não confirmada. A cópia arquivada permanece disponível.');
+    }
+    arquivo.getRange(linha,29,1,2).setValues([[agora,String(sessao.rg)]]);
+    return {restaurado:true,protocolo:String(r[1])};
+  } finally { lock.releaseLock(); }
+}
+
+function assinaturaDataRascunhoArquivo_(valor) {
+  var d=dataRascunhoArquivo_(valor);
+  return d ? Utilities.formatDate(d,'America/Sao_Paulo','yyyy-MM-dd') : String(valor);
+}
+
+function garantirLinhasArquivoRascunhos_(aba,ultima) {
+  if (ultima>aba.getMaxRows()) aba.insertRowsAfter(aba.getMaxRows(),ultima-aba.getMaxRows());
 }

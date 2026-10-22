@@ -83,6 +83,8 @@ test('rascunhos: mantém bloqueio de distribuídos, ativos, reativação e aviso
  const items=['P1','P2','P3','P4','P4'].map(protocolo=>({protocolo}));
  const old=fixture(baseline,data),now=fixture(current,data);
  assert.deepEqual(plain(now.context.salvarRascunhosRoteiro(items,'22/10/2026','token')),plain(old.context.salvarRascunhosRoteiro(items,'22/10/2026','token')));
+ // Retomar um rascunho agora renova deliberadamente o prazo de retenção.
+ old.sheets.RASCUNHO_ROTEIRO.cells[1][19]='22/10/2026 12:00';
  assert.deepEqual(now.sheets.RASCUNHO_ROTEIRO.cells,old.sheets.RASCUNHO_ROTEIRO.cells);
 });
 test('finalização: só altera rascunhos da data e protocolos selecionados',()=>{

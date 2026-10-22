@@ -1,21 +1,18 @@
-VERSÃO PARA TESTE — SISTEMA-CBMGO
+SISTEMA-CBMGO — ARQUIVAMENTO DE RASCUNHOS
 
-1. Baixe o ZIP completo e extraia os arquivos no computador.
-2. Abra WebApp.txt no Bloco de Notas. Copie todo o conteúdo e substitua o conteúdo de WebApp.gs no Apps Script.
-3. Abra Index.txt no Bloco de Notas. Copie todo o conteúdo e substitua o conteúdo de Index.html no Apps Script.
-4. Não acrescente cópias dos mesmos códigos em outros arquivos do projeto.
-5. Salve antes de implantar. Confirme que não há erro de sintaxe.
-6. Use uma cópia da planilha e uma implantação de teste.
+1. Extraia o ZIP. Abra WebApp.txt no Bloco de Notas e substitua TODO o conteúdo de WebApp.gs no Apps Script.
+2. Abra Index.txt e substitua TODO o conteúdo de Index.html. O nome do HTML no editor deve continuar Index.
+3. Não duplique estes códigos em outros arquivos. Preserve os demais scripts do projeto. Salve e teste primeiro numa cópia da base.
+4. Para a rotina de 15 dias, execute simularArquivamentoRascunhos_ no editor: informa as contagens sem mover dados.
+5. Na conta responsável e no projeto vinculado à planilha correta, execute instalarArquivamentoRascunhos_ e autorize no Google. O log mostra o link da nova planilha ARQUIVO_RASCUNHOS_DIC.
+6. Publique uma nova versão da implantação. Atualizar o código não instala automaticamente o gatilho.
 
-WebApp.gs e WebApp.txt têm o mesmo conteúdo. Index.html e Index.txt também.
-Arquivos .txt são alternativas para copiar; não são arquivos adicionais do projeto Apps Script.
-Mantenha o HTML com o nome Index no editor. Os outros scripts existentes no projeto não estão neste pacote e devem ser preservados.
+WebApp.gs e WebApp.txt têm conteúdo idêntico; Index.html e Index.txt também. Use somente um de cada par para copiar.
 
-Inclui correção da colagem e do tratamento de capturas idênticas da Conferência, além das otimizações locais documentadas.
-57 testes locais passaram. Os tempos no Google ainda não foram validados.
-A falha de colagem de Vistorias permanece pendente. Arquivamento de 15 dias e sincronização após lançamento ainda não estão implementados.
-Nenhum dado da planilha enviada está incluído neste pacote.
+ARQUIVAMENTO: somente RASCUNHO ou REMOVIDO, há 15 dias sem atividade, com data do roteiro anterior a hoje. Abrir/retomar ou remover renova o prazo. LANÇADO e bases estatísticas são mantidos. Datas inválidas são preservadas.
+Uma planilha separada recebe a cópia verificada antes da exclusão na origem. A origem ganha a coluna 24 ARQUIVO_RASCUNHO_ID. Até 50 linhas por dia, por volta das 03h de São Paulo.
+Consulta/recuperação: tela Roteiros, botão Rascunhos arquivados, pela data original, para Conferência/Gestor. A cópia permanece no arquivo após recuperar. Não há compartilhamento automático da nova planilha.
+Se o projeto não for vinculado, configure RASCUNHO_ORIGEM_ID nas propriedades antes de instalar. Não reutilize os IDs do arquivo de teste na produção. Use uma única conta responsável, com acesso às duas planilhas; preferencialmente, implantação executando como essa conta.
+Para interromper o agendamento: executar desativarArquivamentoRascunhos_. Nenhum arquivo é apagado.
 
-Correção de interface: botão Alterar vistoriadores selecionados movido para Vistorias do Dia. Para essa correção, basta substituir Index.html e atualizar a implantação; backend inalterado.
-
-ATUALIZAÇÃO MAIS RECENTE — FILA DA CONFERÊNCIA: substituir tanto WebApp.gs quanto Index.html. Abertura direta da consulta e ordenação/renderização mais leves. A instrução anterior de atualizar somente HTML referia-se exclusivamente à correção do botão de Vistorias.
+Mantém as otimizações de Vistorias/Conferência e o tratamento de Vistoriado por. 66 testes locais passaram; nenhuma ativação ou medição no Google foi feita neste ambiente. Nenhum dado da planilha enviada está incluído no pacote.

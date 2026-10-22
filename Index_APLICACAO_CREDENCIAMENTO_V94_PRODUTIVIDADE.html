@@ -2363,6 +2363,7 @@
         <button class="btn btn-outline-danger" onclick="limparImportacaoSiapi()">
           Limpar lista inteira
         </button>
+        <button class="btn btn-outline-secondary" id="btn-arquivo-rascunhos" style="display:none" onclick="abrirRascunhosArquivados()">Rascunhos arquivados</button>
       </div>
     </div>
 
@@ -2450,6 +2451,17 @@
 
 
   <!-- Modal de confirmação da distribuição -->
+<div class="modal fade" id="modal-rascunhos-arquivados" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Rascunhos arquivados</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div>
+    <div class="modal-body"><p>Consulta pela data selecionada no roteiro. A recuperação mantém os dados salvos no arquivo.</p>
+      <div id="arquivo-rascunhos-status" role="status"></div>
+      <div class="table-responsive"><table class="table"><thead><tr><th>Protocolo</th><th>Situação original</th><th>Arquivado em</th><th>Ação</th></tr></thead><tbody id="arquivo-rascunhos-tbody"></tbody></table></div>
+    </div>
+    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button></div>
+  </div></div>
+</div>
+
   <div class="modal fade" id="modal-distribuicao-roteiro" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
@@ -3238,6 +3250,9 @@
 
       var login = document.getElementById('login-screen');
       if (login) login.style.display = 'flex';
+
+      var arquivoBtn = document.getElementById('btn-arquivo-rascunhos');
+      if (arquivoBtn) arquivoBtn.style.display = ['GESTOR','CONFERENCIA'].indexOf(perfil) >= 0 ? 'inline-block' : 'none';
 
       var userInfo = document.getElementById('user-info');
       if (userInfo) userInfo.innerHTML = '<i class="bi bi-person-circle me-1"></i> Acesso não identificado';
@@ -9290,6 +9305,43 @@
         .lancarDistribuicaoRoteiroSiapi(itens, sessaoToken);
     }
 
+
+    var rascunhosArquivadosTela = [];
+    var dataConsultaArquivoRascunhos = '';
+    function abrirRascunhosArquivados() {
+      var data = document.getElementById('rot-data-roteiro').value;
+      if (!data) { alert('Selecione a data do roteiro.'); return; }
+      dataConsultaArquivoRascunhos = data;
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-rascunhos-arquivados')).show();
+      consultarRascunhosArquivadosTela();
+    }
+    function consultarRascunhosArquivadosTela() {
+      var status = document.getElementById('arquivo-rascunhos-status');
+      var tbody = document.getElementById('arquivo-rascunhos-tbody');
+      status.textContent = 'Consultando rascunhos arquivados...'; tbody.innerHTML = '';
+      google.script.run.withSuccessHandler(function(r) {
+        rascunhosArquivadosTela = r.itens || [];
+        status.textContent = !r.configurado ? 'O arquivamento ainda não foi ativado pelo responsável.' :
+          'Data: ' + dataConsultaArquivoRascunhos.split('-').reverse().join('/') + ' — ' + (r.total || 0) + ' registro(s). Exibindo os últimos 100, no máximo.';
+        tbody.innerHTML = rascunhosArquivadosTela.map(function(x, i) {
+          return '<tr><td>'+escaparHtmlRoteiro(x.protocolo)+'</td><td>'+escaparHtmlRoteiro(x.status)+'</td><td>'+escaparHtmlRoteiro(x.arquivadoEm)+'</td><td>' +
+            (x.restauradoEm ? 'Recuperado em '+escaparHtmlRoteiro(x.restauradoEm) : '<button class="btn btn-sm btn-primary" onclick="recuperarRascunhoArquivadoTela('+i+',this)">Recuperar</button>') + '</td></tr>';
+        }).join('');
+      }).withFailureHandler(function(err) { status.textContent = err.message || String(err); }).listarRascunhosArquivados(dataConsultaArquivoRascunhos,sessaoToken);
+    }
+    function recuperarRascunhoArquivadoTela(indice, botao) {
+      var item = rascunhosArquivadosTela[indice];
+      if (!item) return;
+      botao.disabled = true;
+      google.script.run.withSuccessHandler(function() {
+        consultarRascunhosArquivadosTela();
+        if (document.getElementById('rot-data-roteiro').value === dataConsultaArquivoRascunhos && !dadosSiapiRoteiro.length) carregarRascunhosRoteiro();
+        else alert('Rascunho recuperado. Reabra a data após concluir o trabalho da lista atual para consultá-lo.');
+      }).withFailureHandler(function(err) {
+        botao.disabled = false;
+        document.getElementById('arquivo-rascunhos-status').textContent = err.message || String(err);
+      }).restaurarRascunhoArquivado(item.id,sessaoToken);
+    }
 
     function carregarRascunhosRoteiro() {
       var data = document.getElementById('rot-data-roteiro').value;
