@@ -28,6 +28,57 @@ function doGet() {
 //   CONSULTA    = reservado para configuração futura
 // ==========================================================
 
+// Verifica o cabeçalho em uma leitura. Não mantém cache de dados entre usuários.
+function gravarLinhasAlteradasLeve_(aba, linhas, totalColunas) {
+  var numeros = Object.keys(linhas).map(Number).sort(function(a,b) { return a-b; });
+  var i = 0;
+  while (i < numeros.length) {
+    var inicio = numeros[i];
+    var valores = [linhas[inicio]];
+    i++;
+    while (i < numeros.length && numeros[i] === inicio + valores.length && valores.length < 500) {
+      valores.push(linhas[numeros[i++]]);
+    }
+    aba.getRange(inicio,1,valores.length,totalColunas).setValues(valores);
+  }
+}
+
+function prepararCabecalhoLeve_(aba, cab, opcoes) {
+  opcoes = opcoes || {};
+  var vazio = aba.getLastRow() === 0;
+  var atual = vazio ? [] : aba.getRange(1,1,1,cab.length).getDisplayValues()[0];
+  var completo = vazio || (opcoes.primeiroVazio && !String(atual[0] || "").trim());
+  var alterou = false;
+  if (completo) {
+    aba.getRange(1,1,1,cab.length).setValues([cab]);
+    alterou = true;
+  } else {
+    // Escreve só blocos alterados, preservando as demais células e fórmulas.
+    var inicio = -1;
+    for (var i = 0; i <= cab.length; i++) {
+      var precisa = i < cab.length && (opcoes.substituir
+        ? String(atual[i] || "") !== cab[i]
+        : !opcoes.somenteInicial && !String(atual[i] || "").trim());
+      if (precisa && inicio < 0) inicio = i;
+      if (!precisa && inicio >= 0) {
+        aba.getRange(1,inicio+1,1,i-inicio).setValues([cab.slice(inicio,i)]);
+        inicio = -1;
+        alterou = true;
+      }
+    }
+  }
+  if (alterou) {
+    aba.setFrozenRows(1);
+    if (opcoes.cor) {
+      var faixa = aba.getRange(1,1,1,cab.length).setFontWeight("bold")
+        .setBackground(opcoes.cor).setFontColor(opcoes.texto || "#FFFFFF");
+      if (opcoes.centralizar) faixa.setHorizontalAlignment("center");
+    }
+    if (opcoes.redimensionar) aba.autoResizeColumns(1,cab.length);
+  }
+  return alterou;
+}
+
 function garantirEstruturaAcessos_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var aba = ss.getSheetByName("ACESSOS");
@@ -56,19 +107,28 @@ function garantirEstruturaAcessos_() {
 
   // Para usuários já existentes, a nova regra entra em vigor automaticamente:
   // se TROCAR_SENHA estiver vazio, marca SIM para obrigar a troca no próximo login.
-  var mapaAtual = obterMapaCabecalhosAcessos_(aba);
+  var mapaAtual = {};
+  headers.forEach(function(h,i) { mapaAtual[h] = i; });
   if (aba.getLastRow() >= 2 && mapaAtual.TROCAR_SENHA !== undefined) {
     var qtd = aba.getLastRow() - 1;
     var faixaTroca = aba.getRange(2, mapaAtual.TROCAR_SENHA + 1, qtd, 1);
     var valoresTroca = faixaTroca.getDisplayValues();
+    var trocasPendentes = [];
+    var numeroColunaTroca = mapaAtual.TROCAR_SENHA + 1;
+    var letraColunaTroca = "";
+    while (numeroColunaTroca > 0) {
+      numeroColunaTroca--;
+      letraColunaTroca = String.fromCharCode(65 + numeroColunaTroca % 26) + letraColunaTroca;
+      numeroColunaTroca = Math.floor(numeroColunaTroca / 26);
+    }
 
     for (var i = 0; i < valoresTroca.length; i++) {
       if (!String(valoresTroca[i][0] || "").trim()) {
-        valoresTroca[i][0] = "SIM";
+        trocasPendentes.push(letraColunaTroca + (i+2));
       }
     }
 
-    faixaTroca.setValues(valoresTroca);
+    if (trocasPendentes.length) aba.getRangeList(trocasPendentes).setValue("SIM");
   }
 
   aba.setFrozenRows(1);
@@ -731,15 +791,12 @@ function garantirEstruturaFuncoesPessoal_() {
   var aba=ss.getSheetByName("FUNCOES_PESSOAL");
   var cab=["RG","NOME","GRADUAÇÃO","FUNÇÕES","ATUALIZADO_EM","ATUALIZADO_POR"];
   if(!aba) aba=ss.insertSheet("FUNCOES_PESSOAL");
-  if(aba.getLastRow()===0) aba.getRange(1,1,1,cab.length).setValues([cab]);
-  else cab.forEach(function(h,i){if(!String(aba.getRange(1,i+1).getDisplayValue()||"").trim()) aba.getRange(1,i+1).setValue(h);});
-  aba.setFrozenRows(1);
-  aba.getRange(1,1,1,cab.length).setFontWeight("bold").setBackground("#4f2d7f").setFontColor("#ffffff");
+  prepararCabecalhoLeve_(aba,cab,{cor:"#4f2d7f",texto:"#ffffff"});
 
   var existentes={};
   if(aba.getLastRow()>=2){
     var vals=aba.getRange(2,1,aba.getLastRow()-1,6).getDisplayValues();
-    vals.forEach(function(r,idx){var rg=String(r[0]||"").trim();if(rg) existentes[rg]={linha:idx+2,funcoes:normalizarFuncoesPessoal_(r[3])};});
+    vals.forEach(function(r,idx){var rg=String(r[0]||"").trim();if(rg) existentes[rg]={linha:idx+2,funcoes:normalizarFuncoesPessoal_(r[3]),nome:r[1],graduacao:r[2]};});
   }
   var militares=obterMilitaresCadastroPessoal_();
   var gestores=obterGestoresPorRg_();
@@ -747,7 +804,9 @@ function garantirEstruturaFuncoesPessoal_() {
   militares.forEach(function(m){
     if(!m.rg) return;
     if(existentes[m.rg]){
-      aba.getRange(existentes[m.rg].linha,2,1,2).setValues([[m.nome,m.graduacao]]);
+      if(existentes[m.rg].nome!==m.nome || existentes[m.rg].graduacao!==m.graduacao) {
+        aba.getRange(existentes[m.rg].linha,2,1,2).setValues([[m.nome,m.graduacao]]);
+      }
       return;
     }
     var funcoes=[];
@@ -1165,16 +1224,7 @@ function garantirEstruturaAfastamentos_() {
     "LANÇADO_POR_RG","LANÇADO_POR","CRIADO_EM","ATUALIZADO_EM","STATUS"
   ];
   if (!aba) aba = ss.insertSheet("AFASTAMENTOS");
-  if (aba.getLastRow() === 0) {
-    aba.getRange(1,1,1,cab.length).setValues([cab]);
-  } else {
-    var atual = aba.getRange(1,1,1,Math.max(aba.getLastColumn(), cab.length)).getDisplayValues()[0];
-    cab.forEach(function(h, i) {
-      if (!String(atual[i] || "").trim()) aba.getRange(1,i+1).setValue(h);
-    });
-  }
-  aba.setFrozenRows(1);
-  aba.getRange(1,1,1,cab.length).setFontWeight("bold").setBackground("#6f42c1").setFontColor("#ffffff");
+  prepararCabecalhoLeve_(aba, cab, {cor:"#6f42c1",texto:"#ffffff"});
   return aba;
 }
 
@@ -1345,10 +1395,7 @@ function garantirEstruturaDocsDespacho_() {
     "DECISAO_ISENCAO","JUSTIFICATIVA_ISENCAO","CADASTRADO_EM","ATUALIZADO_EM","CHAVE_IMPORTACAO","FONTE"
   ];
   if (!aba) aba = ss.insertSheet("DOCS_DESPACHO");
-  if (aba.getLastRow() === 0) aba.getRange(1,1,1,cab.length).setValues([cab]);
-  else cab.forEach(function(h,i){ if(!String(aba.getRange(1,i+1).getDisplayValue()||"").trim()) aba.getRange(1,i+1).setValue(h); });
-  aba.setFrozenRows(1);
-  aba.getRange(1,1,1,cab.length).setFontWeight("bold").setBackground("#355a8a").setFontColor("#fff");
+  prepararCabecalhoLeve_(aba,cab,{cor:"#355a8a",texto:"#fff"});
   return aba;
 }
 
@@ -1419,7 +1466,7 @@ function consolidarDuplicadosDocsHistoricos_() {
   var aba=garantirEstruturaDocsDespacho_();
   if(aba.getLastRow()<3) return 0;
 
-  var lock=LockService.getDocumentLock();
+  var lock=LockService.getScriptLock();
   lock.waitLock(20000);
   try{
     var vals=aba.getRange(2,1,aba.getLastRow()-1,23).getDisplayValues();
@@ -1841,12 +1888,7 @@ function garantirEstruturaAtendimentos_() {
   var aba = ss.getSheetByName("ATENDIMENTOS");
   var cabecalho = ["DATA/HORA","RG_ATENDENTE","ATENDENTE","TIPO_ATENDIMENTO","SOLICITANTE","PROTOCOLO","TELEFONE","MOTIVO_ATENDIMENTO","OBSERVAÇÃO"];
   if (!aba) aba = ss.insertSheet("ATENDIMENTOS");
-  if (aba.getLastRow() === 0 || !String(aba.getRange(1,1).getDisplayValue() || "").trim()) {
-    aba.getRange(1,1,1,cabecalho.length).setValues([cabecalho]);
-  }
-  aba.setFrozenRows(1);
-  aba.getRange(1,1,1,cabecalho.length).setFontWeight("bold").setBackground("#5C1D1D").setFontColor("#FFFFFF").setHorizontalAlignment("center");
-  aba.autoResizeColumns(1,cabecalho.length);
+  prepararCabecalhoLeve_(aba, cabecalho, {primeiroVazio:true,somenteInicial:true,cor:"#5C1D1D",centralizar:true,redimensionar:true});
   return aba;
 }
 
@@ -1934,23 +1976,7 @@ function garantirEstruturaCredenciamentoProcessos_() {
     "ATUALIZADO_EM"
   ];
 
-  if (aba.getLastRow() === 0 || !String(aba.getRange(1,1).getDisplayValue() || "").trim()) {
-    aba.getRange(1,1,1,cab.length).setValues([cab]);
-  } else {
-    for (var i=0; i<cab.length; i++) {
-      if (!String(aba.getRange(1,i+1).getDisplayValue() || "").trim()) {
-        aba.getRange(1,i+1).setValue(cab[i]);
-      }
-    }
-  }
-
-  aba.setFrozenRows(1);
-  aba.getRange(1,1,1,cab.length)
-    .setFontWeight("bold")
-    .setBackground("#E8C9DB")
-    .setFontColor("#1F4E79")
-    .setHorizontalAlignment("center");
-
+  prepararCabecalhoLeve_(aba, cab, {primeiroVazio:true,cor:"#E8C9DB",texto:"#1F4E79",centralizar:true});
   return aba;
 }
 
@@ -1975,23 +2001,7 @@ function garantirEstruturaHistoricoCredenciamento_() {
     "ORIGEM"
   ];
 
-  if (aba.getLastRow() === 0 || !String(aba.getRange(1,1).getDisplayValue() || "").trim()) {
-    aba.getRange(1,1,1,cab.length).setValues([cab]);
-  } else {
-    for (var i=0; i<cab.length; i++) {
-      if (!String(aba.getRange(1,i+1).getDisplayValue() || "").trim()) {
-        aba.getRange(1,i+1).setValue(cab[i]);
-      }
-    }
-  }
-
-  aba.setFrozenRows(1);
-  aba.getRange(1,1,1,cab.length)
-    .setFontWeight("bold")
-    .setBackground("#5C1D1D")
-    .setFontColor("#FFFFFF")
-    .setHorizontalAlignment("center");
-
+  prepararCabecalhoLeve_(aba, cab, {primeiroVazio:true,cor:"#5C1D1D",centralizar:true});
   return aba;
 }
 
@@ -2085,6 +2095,8 @@ function salvarAlimentacaoCredenciamento(itens, token) {
     var agora = dataHoraSaoPauloTexto_();
     var novos = 0;
     var existentes = 0;
+    var alteradas = {};
+    var proximaLinha = aba.getLastRow()+1;
 
     itens.forEach(function(item) {
       var p = normalizarProtocoloRoteiro_(item.protocolo);
@@ -2111,15 +2123,16 @@ function salvarAlimentacaoCredenciamento(itens, token) {
       ];
 
       if (entrada) {
-        aba.getRange(entrada.linha,1,1,linha.length).setValues([linha]);
+        alteradas[entrada.linha] = linha;
         existentes++;
       } else {
-        aba.appendRow(linha);
-        mapa[p] = {linha:aba.getLastRow(), r:linha};
+        alteradas[proximaLinha] = linha;
+        mapa[p] = {linha:proximaLinha++, r:linha};
         novos++;
       }
     });
 
+    gravarLinhasAlteradasLeve_(aba, alteradas, 15);
     SpreadsheetApp.flush();
     return {
       sucesso:true,
@@ -2374,6 +2387,8 @@ function importarHistoricoCredenciamento(texto, token, substituirCargaHistorica)
     }
 
     var agora = dataHoraSaoPauloTexto_();
+    var alteradas = {};
+    var proximaLinha = proc.getLastRow()+1;
     Object.keys(porProtocolo).forEach(function(p) {
       var arr = porProtocolo[p];
       arr.sort(function(a,b) {
@@ -2403,13 +2418,14 @@ function importarHistoricoCredenciamento(texto, token, substituirCargaHistorica)
       ];
 
       if (atualEntrada) {
-        proc.getRange(atualEntrada.linha,1,1,15).setValues([linha]);
+        alteradas[atualEntrada.linha] = linha;
       } else {
-        proc.appendRow(linha);
-        mapaProc[p] = {linha:proc.getLastRow(), r:linha};
+        alteradas[proximaLinha] = linha;
+        mapaProc[p] = {linha:proximaLinha++, r:linha};
       }
     });
 
+    gravarLinhasAlteradasLeve_(proc, alteradas, 15);
     SpreadsheetApp.flush();
     return {
       sucesso:true,
@@ -2706,23 +2722,7 @@ function garantirEstruturaConferenciaProtocolos_() {
     "MOVIMENTACAO_ANTERIOR","DATA_HORA_ULTIMA_MOVIMENTACAO"
   ];
 
-  if (aba.getLastRow() === 0 || !String(aba.getRange(1,1).getDisplayValue() || "").trim()) {
-    aba.getRange(1,1,1,cab.length).setValues([cab]);
-  } else {
-    for (var i=0; i<cab.length; i++) {
-      if (!String(aba.getRange(1,i+1).getDisplayValue() || "").trim()) {
-        aba.getRange(1,i+1).setValue(cab[i]);
-      }
-    }
-  }
-
-  aba.setFrozenRows(1);
-  aba.getRange(1,1,1,cab.length)
-    .setFontWeight("bold")
-    .setBackground("#5C1D1D")
-    .setFontColor("#FFFFFF")
-    .setHorizontalAlignment("center");
-
+  prepararCabecalhoLeve_(aba, cab, {primeiroVazio:true,cor:"#5C1D1D",centralizar:true});
   return aba;
 }
 
@@ -2737,17 +2737,7 @@ function garantirEstruturaHistoricoConferencia_() {
     "ALTERACOES","SNAPSHOT"
   ];
 
-  if (aba.getLastRow() === 0 || !String(aba.getRange(1,1).getDisplayValue() || "").trim()) {
-    aba.getRange(1,1,1,cab.length).setValues([cab]);
-  }
-
-  aba.setFrozenRows(1);
-  aba.getRange(1,1,1,cab.length)
-    .setFontWeight("bold")
-    .setBackground("#5C1D1D")
-    .setFontColor("#FFFFFF")
-    .setHorizontalAlignment("center");
-
+  prepararCabecalhoLeve_(aba, cab, {primeiroVazio:true,somenteInicial:true,cor:"#5C1D1D",centralizar:true});
   return aba;
 }
 
@@ -2960,7 +2950,8 @@ function compararCapturaConferencia_(anterior, novo) {
   return mudancas.join(" | ");
 }
 
-function gravarBlocosAlteradosConferencia_(aba, matriz, indicesAlterados, totalColunas) {
+function gravarBlocosAlteradosConferencia_(aba, matriz, indicesAlterados, totalColunas, lacunaMaxima) {
+  lacunaMaxima = lacunaMaxima || 20;
   if (!indicesAlterados || !indicesAlterados.length) return;
 
   var unicos = {};
@@ -2983,7 +2974,7 @@ function gravarBlocosAlteradosConferencia_(aba, matriz, indicesAlterados, totalC
     var atual = indices[k];
 
     // Regrava pequenos intervalos juntos para reduzir chamadas ao Sheets.
-    if ((atual - fim) <= 20 && (atual - inicio) < 500) {
+    if ((atual - fim) <= lacunaMaxima && (atual - inicio) < 500) {
       fim = atual;
     } else {
       blocos.push([inicio,fim]);
@@ -3009,12 +3000,54 @@ function gravarBlocosAlteradosConferencia_(aba, matriz, indicesAlterados, totalC
 }
 
 
+function validarCapturasConferencia_(registros) {
+  var campos = ['protocolo','movimentacao','logradouro','bairro','cidade','razaoSocial','divisao','area'];
+  var recebidos = Object.create(null);
+  return registros.map(function(item, i) {
+    var captura = {};
+    campos.forEach(function(campo) {
+      if (!item || !Object.prototype.hasOwnProperty.call(item, campo) || item[campo] === undefined) {
+        throw new Error('Registro ' + (i+1) + ': campo ' + campo + ' ausente. Copie novamente do SIAPI.');
+      }
+      captura[campo] = String(item[campo] === null ? '' : item[campo])
+        .replace(/\s+/g, ' ').trim();
+    });
+    if (!/^\d{3,12}\/\d{2,4}$/.test(captura.protocolo) ||
+        !extrairDataHoraMovimentacaoConferencia_(captura.movimentacao)) {
+      throw new Error('Registro ' + (i+1) + ': protocolo ou data da movimentação inválidos. Nenhum registro foi importado.');
+    }
+    if (captura.area && !/^\d[\d., ]*$/.test(captura.area)) {
+      throw new Error('Registro ' + (i+1) + ': área inválida. Confira o alinhamento das colunas.');
+    }
+    var dataHora = extrairDataHoraMovimentacaoConferencia_(captura.movimentacao);
+    var partes = dataHora.match(/^(\d{2})\/(\d{2})\/(\d{4})(?: (\d{2}):(\d{2}):(\d{2}))?$/);
+    var dia = partes ? Number(partes[1]) : 0;
+    var mes = partes ? Number(partes[2]) : 0;
+    var ano = partes ? Number(partes[3]) : 0;
+    var calendario = new Date(ano, mes-1, dia);
+    if (!partes || calendario.getFullYear() !== ano || calendario.getMonth() !== mes-1 ||
+        calendario.getDate() !== dia || Number(partes[4] || 0) > 23 ||
+        Number(partes[5] || 0) > 59 || Number(partes[6] || 0) > 59) {
+      throw new Error('Registro ' + (i+1) + ': data da movimentação inválida.');
+    }
+    var assinatura = JSON.stringify(captura);
+    if (recebidos[captura.protocolo] && recebidos[captura.protocolo] !== assinatura) {
+      throw new Error('Registro ' + (i+1) + ': protocolo repetido com dados diferentes. Confira o lote.');
+    }
+    recebidos[captura.protocolo] = assinatura;
+    return captura;
+  });
+}
+
 function salvarCapturasConferencia(registros, token) {
   var sessao = exigirAtribuicaoConferencia_(token);
   registros = Array.isArray(registros) ? registros : [];
   if (!registros.length) throw new Error("Nenhum protocolo foi informado.");
 
-  var lock = LockService.getDocumentLock();
+  // Valida o lote inteiro antes de inicializar abas ou gravar qualquer célula.
+  registros = validarCapturasConferencia_(registros);
+
+  var lock = LockService.getScriptLock();
   lock.waitLock(30000);
 
   try {
@@ -3043,6 +3076,12 @@ function salvarCapturasConferencia(registros, token) {
 
     var novos = 0;
     var atualizados = 0;
+    var semAlteracao = 0;
+    var duplicados = 0;
+    var ultimasCapturas = [];
+    var mesmaDataSim = [];
+    var mesmaDataNao = [];
+    var primeiraImportacaoAusente = [];
     var vistos = {};
     var historicos = [];
     var novasLinhas = [];
@@ -3053,19 +3092,10 @@ function salvarCapturasConferencia(registros, token) {
         .replace(/\u00A0/g," ")
         .trim();
 
-      if (!protocolo || vistos[protocolo]) return;
+      if (vistos[protocolo]) { duplicados++; return; }
       vistos[protocolo] = true;
 
-      var captura = {
-        protocolo:protocolo,
-        movimentacao:normalizarTextoConferencia_(item.movimentacao),
-        logradouro:normalizarTextoConferencia_(item.logradouro),
-        bairro:normalizarTextoConferencia_(item.bairro),
-        cidade:normalizarTextoConferencia_(item.cidade),
-        razaoSocial:normalizarTextoConferencia_(item.razaoSocial),
-        divisao:normalizarTextoConferencia_(item.divisao),
-        area:normalizarTextoConferencia_(item.area)
-      };
+      var captura = item;
 
       var dataHoraMov =
         extrairDataHoraMovimentacaoConferencia_(captura.movimentacao);
@@ -3138,6 +3168,32 @@ function salvarCapturasConferencia(registros, token) {
 
       var linha = existentes[indice];
       var anterior = objetoConferenciaDaLinha_(linha);
+
+      var camposCapturados = ['movimentacao','logradouro','bairro','cidade','razaoSocial','divisao','area'];
+      var mudou = camposCapturados.some(function(campo) {
+        return String(anterior[campo] || '').replace(/\s+/g,' ').trim() !== captura[campo];
+      });
+      if (!mudou) {
+        // Recaptura não é movimentação: preserva estado, responsável, ciclo e ATUALIZADO_EM.
+        semAlteracao++;
+        linha[18] = agora;
+        ultimasCapturas.push('S' + (indice+2));
+        if (String(linha[23] || '') !== mesmaData) {
+          linha[23] = mesmaData;
+          (mesmaData === 'SIM' ? mesmaDataSim : mesmaDataNao).push('X' + (indice+2));
+        }
+        if (!linha[22]) {
+          linha[22] = hoje;
+          primeiraImportacaoAusente.push('W' + (indice+2));
+        }
+        // Repara metadados de bases antigas sem inventar uma alteração operacional.
+        if (String(linha[21] || '') !== dataMov || String(linha[26] || '') !== dataHoraMov) {
+          linha[21] = dataMov;
+          linha[26] = dataHoraMov;
+          indicesAlterados.push(indice);
+        }
+        return;
+      }
 
       var anteriorComparacao =
         anterior.dataHoraUltimaMovimentacao ||
@@ -3228,8 +3284,15 @@ function salvarCapturasConferencia(registros, token) {
       aba,
       existentes,
       indicesAlterados,
-      totalColunas
+      totalColunas,
+      80 // Agrupa alterações esparsas do lote; mantém o limite de 500 linhas por faixa.
     );
+
+    // Um valor comum por grupo, sem uma chamada remota por protocolo repetido.
+    if (ultimasCapturas.length) aba.getRangeList(ultimasCapturas).setValue(agora);
+    if (mesmaDataSim.length) aba.getRangeList(mesmaDataSim).setValue('SIM');
+    if (mesmaDataNao.length) aba.getRangeList(mesmaDataNao).setValue('NÃO');
+    if (primeiraImportacaoAusente.length) aba.getRangeList(primeiraImportacaoAusente).setValue(hoje);
 
     // Novos protocolos entram numa única gravação.
     if (novasLinhas.length) {
@@ -3240,6 +3303,15 @@ function salvarCapturasConferencia(registros, token) {
         totalColunas
       ).setValues(novasLinhas);
     }
+
+    // Um recibo por lote, incluindo capturas idênticas, nas mesmas colunas do histórico.
+    var resumoImportacao = {recebidos:registros.length,novos:novos,atualizados:atualizados,
+      semAlteracao:semAlteracao,duplicados:duplicados};
+    historicos.push([agora,'',0,'IMPORTAÇÃO SIAPI',sessao.rg,
+      sessao.nomeGuerra || sessao.nome || ('RG ' + sessao.rg),'','','','',
+      'Resumo da importação: ' + novos + ' novo(s), ' + atualizados +
+      ' alterado(s), ' + semAlteracao + ' sem alteração, ' + duplicados + ' duplicado(s).',
+      JSON.stringify(resumoImportacao)]);
 
     // Histórico também numa única gravação.
     if (historicos.length) {
@@ -3257,7 +3329,9 @@ function salvarCapturasConferencia(registros, token) {
       sucesso:true,
       novos:novos,
       atualizados:atualizados,
-      totalProcessados:novos + atualizados
+      semAlteracao:semAlteracao,
+      duplicados:duplicados,
+      totalProcessados:novos + atualizados + semAlteracao
     };
   } finally {
     try { lock.releaseLock(); } catch (e) {}
@@ -3325,7 +3399,7 @@ function atribuirProtocolosConferencia(protocolos, token) {
     throw new Error("Selecione pelo menos um protocolo.");
   }
 
-  var lock = LockService.getDocumentLock();
+  var lock = LockService.getScriptLock();
   lock.waitLock(30000);
 
   try {
@@ -3531,120 +3605,105 @@ function listarFilaConferencia(token) {
   var sessao = exigirPerfil_(token, ["CONFERENCIA"]);
   var meuRg = normalizarRgCadastro_(sessao.rg);
 
-  // Leitura não bloqueante:
-  // tenta sincronizar com uma gravação da própria Conferência por poucos ms,
-  // mas nunca fica parada aguardando Vistorias ou outro módulo.
-  var lock = LockService.getDocumentLock();
-  var lockObtido = false;
-  try {
-    lockObtido = lock.tryLock(150);
-  } catch (e) {
-    lockObtido = false;
-  }
+  // Consulta somente leitura: não ocupa o bloqueio das gravações.
+  var aba = garantirEstruturaConferenciaProtocolos_();
+  var itens = [];
+  var disponiveis = 0;
+  var emVerificacao = 0;
+  var concluidosHoje = 0;
+  var meusConcluidosHoje = 0;
+  var hoje = Utilities.formatDate(new Date(), "America/Sao_Paulo", "dd/MM/yyyy");
 
-  try {
-    var aba = garantirEstruturaConferenciaProtocolos_();
-    var itens = [];
-    var disponiveis = 0;
-    var emVerificacao = 0;
-    var concluidosHoje = 0;
-    var meusConcluidosHoje = 0;
-    var hoje = Utilities.formatDate(new Date(), "America/Sao_Paulo", "dd/MM/yyyy");
+  var histConf = garantirEstruturaHistoricoConferencia_();
 
-    var histConf = garantirEstruturaHistoricoConferencia_();
+  // Para os contadores, procura somente os eventos de HOJE.
+  // Não lê mais o histórico inteiro em toda atualização da fila.
+  if (histConf.getLastRow() >= 2) {
+    var achadosHoje = histConf
+      .getRange(2, 1, histConf.getLastRow() - 1, 1)
+      .createTextFinder(hoje)
+      .matchEntireCell(false)
+      .findAll();
 
-    // Para os contadores, procura somente os eventos de HOJE.
-    // Não lê mais o histórico inteiro em toda atualização da fila.
-    if (histConf.getLastRow() >= 2) {
-      var achadosHoje = histConf
-        .getRange(2, 1, histConf.getLastRow() - 1, 1)
-        .createTextFinder(hoje)
-        .matchEntireCell(false)
-        .findAll();
+    var linhasHoje = {hoje:achadosHoje.map(function(cel) { return cel.getRow(); })};
+    var historicoHoje = lerLinhasProtocolosRoteiro_(histConf, linhasHoje, 5);
+    achadosHoje.forEach(function(cel) {
+      var lr = cel.getRow();
+      var dadosHist = historicoHoje[lr].slice(3,5);
 
-      achadosHoje.forEach(function(cel) {
-        var lr = cel.getRow();
-        var dadosHist = histConf
-          .getRange(lr, 4, 1, 2)
-          .getDisplayValues()[0];
+      var evento =
+        normalizarMaiusculoConferencia_(dadosHist[0]);
+      var rgHistorico =
+        normalizarRgCadastro_(dadosHist[1]);
 
-        var evento =
-          normalizarMaiusculoConferencia_(dadosHist[0]);
-        var rgHistorico =
-          normalizarRgCadastro_(dadosHist[1]);
-
-        if (evento === "CONCLUÍDO") {
-          concluidosHoje++;
-          if (rgHistorico === meuRg) {
-            meusConcluidosHoje++;
-          }
+      if (evento === "CONCLUÍDO") {
+        concluidosHoje++;
+        if (rgHistorico === meuRg) {
+          meusConcluidosHoje++;
         }
-      });
-    }
-
-    if (aba.getLastRow() >= 2) {
-      var vals = aba.getRange(2,1,aba.getLastRow()-1,23).getDisplayValues();
-
-      vals.forEach(function(r) {
-        var x = objetoConferenciaDaLinha_(r);
-        var estado = normalizarMaiusculoConferencia_(x.estadoInterno);
-
-        // Só contam registros operacionais válidos.
-        if (estado === "DISPONÍVEL") {
-          disponiveis++;
-          itens.push(x);
-        } else if (estado === "EM VERIFICAÇÃO") {
-          emVerificacao++;
-          itens.push(x);
-        }
-
-
-      });
-    }
-
-    var agoraOrdenacao = new Date();
-    itens.sort(function(a,b) {
-      function prioridade(x) {
-        var estado = normalizarMaiusculoConferencia_(x.estadoInterno);
-        var rg = normalizarRgCadastro_(x.rgConferente);
-        var divisao = normalizarMaiusculoConferencia_(x.divisao);
-
-        if (divisao === "F-7") return 0;
-        if (estado === "EM VERIFICAÇÃO" && rg === meuRg) return 1;
-        if (estado === "EM VERIFICAÇÃO") return 2;
-        if (estado === "DISPONÍVEL") return 3;
-        return 4;
       }
-
-      var pa = prioridade(a);
-      var pb = prioridade(b);
-      if (pa !== pb) return pa - pb;
-
-      var ka = chaveDataFilaConferenciaServidor_(a, agoraOrdenacao);
-      var kb = chaveDataFilaConferenciaServidor_(b, agoraOrdenacao);
-      if (ka.grupo !== kb.grupo) return ka.grupo - kb.grupo;
-      if (ka.mes !== kb.mes) return ka.mes - kb.mes;
-      if (ka.ordem !== kb.ordem) return ka.ordem - kb.ordem;
-
-      return String(a.protocolo || "").localeCompare(String(b.protocolo || ""));
     });
-
-    return {
-      itens:itens,
-      resumo:{
-        disponiveis:disponiveis,
-        emVerificacao:emVerificacao,
-        concluidosHoje:concluidosHoje,
-        meusConcluidosHoje:meusConcluidosHoje,
-        totalOperacional:disponiveis + emVerificacao
-      }
-    };
-  } finally {
-    if (lockObtido) {
-      try { lock.releaseLock(); } catch (e) {}
-    }
   }
+
+  if (aba.getLastRow() >= 2) {
+    var vals = aba.getRange(2,1,aba.getLastRow()-1,23).getDisplayValues();
+
+    vals.forEach(function(r) {
+      var x = objetoConferenciaDaLinha_(r);
+      var estado = normalizarMaiusculoConferencia_(x.estadoInterno);
+
+      // Só contam registros operacionais válidos.
+      if (estado === "DISPONÍVEL") {
+        disponiveis++;
+        itens.push(x);
+      } else if (estado === "EM VERIFICAÇÃO") {
+        emVerificacao++;
+        itens.push(x);
+      }
+
+
+    });
+  }
+
+  var agoraOrdenacao = new Date();
+  itens.sort(function(a,b) {
+    function prioridade(x) {
+      var estado = normalizarMaiusculoConferencia_(x.estadoInterno);
+      var rg = normalizarRgCadastro_(x.rgConferente);
+      var divisao = normalizarMaiusculoConferencia_(x.divisao);
+
+      if (divisao === "F-7") return 0;
+      if (estado === "EM VERIFICAÇÃO" && rg === meuRg) return 1;
+      if (estado === "EM VERIFICAÇÃO") return 2;
+      if (estado === "DISPONÍVEL") return 3;
+      return 4;
+    }
+
+    var pa = prioridade(a);
+    var pb = prioridade(b);
+    if (pa !== pb) return pa - pb;
+
+    var ka = chaveDataFilaConferenciaServidor_(a, agoraOrdenacao);
+    var kb = chaveDataFilaConferenciaServidor_(b, agoraOrdenacao);
+    if (ka.grupo !== kb.grupo) return ka.grupo - kb.grupo;
+    if (ka.mes !== kb.mes) return ka.mes - kb.mes;
+    if (ka.ordem !== kb.ordem) return ka.ordem - kb.ordem;
+
+    return String(a.protocolo || "").localeCompare(String(b.protocolo || ""));
+  });
+
+  return {
+    itens:itens,
+    resumo:{
+      disponiveis:disponiveis,
+      emVerificacao:emVerificacao,
+      concluidosHoje:concluidosHoje,
+      meusConcluidosHoje:meusConcluidosHoje,
+      totalOperacional:disponiveis + emVerificacao
+    }
+  };
 }
+
 
 function assumirProtocolosSelecionadosConferencia(protocolos, token) {
   var sessao = exigirPerfil_(token, ["CONFERENCIA"]);
@@ -3664,7 +3723,7 @@ function assumirProtocolosSelecionadosConferencia(protocolos, token) {
     throw new Error("Selecione pelo menos um protocolo disponível.");
   }
 
-  var lock = LockService.getDocumentLock();
+  var lock = LockService.getScriptLock();
   lock.waitLock(20000);
 
   try {
@@ -3745,7 +3804,7 @@ function assumirProtocoloConferencia(protocolo, token) {
   protocolo = normalizarTextoConferencia_(protocolo);
   if (!protocolo) throw new Error("Protocolo inválido.");
 
-  var lock = LockService.getDocumentLock();
+  var lock = LockService.getScriptLock();
   lock.waitLock(15000);
 
   try {
@@ -3858,7 +3917,7 @@ function liberarProtocolosSelecionadosConferencia(protocolos, token) {
     throw new Error("Nenhum protocolo foi informado para liberação.");
   }
 
-  var lock = LockService.getDocumentLock();
+  var lock = LockService.getScriptLock();
   lock.waitLock(20000);
 
   try {
@@ -3979,7 +4038,7 @@ function liberarProtocoloConferencia(protocolo, token) {
   var sessao = exigirPerfil_(token, ["CONFERENCIA"]);
   protocolo = normalizarTextoConferencia_(protocolo);
 
-  var lock = LockService.getDocumentLock();
+  var lock = LockService.getScriptLock();
   lock.waitLock(15000);
 
   try {
@@ -4030,7 +4089,7 @@ function concluirProtocoloConferencia(protocolo, statusSiapi, observacao, token)
     throw new Error("Selecione um status válido do SIAPI.");
   }
 
-  var lock = LockService.getDocumentLock();
+  var lock = LockService.getScriptLock();
   lock.waitLock(8000);
 
   try {
@@ -4306,13 +4365,7 @@ function garantirEstruturaRascunhoRoteiro_() {
     "DATA_COPIA_SIAPI","ANDAMENTO_MAIS_20_DIAS"
   ];
 
-  if (aba.getLastRow() === 0 || !String(aba.getRange(1,1).getDisplayValue() || "").trim()) {
-    aba.getRange(1,1,1,cab.length).setValues([cab]);
-  } else {
-    aba.getRange(1,1,1,cab.length).setValues([cab]);
-  }
-
-  aba.setFrozenRows(1);
+  prepararCabecalhoLeve_(aba, cab, {substituir:true});
   return aba;
 }
 
@@ -4351,27 +4404,54 @@ function itemRascunhoRoteiroDaLinha_(r) {
 
 function localizarLinhasProtocolosRoteiro_(aba, colunaProtocolo, protocolos) {
   var mapa = {};
-  protocolos = Array.isArray(protocolos) ? protocolos : [];
-
-  if (!aba || aba.getLastRow() < 2 || !protocolos.length) return mapa;
-
-  var faixa = aba.getRange(2, colunaProtocolo, aba.getLastRow() - 1, 1);
-
-  protocolos.forEach(function(p) {
+  var unicos = {};
+  (Array.isArray(protocolos) ? protocolos : []).forEach(function(p) {
     p = normalizarProtocoloRoteiro_(p);
-    if (!p) return;
-
-    var encontrados = faixa
-      .createTextFinder(p)
-      .matchEntireCell(true)
-      .findAll();
-
-    mapa[p] = encontrados.map(function(cel) {
-      return cel.getRow();
-    });
+    if (p) unicos[p] = true;
   });
+  var lista = Object.keys(unicos);
+  if (!aba || !lista.length) return mapa;
+  var ultimaLinha = aba.getLastRow();
+  if (ultimaLinha < 2) return mapa;
+  var faixa = aba.getRange(2, colunaProtocolo, ultimaLinha - 1, 1);
+  lista.forEach(function(p) { mapa[p] = []; });
 
+  // Uma busca pontual continua econômica para edição individual.
+  if (lista.length === 1) {
+    mapa[lista[0]] = faixa.createTextFinder(lista[0])
+      .matchEntireCell(true).findAll().map(function(cel) { return cel.getRow(); });
+    return mapa;
+  }
+
+  // Para lotes, lê a coluna uma vez em vez de fazer N chamadas ao Sheets.
+  faixa.getDisplayValues().forEach(function(r, i) {
+    var p = String(r[0] || "").toUpperCase();
+    if (Object.prototype.hasOwnProperty.call(unicos, p)) mapa[p].push(i + 2);
+  });
   return mapa;
+}
+
+function lerLinhasProtocolosRoteiro_(aba, mapa, totalColunas) {
+  var linhas = {};
+  Object.keys(mapa).forEach(function(p) {
+    mapa[p].forEach(function(linha) { linhas[linha] = true; });
+  });
+  var numeros = Object.keys(linhas).map(Number).sort(function(a,b) { return a-b; });
+  var resultado = {};
+  var i = 0;
+  while (i < numeros.length) {
+    var inicio = numeros[i];
+    var fim = inicio;
+    var proximo = i + 1;
+    // Agrupa linhas próximas, limitando tamanho e leitura de lacunas.
+    while (proximo < numeros.length && numeros[proximo] - fim <= 20 &&
+           numeros[proximo] - inicio < 500) {
+      fim = numeros[proximo++];
+    }
+    var valores = aba.getRange(inicio, 1, fim - inicio + 1, totalColunas).getDisplayValues();
+    for (; i < proximo; i++) resultado[numeros[i]] = valores[numeros[i] - inicio];
+  }
+  return resultado;
 }
 
 
@@ -4437,13 +4517,15 @@ function salvarRascunhosRoteiro(itens, dataRoteiro, token) {
     var linhasRascunho =
       localizarLinhasProtocolosRoteiro_(aba, 2, protocolos);
 
+    var dadosRoteiro = lerLinhasProtocolosRoteiro_(roteiro, linhasRoteiro, 11);
+    var dadosRascunho = lerLinhasProtocolosRoteiro_(aba, linhasRascunho, 23);
     var distribuidosMesmoDia = {};
     var distribuicoesOutrasDatas = {};
 
     protocolos.forEach(function(p) {
       (linhasRoteiro[p] || []).forEach(function(linha) {
         // Apenas as colunas DATA e STATUS são necessárias aqui.
-        var dados = roteiro.getRange(linha, 1, 1, 11).getDisplayValues()[0];
+        var dados = dadosRoteiro[linha];
 
         var status = String(dados[10] || "").trim().toUpperCase();
         if (status === "CANCELADO") return;
@@ -4500,7 +4582,7 @@ function salvarRascunhosRoteiro(itens, dataRoteiro, token) {
         var lr = candidatos[i];
 
         var dadosLinha =
-          aba.getRange(lr, 1, 1, 23).getDisplayValues()[0];
+          dadosRascunho[lr];
 
         if (String(dadosLinha[0] || "").trim() !== dataTxt) {
           continue;
@@ -5861,9 +5943,7 @@ function garantirMapaSetoresRoteiro_() {
 
   var cab = ["BAIRRO/SETOR", "REGIÃO", "DIA_PREFERENCIAL", "OBSERVAÇÃO"];
 
-  if (aba.getLastRow() === 0 || !String(aba.getRange(1,1).getDisplayValue() || "").trim()) {
-    aba.getRange(1,1,1,4).setValues([cab]);
-  }
+  prepararCabecalhoLeve_(aba,cab,{primeiroVazio:true,somenteInicial:true,cor:"#5C1D1D",centralizar:true,redimensionar:true});
 
   // A versão anterior criava a aba vazia. Se ela ainda estiver vazia,
   // carrega automaticamente toda a relação oficial enviada do SIAPI.
@@ -5871,14 +5951,6 @@ function garantirMapaSetoresRoteiro_() {
     var dados = obterDadosMapaSetoresPadrao_();
     if (dados.length) aba.getRange(2,1,dados.length,4).setValues(dados);
   }
-
-  aba.setFrozenRows(1);
-  aba.getRange(1,1,1,4)
-    .setFontWeight("bold")
-    .setBackground("#5C1D1D")
-    .setFontColor("#FFFFFF")
-    .setHorizontalAlignment("center");
-  aba.autoResizeColumns(1,4);
 
   return aba;
 }
@@ -6065,10 +6137,11 @@ function obterHistoricoPorProtocoloRoteiro_(protocolos) {
   var linhasHist =
     localizarLinhasProtocolosRoteiro_(hist, 3, lista);
 
+  var dadosHist = lerLinhasProtocolosRoteiro_(hist, linhasHist, 17);
   lista.forEach(function(p) {
     (linhasHist[p] || []).forEach(function(linha) {
       var r =
-        hist.getRange(linha, 1, 1, 17).getDisplayValues()[0];
+        dadosHist[linha];
 
       add(r[2], {
         data:r[1] || r[0] || "",
@@ -6084,10 +6157,11 @@ function obterHistoricoPorProtocoloRoteiro_(protocolos) {
   var linhasRoteiro =
     localizarLinhasProtocolosRoteiro_(roteiro, 2, lista);
 
+  var dadosRoteiro = lerLinhasProtocolosRoteiro_(roteiro, linhasRoteiro, 12);
   lista.forEach(function(p) {
     (linhasRoteiro[p] || []).forEach(function(linha) {
       var r =
-        roteiro.getRange(linha, 1, 1, 12).getDisplayValues()[0];
+        dadosRoteiro[linha];
 
       add(r[1], {
         data:r[0] || "",
@@ -6296,17 +6370,19 @@ function finalizarRascunhosRoteiroRapido_(itens) {
   });
 
   var linhas = localizarLinhasProtocolosRoteiro_(aba, 2, protocolos);
-
+  var dados = lerLinhasProtocolosRoteiro_(aba, linhas, 21);
+  var enderecos = [];
   protocolos.forEach(function(p) {
     (linhas[p] || []).forEach(function(linha) {
-      var dataTxt = String(aba.getRange(linha,1).getDisplayValue() || "").trim();
-      if (!alvos[dataTxt + "|" + p]) return;
-
-      var celStatus = aba.getRange(linha,21);
-      var status = String(celStatus.getDisplayValue() || "").trim().toUpperCase();
-      if (status === "RASCUNHO") celStatus.setValue("LANÇADO");
+      var r = dados[linha];
+      var dataTxt = String(r[0] || "").trim();
+      if (alvos[dataTxt + "|" + p] &&
+          String(r[20] || "").trim().toUpperCase() === "RASCUNHO") {
+        enderecos.push("U" + linha);
+      }
     });
   });
+  if (enderecos.length) aba.getRangeList(enderecos).setValue("LANÇADO");
 }
 
 function atualizarStatusOrigemRoteiroRapido_(itens) {
@@ -6401,10 +6477,11 @@ function lancarDistribuicaoRoteiroSiapi(itens, token) {
     // Procura somente os protocolos selecionados, não a planilha inteira.
     var linhasPorProtocolo = localizarLinhasProtocolosRoteiro_(roteiro, 2, protocolos);
     var existentes = {};
+    var dadosExistentes = lerLinhasProtocolosRoteiro_(roteiro, linhasPorProtocolo, 11);
 
     protocolos.forEach(function(p) {
       (linhasPorProtocolo[p] || []).forEach(function(linha) {
-        var r = roteiro.getRange(linha,1,1,11).getDisplayValues()[0];
+        var r = dadosExistentes[linha];
         if (String(r[10] || "").trim().toUpperCase() === "CANCELADO") return;
         existentes[String(r[0] || "").trim() + "|" + p] = true;
       });
@@ -6568,15 +6645,7 @@ function garantirEstruturaPendenciasRoteiro_() {
     "REGIÃO","MOTIVO","OBSERVAÇÃO","USUÁRIO_RG","USUÁRIO_NOME",
     "SERVIÇO","BAIRRO","ANDAMENTO","RAZÃO_SOCIAL","DIVISÃO","VISTORIADO_POR","ÁREA"
   ];
-  if (pend.getLastRow() === 0 || !String(pend.getRange(1,1).getDisplayValue() || "").trim()) {
-    pend.getRange(1,1,1,hp.length).setValues([hp]);
-  } else {
-    // Completa novas colunas sem apagar os dados antigos.
-    pend.getRange(1,1,1,hp.length).setValues([hp]);
-  }
-  pend.setFrozenRows(1);
-  pend.getRange(1,1,1,hp.length)
-    .setFontWeight("bold").setBackground("#B91C1C").setFontColor("#FFFFFF");
+  prepararCabecalhoLeve_(pend,hp,{substituir:true,cor:"#B91C1C"});
 
   var sol = ss.getSheetByName("SOLICITACOES_VISTORIA");
   if (!sol) sol = ss.insertSheet("SOLICITACOES_VISTORIA");
@@ -6585,15 +6654,7 @@ function garantirEstruturaPendenciasRoteiro_() {
     "ID","DATA/HORA","PROTOCOLO","MOTIVO","DATA_LIMITE",
     "SETOR/REGIÃO","OBSERVAÇÃO","RG_ATENDENTE","ATENDENTE","STATUS","RAZÃO_SOCIAL","EVENTO_TEMPORÁRIO"
   ];
-  if (sol.getLastRow() === 0 || !String(sol.getRange(1,1).getDisplayValue() || "").trim()) {
-    sol.getRange(1,1,1,hs.length).setValues([hs]);
-  } else {
-    // Preserva os dados existentes e apenas completa/atualiza o cabeçalho.
-    sol.getRange(1,1,1,hs.length).setValues([hs]);
-  }
-  sol.setFrozenRows(1);
-  sol.getRange(1,1,1,hs.length)
-    .setFontWeight("bold").setBackground("#1565C0").setFontColor("#FFFFFF");
+  prepararCabecalhoLeve_(sol,hs,{substituir:true,cor:"#1565C0"});
 
   return {pendencias:pend, solicitacoes:sol};
 }
@@ -8394,17 +8455,15 @@ function editarDadosSiapiVistoriaDia(dados, token) {
     throw new Error("Não há lançamentos para editar.");
   }
 
-  var ncols = Math.max(26, roteiro.getLastColumn());
-  var vals = roteiro.getRange(2,1,roteiro.getLastRow()-1,ncols).getDisplayValues();
+  var linhasProtocolo = localizarLinhasProtocolosRoteiro_(roteiro, 2, [protocolo]);
+  var dadosLinhas = lerLinhasProtocolosRoteiro_(roteiro, linhasProtocolo, 26);
+  var candidatos = linhasProtocolo[protocolo] || [];
   var linha = -1;
-
-  for (var i=vals.length-1; i>=0; i--) {
-    if (
-      chaveDataRoteiro_(vals[i][0]) === dataChave &&
-      normalizarProtocoloRoteiro_(vals[i][1]) === protocolo &&
-      String(vals[i][10] || "").trim().toUpperCase() !== "CANCELADO"
-    ) {
-      linha = i + 2;
+  for (var i = candidatos.length - 1; i >= 0; i--) {
+    var atual = dadosLinhas[candidatos[i]];
+    if (chaveDataRoteiro_(atual[0]) === dataChave &&
+        String(atual[10] || "").trim().toUpperCase() !== "CANCELADO") {
+      linha = candidatos[i];
       break;
     }
   }
@@ -8415,18 +8474,17 @@ function editarDadosSiapiVistoriaDia(dados, token) {
   var mais20 = andamentoMaisDe20DiasNaCopia_(dados.dataAndamento, dataCopia);
 
   roteiro.getRange(linha,10).setValue(String(dados.servico || "").trim());
-  roteiro.getRange(linha,15).setValue(String(dados.bairro || "").trim());
-  roteiro.getRange(linha,16).setValue(String(dados.razaoSocial || "").trim());
-  roteiro.getRange(linha,17).setValue(String(dados.divisao || "").trim());
-  roteiro.getRange(linha,18).setValue(String(dados.area || "").trim());
-  roteiro.getRange(linha,19).setValue(String(dados.ultimoAndamento || "").trim());
-  roteiro.getRange(linha,20).setValue(String(dados.dataAndamento || "").trim());
-  roteiro.getRange(linha,24).setValue(String(dados.vistoriadoPorSiapi || "").trim());
-  roteiro.getRange(linha,25).setValue(dataCopia);
-  roteiro.getRange(linha,26).setValue(mais20 ? "SIM" : "NÃO");
+  roteiro.getRange(linha,15,1,6).setValues([[
+    String(dados.bairro || "").trim(), String(dados.razaoSocial || "").trim(),
+    String(dados.divisao || "").trim(), String(dados.area || "").trim(),
+    String(dados.ultimoAndamento || "").trim(), String(dados.dataAndamento || "").trim()
+  ]]);
+  roteiro.getRange(linha,24,1,3).setValues([[
+    String(dados.vistoriadoPorSiapi || "").trim(), dataCopia, mais20 ? "SIM" : "NÃO"
+  ]]);
 
   // Se veio de PENDENCIAS_VISTORIAS, reflete também os dados compatíveis nela.
-  var origemPendenciaId = String(roteiro.getRange(linha,22).getDisplayValue() || "").trim();
+  var origemPendenciaId = String(dadosLinhas[linha][21] || "").trim();
   if (origemPendenciaId) {
     var pend = ss.getSheetByName("PENDENCIAS_VISTORIAS");
     if (pend && pend.getLastRow() >= 2) {
@@ -8434,13 +8492,12 @@ function editarDadosSiapiVistoriaDia(dados, token) {
       for (var p=0; p<pv.length; p++) {
         if (String(pv[p][0] || "").trim() !== origemPendenciaId) continue;
         var lr = p + 2;
-        pend.getRange(lr,16).setValue(String(dados.servico || "").trim());
-        pend.getRange(lr,17).setValue(String(dados.bairro || "").trim());
-        pend.getRange(lr,18).setValue(String(dados.ultimoAndamento || "").trim());
-        pend.getRange(lr,19).setValue(String(dados.razaoSocial || "").trim());
-        pend.getRange(lr,20).setValue(String(dados.divisao || "").trim());
-        pend.getRange(lr,21).setValue(String(dados.vistoriadoPorSiapi || "").trim());
-        pend.getRange(lr,22).setValue(String(dados.area || "").trim());
+        pend.getRange(lr,16,1,7).setValues([[
+          String(dados.servico || "").trim(), String(dados.bairro || "").trim(),
+          String(dados.ultimoAndamento || "").trim(), String(dados.razaoSocial || "").trim(),
+          String(dados.divisao || "").trim(), String(dados.vistoriadoPorSiapi || "").trim(),
+          String(dados.area || "").trim()
+        ]]);
         break;
       }
     }
@@ -8929,12 +8986,7 @@ function garantirConfigPSE_() {
     "DATA_REF", "V_DIURNO_AZUL", "V_DIURNO_VERM", "V_NOTURNO_AZUL", "V_NOTURNO_VERM"
   ];
 
-  if (aba.getLastRow() === 0) {
-    aba.getRange(1,1,1,headers.length).setValues([headers]);
-  } else {
-    aba.getRange(1,1,1,headers.length).setValues([headers]);
-  }
-
+  prepararCabecalhoLeve_(aba, headers, {substituir:true});
   return aba;
 }
 
@@ -9539,31 +9591,34 @@ function obterConfiguracaoPeriodo() {
 
 
 
+  var configValores = abaConfig.getRange(2,1,1,16).getValues()[0];
+  var configExibidos = abaConfig.getRange(2,1,1,2).getDisplayValues()[0];
+
   return { 
 
-    inicio: abaConfig.getRange("A2").getDisplayValue() || "2026-09-01", 
+    inicio: configExibidos[0] || "2026-09-01",
 
-    fim: abaConfig.getRange("B2").getDisplayValue() || "2026-09-30", 
+    fim: configExibidos[1] || "2026-09-30",
 
-    cota: parseFloat(abaConfig.getRange("F2").getValue()) || 90000,
+    cota: parseFloat(configValores[5]) || 90000,
 
-    supDic: parseFloat(abaConfig.getRange("G2").getValue()) || 0,
+    supDic: parseFloat(configValores[6]) || 0,
 
-    supDap: parseFloat(abaConfig.getRange("H2").getValue()) || 0,
+    supDap: parseFloat(configValores[7]) || 0,
 
-    supGuarda: parseFloat(abaConfig.getRange("I2").getValue()) || 0,
+    supGuarda: parseFloat(configValores[8]) || 0,
 
-    supDefau: parseFloat(abaConfig.getRange("J2").getValue()) || 0,
+    supDefau: parseFloat(configValores[9]) || 0,
 
-    supDnd: parseFloat(abaConfig.getRange("K2").getValue()) || 0,
+    supDnd: parseFloat(configValores[10]) || 0,
 
-    vDiurnoAzul: parseFloat(abaConfig.getRange("M2").getValue()) || 30.00,
+    vDiurnoAzul: parseFloat(configValores[12]) || 30.00,
 
-    vDiurnoVermelho: parseFloat(abaConfig.getRange("N2").getValue()) || 40.00,
+    vDiurnoVermelho: parseFloat(configValores[13]) || 40.00,
 
-    vNoturnoAzul: parseFloat(abaConfig.getRange("O2").getValue()) || 33.00,
+    vNoturnoAzul: parseFloat(configValores[14]) || 33.00,
 
-    vNoturnoVermelho: parseFloat(abaConfig.getRange("P2").getValue()) || 45.00
+    vNoturnoVermelho: parseFloat(configValores[15]) || 45.00
 
   };
 
@@ -9585,9 +9640,7 @@ function salvarConfiguracaoPeriodo_(dataInicioStr, dataFimStr) {
 
   }
 
-  abaConfig.getRange("A2").setValue(dataInicioStr);
-
-  abaConfig.getRange("B2").setValue(dataFimStr);
+  abaConfig.getRange(2,1,1,2).setValues([[dataInicioStr,dataFimStr]]);
 
   return "Período mensal atualizado: " + dataInicioStr + " até " + dataFimStr;
 
@@ -9614,12 +9667,7 @@ function garantirConfigFinanceiroMensal_() {
     "ATUALIZADO_EM"
   ];
 
-  if (aba.getLastRow() === 0 || !String(aba.getRange(1,1).getDisplayValue() || "").trim()) {
-    aba.getRange(1,1,1,cab.length).setValues([cab]);
-  } else {
-    aba.getRange(1,1,1,cab.length).setValues([cab]);
-  }
-
+  prepararCabecalhoLeve_(aba, cab, {substituir:true});
   return aba;
 }
 
@@ -9720,17 +9768,10 @@ function salvarConfiguracaoFinanceira_(cotaUnidadeStr, supDicStr, supDapStr, sup
 
   }
 
-  abaConfig.getRange("F2").setValue(parseMoedaBR(cotaUnidadeStr));
-
-  abaConfig.getRange("G2").setValue(parseMoedaBR(supDicStr));
-
-  abaConfig.getRange("H2").setValue(parseMoedaBR(supDapStr));
-
-  abaConfig.getRange("I2").setValue(parseMoedaBR(supGuardaStr));
-
-  abaConfig.getRange("J2").setValue(parseMoedaBR(supDefauStr));
-
-  abaConfig.getRange("K2").setValue(parseMoedaBR(supDndStr));
+  abaConfig.getRange(2,6,1,6).setValues([[
+    parseMoedaBR(cotaUnidadeStr), parseMoedaBR(supDicStr), parseMoedaBR(supDapStr),
+    parseMoedaBR(supGuardaStr), parseMoedaBR(supDefauStr), parseMoedaBR(supDndStr)
+  ]]);
 
   return "Cota Inicial e Suplementações do mês salvas com sucesso!";
 
@@ -10175,6 +10216,7 @@ function lancarVoluntariosSelecionadosWeb_(listaSelecionados) {
 
   try {
     var lancados = 0;
+    var novasEscalas = [];
     var bloqueados = [];
 
     // Chaves de militares já escalados na planilha:
@@ -10285,7 +10327,7 @@ function lancarVoluntariosSelecionadosWeb_(listaSelecionados) {
               )
         );
 
-      abaControle.appendRow([
+      novasEscalas.push([
         dataFormatadaLimpa,                                      // A Data
         String(item.rg || ""),                                  // B RG
         item.nome || "MILITAR",                                 // C Nome
@@ -10315,6 +10357,10 @@ function lancarVoluntariosSelecionadosWeb_(listaSelecionados) {
 
       lancados++;
     });
+    if (novasEscalas.length) {
+      abaControle.getRange(abaControle.getLastRow()+1,1,novasEscalas.length,13).setValues(novasEscalas);
+    }
+
 
     sincronizarEscalaPSE();
 
@@ -11520,16 +11566,19 @@ function salvarInscricoesVoluntario_(inscricoes) {
   var dataHoraLocal = Utilities.formatDate(new Date(), "America/Sao_Paulo", "dd/MM/yyyy HH:mm:ss");
 
   var inseridos = 0;
+  var novasInscricoes = [];
 
   inscricoes.forEach(function(item) {
 
     if (item.turno && item.turno !== "" && item.turno !== "Nenhum") {
 
-      aba.appendRow([dataHoraLocal, email, item.data, item.diaSemana, item.turno]); inseridos++;
+      novasInscricoes.push([dataHoraLocal, email, item.data, item.diaSemana, item.turno]); inseridos++;
 
     }
 
   });
+
+  if (novasInscricoes.length) aba.getRange(aba.getLastRow()+1,1,novasInscricoes.length,5).setValues(novasInscricoes);
 
   return "Sucesso! " + inseridos + " inscrição(ões) registrada(s).";
 

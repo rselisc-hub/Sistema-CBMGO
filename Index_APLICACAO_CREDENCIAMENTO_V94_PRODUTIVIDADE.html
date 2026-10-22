@@ -1758,7 +1758,7 @@
           </button>
           <div class="d-flex gap-2">
             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fechar</button>
-            <button type="button" class="btn btn-success" onclick="concluirProtocoloConferenciaAtual()">
+            <button id="conf-btn-concluir" type="button" class="btn btn-success" onclick="concluirProtocoloConferenciaAtual()">
               <i class="bi bi-check2-circle me-1"></i>Concluir
             </button>
           </div>
@@ -6190,7 +6190,7 @@
       pararAtualizacaoAutomaticaConferencia();
       conferenciaIntervalo = setInterval(function() {
         var tela = document.getElementById('conferencia-screen');
-        if (!tela || tela.style.display === 'none') return;
+        if (!tela || tela.style.display === 'none' || document.hidden || conferenciaConclusaoEmAndamento) return;
 
         if (conferenciaTelaAtual === 'fila') {
           carregarFilaConferencia(true);
@@ -6331,51 +6331,54 @@
 
 
     function extrairRegistrosConferenciaTexto(bruto) {
-      bruto = String(bruto || '').replace(/\r/g,'').trim();
-      if (!bruto) return [];
+      bruto = String(bruto || '').replace(/\r\n?/g, '\n');
+      if (!bruto.trim()) return [];
+      var registros = [];
+      var pendente = null;
+      var protocoloValido = /^\d{3,12}\/\d{2,4}$/;
 
-      var linhas = bruto.split(/\n+/).map(function(l) {
-        return String(l || '').trim();
-      }).filter(Boolean);
-
-      var regs = [];
-
-      linhas.forEach(function(linha) {
-        if (/^PROTOCOLO\b/i.test(linha)) return;
-
-        var cols = linha.split('\t').map(function(x) {
-          return String(x || '').trim();
-        });
-
-        if (cols.length < 2) {
-          cols = linha.split(/\s{2,}/).map(function(x) {
-            return String(x || '').trim();
-          });
+      function concluirRegistro() {
+        if (!pendente) return;
+        if (pendente.length !== 8) {
+          throw new Error('Registro ' + (registros.length + 1) +
+            ': são esperadas 8 colunas. Confira a cópia do SIAPI.');
         }
+        var campos = ['protocolo','movimentacao','logradouro','bairro',
+          'cidade','razaoSocial','divisao','area'];
+        var item = {};
+        campos.forEach(function(campo, i) { item[campo] = pendente[i]; });
+        registros.push(item);
+        pendente = null;
+      }
 
-        var p = -1;
-        for (var i=0; i<cols.length; i++) {
-          if (/^\d{3,12}\/\d{2,4}$/.test(cols[i])) {
-            p = i;
-            break;
-          }
+      bruto.split('\n').forEach(function(linha) {
+        if (!linha.trim()) return;
+        if (/^\s*PROTOCOLO\b/i.test(linha)) return;
+        // Não eliminar TABs: uma célula vazia também ocupa uma coluna.
+        var colunas = (linha.indexOf('\t') >= 0
+          ? linha.split('\t') : linha.trim().split(/ {2,}/))
+          .map(function(c) { return String(c || '').trim(); });
+        var inicio = protocoloValido.test(colunas[0] || '') ? 0 :
+          (colunas[0] === '' && protocoloValido.test(colunas[1] || '') ? 1 : -1);
+
+        if (inicio >= 0) {
+          concluirRegistro();
+          pendente = colunas.slice(inicio);
+          return;
         }
-
-        if (p < 0) return;
-
-        regs.push({
-          protocolo:cols[p] || '',
-          movimentacao:cols[p+1] || '',
-          logradouro:cols[p+2] || '',
-          bairro:cols[p+3] || '',
-          cidade:cols[p+4] || '',
-          razaoSocial:cols[p+5] || '',
-          divisao:cols[p+6] || '',
-          area:cols[p+7] || ''
-        });
+        if (!pendente) {
+          throw new Error('Há uma linha sem protocolo. Confira a cópia do SIAPI.');
+        }
+        // Formato recebido: protocolo, seis campos + TAB vazio, área na linha seguinte.
+        if (pendente.length === 8 && pendente[7] === '' && colunas.length === 1 &&
+            /^\d[\d., ]*$/.test(colunas[0])) {
+          pendente[7] = colunas[0];
+        } else {
+          pendente = pendente.concat(colunas);
+        }
       });
-
-      return regs;
+      concluirRegistro();
+      return registros;
     }
 
 
@@ -6383,9 +6386,15 @@
       var c = document.getElementById('conf-siapi-colado');
       var bruto = c ? c.value : '';
 
-      var regs = (window.__confRegistrosPaste && window.__confRegistrosPaste.length)
-        ? window.__confRegistrosPaste.slice()
-        : extrairRegistrosConferenciaTexto(bruto);
+      var regs;
+      try {
+        regs = (window.__confRegistrosPaste && window.__confRegistrosPaste.length)
+          ? window.__confRegistrosPaste.slice()
+          : extrairRegistrosConferenciaTexto(bruto);
+      } catch (erro) {
+        alert('Não foi possível interpretar a colagem. ' + erro.message);
+        return;
+      }
 
       if (!regs.length) {
         alert('Não consegui identificar protocolos no conteúdo colado do SIAPI.');
@@ -6400,7 +6409,8 @@
 
           alert(
             (r.novos || 0) + ' protocolo(s) novo(s) e ' +
-            (r.atualizados || 0) + ' protocolo(s) atualizado(s).'
+            (r.atualizados || 0) + ' protocolo(s) atualizado(s) e ' +
+            (r.semAlteracao || 0) + ' sem alteração.'
           );
         })
         .withFailureHandler(capturarErroServidor)
@@ -7160,7 +7170,10 @@
     }
 
 
+    var conferenciaConclusaoEmAndamento = false;
+
     function concluirProtocoloConferenciaAtual() {
+      if (conferenciaConclusaoEmAndamento) return;
       var protocolo =
         document.getElementById('conf-trab-protocolo').value || '';
       var status =
@@ -7183,9 +7196,20 @@
         )
       ) return;
 
+      conferenciaConclusaoEmAndamento = true;
+      var botao = document.getElementById('conf-btn-concluir');
+      if (botao) botao.disabled = true;
+      function finalizarConclusao() {
+        conferenciaConclusaoEmAndamento = false;
+        if (botao) botao.disabled = false;
+      }
+
       google.script.run
         .withSuccessHandler(function(r) {
+          finalizarConclusao();
           r = r || {};
+          // Uma fila solicitada antes desta gravação não pode desfazer o resultado local.
+          conferenciaFilaUltimaAplicada = ++conferenciaFilaSequencia;
 
           var modal = bootstrap.Modal.getInstance(
             document.getElementById('modal-conferencia-trabalho')
@@ -7262,7 +7286,10 @@
           // Não recarrega automaticamente a tela de Atribuição.
           // Ela será atualizada quando o usuário abrir/atualizar essa aba.
         })
-        .withFailureHandler(capturarErroServidor)
+        .withFailureHandler(function(err) {
+          finalizarConclusao();
+          capturarErroServidor(err);
+        })
         .concluirProtocoloConferencia(
           protocolo,
           status,
