@@ -132,6 +132,7 @@ const schemas = [
 for (const [fn,sheet] of schemas)test('estrutura compatível e sem regravação desnecessária: '+sheet,()=>{
  const old=fixture(baseline,{[sheet]:[]}),now=fixture(current,{[sheet]:[]});
  old.context[fn]();now.context[fn]();
+ if(sheet==='ATENDIMENTOS')old.sheets[sheet].cells[0].push('ID_ENVIO','ASSINATURA_ENVIO');
  if(sheet==='DOCS_DESPACHO')old.sheets[sheet].cells[0].push('EVENTO_TEMPORARIO','OFICIAL_DESPACHO','ASSINATURA_CADASTRO');
  assert.deepEqual(now.sheets[sheet].cells,old.sheets[sheet].cells);
  const writes=now.stats.write;const reads=now.stats.read;
@@ -154,6 +155,7 @@ for(const [divisao,status,final] of [['A','APROVADO','CONCLUÍDO'],['F-7','EXIG�
  const a=old.context.concluirProtocoloConferencia('P1',status,'Observação','token');
  const b=now.context.concluirProtocoloConferencia('P1',status,'Observação','token');
  assert.deepEqual(plain(b),plain(a));assert.equal(b.item.estadoInterno,final);
+
  for(const n of Object.keys(data))assert.deepEqual(now.sheets[n].cells,old.sheets[n].cells);
  assert.ok(now.stats.read<old.stats.read);
  console.log('Conclusão '+divisao+'/'+status+', leituras:',old.stats.read,'=>',now.stats.read);
@@ -254,6 +256,7 @@ test('pendências e solicitações: mesmas estruturas, sem reescrita ao consulta
  const data={PENDENCIAS_VISTORIAS:[],SOLICITACOES_VISTORIA:[]};
  const old=fixture(baseline,data),now=fixture(current,data);
  old.context.garantirEstruturaPendenciasRoteiro_();now.context.garantirEstruturaPendenciasRoteiro_();
+ old.sheets.SOLICITACOES_VISTORIA.cells[0].push('ASSINATURA_ENVIO');
  for(const n of Object.keys(data))assert.deepEqual(now.sheets[n].cells,old.sheets[n].cells);
  const writes=now.stats.write;now.context.garantirEstruturaPendenciasRoteiro_();assert.equal(now.stats.write,writes);
 });

@@ -3898,39 +3898,37 @@
       input.value = '(' + v.substring(0,2) + ') ' + v.substring(2,7) + '-' + v.substring(7);
     }
 
-    function salvarNovoAtendimento() {
-      var solicitante = String(document.getElementById('atd-solicitante').value || '').trim();
-      var motivo = document.getElementById('atd-motivo').value;
-      if (!solicitante) { alert('Informe o nome do solicitante.'); document.getElementById('atd-solicitante').focus(); return; }
-      if (!motivo) { alert('Selecione o motivo do atendimento.'); return; }
-      var tipoAtual = document.getElementById('atd-tipo').value;
-      var dados = { tipoAtendimento:tipoAtual, solicitante:solicitante, protocolo:document.getElementById('atd-protocolo').value, telefone:document.getElementById('atd-telefone').value, motivoAtendimento:motivo, observacao:document.getElementById('atd-observacao').value };
-      var btn = document.getElementById('btn-salvar-atendimento');
-      btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Salvando...';
-      google.script.run.withSuccessHandler(function(res){
-        btn.disabled=false; btn.innerHTML='<i class="bi bi-floppy-fill me-1"></i> Salvar Atendimento';
-        document.getElementById('atd-tipo').value=tipoAtual;
-        document.getElementById('atd-solicitante').value='';
-        document.getElementById('atd-protocolo').value='';
-        document.getElementById('atd-telefone').value='';
-        document.getElementById('atd-motivo').value='';
-        document.getElementById('atd-observacao').value='';
-        carregarResumoAtendimentoHoje();
-        var c=document.getElementById('atd-solicitante'); if(c)c.focus();
-      }).withFailureHandler(function(err){
-        btn.disabled=false; btn.innerHTML='<i class="bi bi-floppy-fill me-1"></i> Salvar Atendimento';
-        alert((err && err.message) ? err.message : 'Erro ao salvar atendimento.');
-      }).salvarAtendimento(dados,sessaoToken);
+    var atendimentoEnvios={},atendimentoResumoSeq=0,atendimentoResumoPronto=false,atendimentoResumoDia=null;
+    function enviarFormularioAtendimento_(nome,botao,ids,dados,metodo,confirmado){
+      var anterior=atendimentoEnvios[nome];if(anterior&&anterior.enviando)return;
+      var assinatura=JSON.stringify(dados);
+      if(anterior&&anterior.assinatura!==assinatura&&!confirm('O envio anterior não foi confirmado. Alterar os dados inicia outro cadastro. Confira a gravação antes de continuar. Deseja iniciar outro?'))return;
+      var tentativa=anterior&&anterior.assinatura===assinatura?anterior:{assinatura:assinatura,chave:(window.crypto&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)+'-'+Math.random().toString(36).slice(2)};
+      atendimentoEnvios[nome]=tentativa;tentativa.enviando=true;dados.chaveRequisicao=tentativa.chave;
+      var btn=document.getElementById(botao),texto=btn.innerHTML,controles=ids.map(function(id){var el=document.getElementById(id),x={el:el,disabled:el.disabled};el.disabled=true;return x;});
+      btn.disabled=true;btn.innerHTML='<span class="spinner-border spinner-border-sm me-2"></span>Salvando…';
+      var status=document.getElementById(botao+'-status');if(!status){status=document.createElement('div');status.id=botao+'-status';status.className='small mt-2';status.setAttribute('role','status');btn.parentNode.appendChild(status);}status.textContent='Salvando na planilha…';
+      function liberar(){tentativa.enviando=false;btn.disabled=false;btn.innerHTML=texto;controles.forEach(function(x){x.el.disabled=x.disabled;});}
+      function falha(e){liberar();status.textContent='Não foi possível confirmar. Repita com os mesmos dados para conferir sem duplicar. '+String(e&&e.message||e||'');}
+      google.script.run.withSuccessHandler(function(r){if(!r||!r.sucesso){falha('Resposta incompleta.');return;}liberar();delete atendimentoEnvios[nome];status.textContent=r.mensagem||'Salvo na planilha.';confirmado(r);}).withFailureHandler(falha)[metodo](dados,sessaoToken);
     }
-
-    function carregarResumoAtendimentoHoje() {
-      google.script.run.withSuccessHandler(function(res){
-        document.getElementById('atd-total-hoje').textContent=res.totalHoje || 0;
-        document.getElementById('atd-meus-hoje').textContent=res.totalUsuarioHoje || 0;
-      }).withFailureHandler(capturarErroServidor).obterResumoAtendimentoHoje(sessaoToken);
+    function salvarNovoAtendimento(){
+      if(atendimentoEnvios.registro&&atendimentoEnvios.registro.enviando)return;
+      var ids=['atd-tipo','atd-solicitante','atd-protocolo','atd-telefone','atd-motivo','atd-observacao'];
+      var d={tipoAtendimento:document.getElementById(ids[0]).value,solicitante:document.getElementById(ids[1]).value.trim(),protocolo:document.getElementById(ids[2]).value,telefone:document.getElementById(ids[3]).value,motivoAtendimento:document.getElementById(ids[4]).value,observacao:document.getElementById(ids[5]).value};
+      if(!d.solicitante||!d.motivoAtendimento){alert('Informe o solicitante e o motivo.');return;}
+      var telefone=d.telefone.replace(/\D/g,'');if(telefone&&telefone.length!==10&&telefone.length!==11){alert('Informe o telefone com DDD, de 10 ou 11 dígitos.');return;}
+      enviarFormularioAtendimento_('registro','btn-salvar-atendimento',ids,d,'salvarAtendimento',function(r){
+        ids.slice(1).forEach(function(id){document.getElementById(id).value='';});
+        atendimentoResumoSeq++;
+        if(atendimentoResumoPronto&&atendimentoResumoDia===dataHojeInput_()&&!r.repetido){['atd-total-hoje','atd-meus-hoje'].forEach(function(id){var el=document.getElementById(id);el.textContent=(Number(el.textContent)||0)+1;});}else carregarResumoAtendimentoHoje();
+        document.getElementById('atd-solicitante').focus();
+      });
     }
-
-
+    function carregarResumoAtendimentoHoje(){
+      var seq=++atendimentoResumoSeq,token=sessaoToken;
+      google.script.run.withSuccessHandler(function(r){if(seq!==atendimentoResumoSeq||token!==sessaoToken)return;atendimentoResumoPronto=true;atendimentoResumoDia=dataHojeInput_();document.getElementById('atd-total-hoje').textContent=r.totalHoje||0;document.getElementById('atd-meus-hoje').textContent=r.totalUsuarioHoje||0;}).withFailureHandler(function(e){if(seq!==atendimentoResumoSeq||token!==sessaoToken)return;atendimentoResumoPronto=false;capturarErroServidor(e);}).obterResumoAtendimentoHoje(token);
+    }
 
     function abrirSolicitacoesVistoriaAtendimento(restaurando) {
       if (!usuarioLogado || !usuarioLogado.permissoes || !usuarioLogado.permissoes.atendimento) {
@@ -3956,52 +3954,15 @@
     }
 
 
-    function salvarSolicitacaoVistoriaAtendimento() {
-      var protocolo = String(document.getElementById('sol-protocolo').value || '').trim();
-      var motivo = document.getElementById('sol-motivo').value;
-      var setor = document.getElementById('sol-setor').value;
-      var razaoSocial = String(document.getElementById('sol-razao-social').value || '').trim();
-      var eventoTemporario = !!document.getElementById('sol-evento-temporario').checked;
-      var observacao = String(document.getElementById('sol-observacao').value || '').trim();
-
-      if (!protocolo) { alert('Informe o protocolo.'); return; }
-      if (!motivo) { alert('Selecione o motivo.'); return; }
-      if (!setor) { alert('Selecione o setor/região.'); return; }
-      if (!razaoSocial) { alert('Informe a Razão Social.'); return; }
-
-      var btn = document.getElementById('btn-salvar-solicitacao-vistoria');
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Salvando...';
-
-      google.script.run
-        .withSuccessHandler(function(r) {
-          btn.disabled = false;
-          btn.innerHTML = '<i class="bi bi-floppy-fill me-1"></i>Salvar solicitação';
-          alert(r.mensagem || 'Solicitação salva.');
-          document.getElementById('sol-protocolo').value = '';
-          document.getElementById('sol-motivo').value = '';
-          document.getElementById('sol-razao-social').value = '';
-          document.getElementById('sol-evento-temporario').checked = false;
-          document.getElementById('sol-observacao').value = '';
-          document.getElementById('sol-protocolo').focus();
-        })
-        .withFailureHandler(function(err) {
-          btn.disabled = false;
-          btn.innerHTML = '<i class="bi bi-floppy-fill me-1"></i>Salvar solicitação';
-          capturarErroServidor(err);
-        })
-        .salvarSolicitacaoVistoriaAtendimento({
-          protocolo:protocolo,
-          motivo:motivo,
-          setor:setor,
-          razaoSocial:razaoSocial,
-          eventoTemporario:eventoTemporario,
-          observacao:observacao
-        }, sessaoToken);
+    function salvarSolicitacaoVistoriaAtendimento(){
+      if(atendimentoEnvios.solicitacao&&atendimentoEnvios.solicitacao.enviando)return;
+      var ids=['sol-protocolo','sol-motivo','sol-setor','sol-razao-social','sol-evento-temporario','sol-observacao'];
+      var d={protocolo:document.getElementById(ids[0]).value.trim(),motivo:document.getElementById(ids[1]).value,setor:document.getElementById(ids[2]).value,razaoSocial:document.getElementById(ids[3]).value.trim(),eventoTemporario:document.getElementById(ids[4]).checked,observacao:document.getElementById(ids[5]).value};
+      if(!d.protocolo||!d.motivo||!d.setor||!d.razaoSocial){alert('Informe protocolo, motivo, setor e razão social.');return;}
+      enviarFormularioAtendimento_('solicitacao','btn-salvar-solicitacao-vistoria',ids,d,'salvarSolicitacaoVistoriaAtendimento',function(){ids.forEach(function(id){var el=document.getElementById(id);if(id===ids[2])return;if(el.type==='checkbox')el.checked=false;else el.value='';});document.getElementById(ids[0]).focus();});
     }
 
-
-    var roteiroVistoriadoresAtendimentoJaCarregado = false;
+    var roteiroVistoriadoresAtendimentoJaCarregado = false, atdRoteiroSeq=0, atdRoteiroToken=null, atdRoteiroFiltro=null,atdRoteiroCarregando=null;
 
     function abrirRoteiroVistoriadoresAtendimento(restaurando) {
       if (
@@ -4029,15 +3990,16 @@
 
       iniciarAtualizacaoAutomaticaVistorias_();
 
-      if (!roteiroVistoriadoresAtendimentoJaCarregado) {
-        carregarRoteiroVistoriadoresAtendimento(false);
-      }
+      carregarRoteiroVistoriadoresAtendimento(false);
     }
 
 
     function carregarRoteiroVistoriadoresAtendimento(completo) {
       var campo = document.getElementById('atd-rv-data');
       var data = completo ? '' : (campo ? campo.value : '');
+      var token=sessaoToken;
+      if(atdRoteiroCarregando&&atdRoteiroCarregando.data===data&&atdRoteiroCarregando.token===token)return;
+      var seq=++atdRoteiroSeq;atdRoteiroCarregando={data:data,token:token};
 
       var status = document.getElementById('atd-rv-status');
       var conteudo = document.getElementById('atd-rv-conteudo');
@@ -4048,13 +4010,16 @@
         '<span class="spinner-border spinner-border-sm me-2"></span>' +
         'Carregando roteiro...';
 
-      conteudo.innerHTML =
+      if(!roteiroVistoriadoresAtendimentoJaCarregado||atdRoteiroToken!==token)conteudo.innerHTML =
         '<div class="card card-custom p-5 text-center">' +
           '<div class="spinner-border text-info"></div>' +
         '</div>';
 
       google.script.run
         .withSuccessHandler(function(r) {
+          if(seq!==atdRoteiroSeq||token!==sessaoToken)return;
+          atdRoteiroCarregando=null;
+          atdRoteiroToken=token;atdRoteiroFiltro=data;
           r = r || {};
 
           var blocos = r.blocos || [];
@@ -4099,7 +4064,9 @@
           renderizarRoteiroVistoriadoresAtendimento(blocos);
         })
         .withFailureHandler(function(err) {
-          resumo.textContent = '0 equipe(s)';
+          if(seq!==atdRoteiroSeq||token!==sessaoToken)return;
+          atdRoteiroCarregando=null;
+          if(!roteiroVistoriadoresAtendimentoJaCarregado)resumo.textContent = '0 equipe(s)';
 
           status.className = 'alert alert-danger mb-3';
 
@@ -4108,7 +4075,7 @@
               ? err.message
               : 'Erro ao carregar o roteiro.';
 
-          conteudo.innerHTML =
+          if(!roteiroVistoriadoresAtendimentoJaCarregado)conteudo.innerHTML =
             '<div class="card card-custom p-5 text-center text-danger">' +
               'Não foi possível carregar o roteiro.' +
             '</div>';
@@ -7335,7 +7302,7 @@
     var conferenciaConclusaoEmAndamento = false;
     var conferenciaConclusaoNaoConfirmada = null;
     window.addEventListener('beforeunload',function(event){
-      if(docsCadastroEnviando || docsTentativaCadastro || conferenciaConclusaoEmAndamento || conferenciaConclusaoNaoConfirmada || Object.keys(preferenciasRascunhoPendentes||{}).length){event.preventDefault();event.returnValue='';}
+      if(Object.keys(atendimentoEnvios||{}).length || docsCadastroEnviando || docsTentativaCadastro || conferenciaConclusaoEmAndamento || conferenciaConclusaoNaoConfirmada || Object.keys(preferenciasRascunhoPendentes||{}).length){event.preventDefault();event.returnValue='';}
     });
     function informarGravacaoConferencia(texto,erro) {
       var el=document.getElementById('conf-gravacao-status');
@@ -9658,6 +9625,9 @@
 
 
     function sairDoSistema() {
+      if(Object.keys(atendimentoEnvios).some(function(k){return atendimentoEnvios[k].enviando;})){alert("Aguarde a confirmação do Atendimento antes de sair.");return;}
+      if(Object.keys(atendimentoEnvios).length&&!confirm("Há um envio de Atendimento sem confirmação. Ele pode já estar salvo. Sair descarta a identificação desta tentativa; consulte a base antes de recadastrar. Deseja sair?"))return;
+      atendimentoResumoPronto=false;atendimentoResumoSeq++;atdRoteiroSeq++;atdRoteiroCarregando=null;roteiroVistoriadoresAtendimentoJaCarregado=false;
       if(docsCadastroEnviando){alert('Aguarde a confirmação do DOC antes de sair.');return;}
       if(docsTentativaCadastro){alert('Há um DOC sem confirmação. Repita Salvar DOC com os mesmos dados antes de sair para conferir a gravação.');return;}
       if(Object.keys(preferenciasRascunhoPendentes).length){alert('Há prioridades ou observações ainda não salvas. Aguarde ou use Tentar salvar rascunho novamente.');return;}
@@ -9666,6 +9636,7 @@
       conferenciaConclusaoNaoConfirmada=null;
       conferenciaFilaCache=[];
       var tokenAtual = sessaoToken;
+      atendimentoEnvios={};
 
       limparSessaoLocal();
       mostrarLogin();

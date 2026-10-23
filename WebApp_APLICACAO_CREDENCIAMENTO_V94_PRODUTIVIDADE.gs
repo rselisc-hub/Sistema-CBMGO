@@ -1925,9 +1925,9 @@ function excluirTacGestao(id,token){exigirPerfil_(token,["GESTOR"]);var a=garant
 function garantirEstruturaAtendimentos_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var aba = ss.getSheetByName("ATENDIMENTOS");
-  var cabecalho = ["DATA/HORA","RG_ATENDENTE","ATENDENTE","TIPO_ATENDIMENTO","SOLICITANTE","PROTOCOLO","TELEFONE","MOTIVO_ATENDIMENTO","OBSERVAÇÃO"];
+  var cabecalho = ["DATA/HORA","RG_ATENDENTE","ATENDENTE","TIPO_ATENDIMENTO","SOLICITANTE","PROTOCOLO","TELEFONE","MOTIVO_ATENDIMENTO","OBSERVAÇÃO","ID_ENVIO","ASSINATURA_ENVIO"];
   if (!aba) aba = ss.insertSheet("ATENDIMENTOS");
-  prepararCabecalhoLeve_(aba, cabecalho, {primeiroVazio:true,somenteInicial:true,cor:"#5C1D1D",centralizar:true,redimensionar:true});
+  prepararCabecalhoLeve_(aba, cabecalho, {primeiroVazio:true,cor:"#5C1D1D",centralizar:true});
   return aba;
 }
 
@@ -1961,10 +1961,30 @@ function salvarAtendimento(dados, token) {
   if (["PRESENCIAL","WHATSAPP","TELEFONE"].indexOf(tipo) === -1) throw new Error("Selecione um tipo de atendimento válido.");
   if (!solicitante) throw new Error("O nome do solicitante é obrigatório.");
   if (["VISTORIA","PROJETOS","SIAPI (SISTEMA)","OUTROS"].indexOf(motivo) === -1) throw new Error("Selecione um motivo de atendimento válido.");
-  var aba = garantirEstruturaAtendimentos_();
-  aba.appendRow([new Date(), sessao.rg, sessao.nome || ("RG " + sessao.rg), tipo, solicitante, protocolo, telefone, motivo, observacao]);
-  aba.getRange(aba.getLastRow(),1).setNumberFormat("dd/MM/yyyy HH:mm:ss");
-  return { sucesso:true, mensagem:"Atendimento salvo com sucesso.", atendente:sessao.nome || ("RG " + sessao.rg) };
+  var envio=identificarEnvioAtendimento_(dados,sessao,[tipo,solicitante,protocolo,telefone,motivo,observacao]);
+  var lock=LockService.getScriptLock();if(!lock.tryLock(3000))throw new Error('Outro processamento está em andamento. Tente novamente com os mesmos dados.');
+  try{
+    var aba=garantirEstruturaAtendimentos_(),anterior=localizarEnvioAtendimento_(aba,10,11,envio);
+    if(!anterior){aba.appendRow([new Date(),sessao.rg,sessao.nome||('RG '+sessao.rg),tipo,solicitante,protocolo,telefone,motivo,observacao,envio.id,envio.assinatura]);aba.getRange(aba.getLastRow(),1).setNumberFormat("dd/MM/yyyy HH:mm:ss");}
+    SpreadsheetApp.flush();
+    return {sucesso:true,mensagem:'Atendimento salvo com sucesso.',atendente:sessao.nome||('RG '+sessao.rg),repetido:!!anterior};
+  }finally{lock.releaseLock();}
+}
+
+// Identificação durável por envio: repetições não criam outra linha.
+function identificarEnvioAtendimento_(dados,sessao,campos){
+  var chave=String(dados.chaveRequisicao||'').trim();
+  if(chave&&!/^[A-Za-z0-9_-]{10,100}$/.test(chave))throw new Error('Identificador do envio inválido.');
+  return {id:chave?'ATD-'+hashCadastroDoc_(String(sessao.rg)+'|'+chave):'',assinatura:hashCadastroDoc_(JSON.stringify(campos))};
+}
+function localizarEnvioAtendimento_(aba,colId,colAssinatura,envio){
+  if(!envio.id||aba.getLastRow()<2)return null;
+  var encontrados=aba.getRange(2,colId,aba.getLastRow()-1,1).createTextFinder(envio.id).matchEntireCell(true).findAll();
+  if(encontrados.length>1)throw new Error('Identificador duplicado na base. Confira a gravação.');
+  if(!encontrados.length)return null;
+  var r=aba.getRange(encontrados[0].getRow(),1,1,colAssinatura).getDisplayValues()[0];
+  if(r[colAssinatura-1]!==envio.assinatura)throw new Error('Este envio já foi usado com outros dados. Confira a gravação antes de iniciar outro.');
+  return r;
 }
 
 function obterResumoAtendimentoHoje(token) {
@@ -1976,7 +1996,7 @@ function obterResumoAtendimentoHoje(token) {
     var hoje = new Date(); hoje.setHours(0,0,0,0);
     dados.forEach(function(r){
       var d = r[0] instanceof Date ? new Date(r[0].getTime()) : new Date(r[0]);
-      if (isNaN(d.getTime())) return;
+      if (!d || isNaN(d.getTime())) return;
       d.setHours(0,0,0,0);
       if (d.getTime() === hoje.getTime()) {
         totalHoje++;
@@ -6757,7 +6777,7 @@ function garantirEstruturaPendenciasRoteiro_() {
 
   var hs = [
     "ID","DATA/HORA","PROTOCOLO","MOTIVO","DATA_LIMITE",
-    "SETOR/REGIÃO","OBSERVAÇÃO","RG_ATENDENTE","ATENDENTE","STATUS","RAZÃO_SOCIAL","EVENTO_TEMPORÁRIO"
+    "SETOR/REGIÃO","OBSERVAÇÃO","RG_ATENDENTE","ATENDENTE","STATUS","RAZÃO_SOCIAL","EVENTO_TEMPORÁRIO","ASSINATURA_ENVIO"
   ];
   prepararCabecalhoLeve_(sol,hs,{substituir:true,cor:"#1565C0"});
 
@@ -6797,13 +6817,21 @@ function salvarSolicitacaoVistoriaAtendimento(dados, token) {
   if (!setor) throw new Error("Selecione o setor/região.");
   if (!razaoSocial) throw new Error("Informe a Razão Social.");
 
+  var envio=identificarEnvioAtendimento_(dados,sessao,[protocolo,motivo,setor,razaoSocial,eventoTemporario,observacao]);
+  var lock=LockService.getScriptLock();if(!lock.tryLock(3000))throw new Error("Aguarde outro processamento e tente novamente.");
+  try{
   var estruturas = garantirEstruturaPendenciasRoteiro_();
   var sol = estruturas.solicitacoes;
 
+  var repetido=localizarEnvioAtendimento_(sol,1,13,envio);
+  if(repetido)return {sucesso:true,id:repetido[0],repetido:true,mensagem:"Solicitação já confirmada. Nenhuma solicitação adicional foi criada."};
   // Evita duas solicitações pendentes para o mesmo protocolo e informa
   // quando, em que horário e por quem a solicitação anterior foi cadastrada.
   if (sol.getLastRow() >= 2) {
-    var atuais = sol.getRange(2,1,sol.getLastRow()-1,12).getDisplayValues();
+    var protocolos=sol.getRange(2,3,sol.getLastRow()-1,1).getDisplayValues(),linhas=[];
+    protocolos.forEach(function(r,i){if(normalizarProtocoloRoteiro_(r[0])===protocolo)linhas.push(i+2);});
+    var mapa=lerLinhasProtocolosRoteiro_(sol,{candidatas:linhas},12);
+    var atuais=linhas.map(function(l){return mapa[l];});
 
     for (var i=0; i<atuais.length; i++) {
       if (
@@ -6824,21 +6852,23 @@ function salvarSolicitacaoVistoriaAtendimento(dados, token) {
   }
 
   var agoraTexto = dataHoraSaoPauloTexto_();
-  var id = gerarIdRoteiro_("ATD");
+  var id = envio.id || gerarIdRoteiro_("ATD");
 
   // "20 DIAS" significa que a solicitação já está atrasada há mais de 20 dias.
   // Não é calculado um novo prazo futuro.
   sol.appendRow([
     id, agoraTexto, protocolo, motivo, "", setor, observacao,
     sessao.rg, sessao.nome, "PENDENTE", razaoSocial,
-    eventoTemporario ? "SIM" : "NÃO"
+    eventoTemporario ? "SIM" : "NÃO",envio.assinatura
   ]);
 
+  SpreadsheetApp.flush();
   return {
     sucesso:true,
     mensagem:"Solicitação de vistoria registrada e enviada para as pendências do Roteiro.",
     id:id
   };
+  }finally{lock.releaseLock();}
 }
 
 
@@ -8116,8 +8146,12 @@ function obterRoteiroVistoriadoresWeb(dataFiltro, token) {
   // Carrega a base de militares uma única vez nesta execução.
   obterMapaMilitaresRoteiro_();
 
-  var vals = aba.getRange(2, 1, aba.getLastRow() - 1, 27).getDisplayValues();
-  var filtroChave = chaveDataRoteiro_(dataFiltro);
+  var filtroChave=chaveDataRoteiro_(dataFiltro),vals;
+  if(filtroChave){
+    var datas=aba.getRange(2,1,aba.getLastRow()-1,1).getDisplayValues(),linhas=[];
+    datas.forEach(function(r,i){if(chaveDataRoteiro_(r[0])===filtroChave)linhas.push(i+2);});
+    var mapa=lerLinhasProtocolosRoteiro_(aba,{datas:linhas},27);vals=linhas.map(function(l){return mapa[l];});
+  }else vals=aba.getRange(2,1,aba.getLastRow()-1,27).getDisplayValues();
   var gruposData = {};
 
   vals.forEach(function(r) {
