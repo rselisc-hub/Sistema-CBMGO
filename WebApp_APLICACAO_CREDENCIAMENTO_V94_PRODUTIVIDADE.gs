@@ -6473,125 +6473,100 @@ function garantirAbasEssenciaisRoteiroRapido_() {
 }
 
 function mapaAfastamentosPorDataRoteiro_(itens) {
-  var porData = {};
-  (itens || []).forEach(function(item) {
-    var d = criarDataSegura(item.dataRoteiro);
-    if (!d) return;
-    var dataTexto = formatarDataTexto(d);
-    if (porData[dataTexto]) return;
-
-    var mapa = {};
-    obterAfastamentosVistoriadoresNaData_(dataTexto).forEach(function(a) {
-      var rg = String(a.rg || "").trim();
-      if (rg) mapa[rg] = a;
-    });
-    porData[dataTexto] = mapa;
-  });
-  return porData;
+  var porData={},rgs=Object.create(null);
+  (itens||[]).forEach(function(item){var d=criarDataSegura(item.dataRoteiro);if(!d)return;porData[formatarDataTexto(d)]={};[item.rg1,item.rg2].forEach(function(rg){rg=String(rg||'').trim();if(rg)rgs[rg]=true;});});
+  var datas=Object.keys(porData);if(!datas.length||!Object.keys(rgs).length)return porData;
+  var aba=garantirEstruturaAfastamentos_();if(aba.getLastRow()<2)return porData;
+  var candidatos=aba.getRange(2,1,aba.getLastRow()-1,12).getDisplayValues().filter(function(r){return rgs[String(r[1]||'').trim()]&&String(r[11]||'ATIVO').trim().toUpperCase()!=='EXCLUÍDO'&&datas.some(function(d){return dataDentroPeriodoAfastamento_(d,r[3],r[4]);});});
+  if(!candidatos.length)return porData;
+  // A regra de elegibilidade é a mesma da consulta, sem reler pessoal por militar/data.
+  var funcoes=obterMapaFuncoesPessoal_();
+  candidatos.sort(function(a,b){return String(a[2]||'').trim().localeCompare(String(b[2]||'').trim(),'pt-BR');}).forEach(function(r){
+    var rg=String(r[1]||'').trim(),nome=String(r[2]||'').trim(),f=funcoes[rg];
+    if(!(f&&f.funcoes.indexOf('VISTORIADOR')!==-1)&&!(nome&&!nomeExcluidoDasVistorias_(nome,nome)))return;
+    datas.forEach(function(d){if(dataDentroPeriodoAfastamento_(d,r[3],r[4]))porData[d][rg]={rg:rg,militar:nome,dataInicial:r[3],dataFinal:r[4],motivo:r[5],observacao:r[6]};});
+  });return porData;
 }
 
 function finalizarRascunhosRoteiroRapido_(itens) {
-  itens = Array.isArray(itens) ? itens : [];
-  if (!itens.length) return;
-
-  var aba = garantirEstruturaRascunhoRoteiro_();
-  if (aba.getLastRow() < 2) return;
-
-  var protocolos = [];
-  var alvos = {};
-  itens.forEach(function(item) {
-    var d = criarDataSegura(item.dataRoteiro);
-    var p = normalizarProtocoloRoteiro_(item.protocolo);
-    if (!d || !p) return;
-    var dataTxt = formatarDataTexto(d);
-    alvos[dataTxt + "|" + p] = true;
-    if (protocolos.indexOf(p) === -1) protocolos.push(p);
-  });
-
-  var linhas = localizarLinhasProtocolosRoteiro_(aba, 2, protocolos);
-  var dados = lerLinhasProtocolosRoteiro_(aba, linhas, 21);
-  var enderecos = [];
-  protocolos.forEach(function(p) {
-    (linhas[p] || []).forEach(function(linha) {
-      var r = dados[linha];
-      var dataTxt = String(r[0] || "").trim();
-      if (alvos[dataTxt + "|" + p] &&
-          String(r[20] || "").trim().toUpperCase() === "RASCUNHO") {
-        enderecos.push("U" + linha);
-      }
-    });
-  });
-  if (enderecos.length) aba.getRangeList(enderecos).setValue("LANÇADO");
+  itens=Array.isArray(itens)?itens:[];if(!itens.length)return;
+  var aba=garantirEstruturaRascunhoRoteiro_(),fim=aba.getLastRow();if(fim<2)return;
+  var alvos=Object.create(null);itens.forEach(function(item){var d=criarDataSegura(item.dataRoteiro),p=normalizarProtocoloRoteiro_(item.protocolo);if(d&&p)alvos[formatarDataTexto(d)+'|'+p]=true;});
+  // Somente data/protocolo e status, em duas leituras, sem os 18 campos intermediários.
+  var chaves=aba.getRange(2,1,fim-1,2).getDisplayValues(),status=aba.getRange(2,21,fim-1,1).getDisplayValues(),enderecos=[];
+  chaves.forEach(function(r,i){if(alvos[String(r[0]||'').trim()+'|'+normalizarProtocoloRoteiro_(r[1])]&&String(status[i][0]||'').trim().toUpperCase()==='RASCUNHO')enderecos.push('U'+(i+2));});
+  if(enderecos.length)aba.getRangeList(enderecos).setValue('LANÇADO');
 }
 
 function atualizarStatusOrigemRoteiroRapido_(itens) {
-  itens = Array.isArray(itens) ? itens : [];
-  if (!itens.length) return;
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var pend = ss.getSheetByName("PENDENCIAS_VISTORIAS");
-  var sol = ss.getSheetByName("SOLICITACOES_VISTORIA");
-
-  itens.forEach(function(item) {
-    var pendId = String(item.origemPendenciaId || "").trim();
-    if (pendId && pend && pend.getLastRow() >= 2) {
-      var achadosP = pend.getRange(2,1,pend.getLastRow()-1,1)
-        .createTextFinder(pendId).matchEntireCell(true).findAll();
-
-      if (achadosP.length) {
-        var linhaP = achadosP[0].getRow();
-        pend.getRange(linhaP,5).setValue("REDISTRIBUÍDA");
-
-        var origemAtual = String(pend.getRange(linhaP,4).getDisplayValue() || "").trim().toUpperCase();
-        if (origemAtual === "CADASTRO MANUAL") {
-          pend.getRange(linhaP,11).setValue(String(item.regiao || "").trim());
-          pend.getRange(linhaP,13).setValue(String(item.observacao || "").trim());
-          pend.getRange(linhaP,16).setValue(String(item.tipoServico || "").trim());
-          pend.getRange(linhaP,17).setValue(String(item.bairro || "").trim());
-          pend.getRange(linhaP,18).setValue(String(item.ultimoAndamentoSiapi || "").trim());
-          pend.getRange(linhaP,19).setValue(String(item.razaoSocial || "").trim());
-          pend.getRange(linhaP,20).setValue(String(item.divisao || "").trim());
-          pend.getRange(linhaP,22).setValue(String(item.area || "").trim());
-        }
+  var pendIds=Object.create(null),solIds=Object.create(null);
+  (itens||[]).forEach(function(item){var p=String(item.origemPendenciaId||'').trim().toUpperCase(),s=String(item.origemSolicitacaoId||'').trim().toUpperCase();if(p)pendIds[p]=item;if(s)solIds[s]=item;});
+  if(!Object.keys(pendIds).length&&!Object.keys(solIds).length)return;
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  if(Object.keys(pendIds).length){var pend=ss.getSheetByName('PENDENCIAS_VISTORIAS');if(pend&&pend.getLastRow()>=2){
+    var vals=pend.getRange(2,1,pend.getLastRow()-1,4).getDisplayValues(),enderecos=[];
+    vals.forEach(function(r,i){var id=String(r[0]||'').toUpperCase(),item=pendIds[id];if(!item)return;delete pendIds[id];var linha=i+2;enderecos.push('E'+linha);
+      if(String(r[3]||'').trim().toUpperCase()==='CADASTRO MANUAL'){
+        pend.getRange(linha,11).setValue(String(item.regiao||'').trim());pend.getRange(linha,13).setValue(String(item.observacao||'').trim());
+        pend.getRange(linha,16,1,5).setValues([[item.tipoServico,item.bairro,item.ultimoAndamentoSiapi,item.razaoSocial,item.divisao].map(function(v){return String(v||'').trim();})]);
+        pend.getRange(linha,22).setValue(String(item.area||'').trim());
       }
-    }
+    });if(enderecos.length)pend.getRangeList(enderecos).setValue('REDISTRIBUÍDA');
+  }}
+  if(Object.keys(solIds).length){var sol=ss.getSheetByName('SOLICITACOES_VISTORIA');if(sol&&sol.getLastRow()>=2){var enderecos=[];
+    sol.getRange(2,1,sol.getLastRow()-1,1).getDisplayValues().forEach(function(r,i){var id=String(r[0]||'').toUpperCase();if(solIds[id]){delete solIds[id];enderecos.push('J'+(i+2));}});
+    if(enderecos.length)sol.getRangeList(enderecos).setValue('DISTRIBUÍDA');
+  }}
+}
 
-    var solId = String(item.origemSolicitacaoId || "").trim();
-    if (solId && sol && sol.getLastRow() >= 2) {
-      var achadosS = sol.getRange(2,1,sol.getLastRow()-1,1)
-        .createTextFinder(solId).matchEntireCell(true).findAll();
-      if (achadosS.length) sol.getRange(achadosS[0].getRow(),10).setValue("DISTRIBUÍDA");
-    }
-  });
+function localizarDistribuicoesExistentesRapido_(roteiro,itens){
+  var alvos=Object.create(null),existentes={};(itens||[]).forEach(function(item){var d=criarDataSegura(item.dataRoteiro),p=normalizarProtocoloRoteiro_(item.protocolo);if(d&&p)alvos[formatarDataTexto(d)+'|'+p]=true;});
+  var fim=roteiro.getLastRow();if(fim<2)return existentes;
+  var dados=roteiro.getRange(2,1,fim-1,2).getDisplayValues(),candidatas=[];
+  dados.forEach(function(r,i){var chave=String(r[0]||'').trim()+'|'+normalizarProtocoloRoteiro_(r[1]);if(alvos[chave])candidatas.push({i:i,chave:chave});});
+  if(candidatas.length){var status=roteiro.getRange(2,11,fim-1,1).getDisplayValues();candidatas.forEach(function(c){if(String(status[c.i][0]||'').trim().toUpperCase()!=='CANCELADO')existentes[c.chave]=true;});}
+  return existentes;
 }
 
 function marcarSincronizacaoRoteiroPendente_() {
-  PropertiesService.getScriptProperties().setProperty(
-    "ROTEIRO_SYNC_PENDENTE",
-    String(Date.now())
-  );
+  // Publica a revisão só depois das gravações, inclusive nas edições do roteiro.
+  SpreadsheetApp.flush();
+  PropertiesService.getScriptProperties().setProperty('ROTEIRO_SYNC_PENDENTE',String(Date.now())+'-'+Utilities.getUuid());
 }
 
 function sincronizarRoteiroPendente(token) {
-  exigirPerfil_(token, ["CONFERENCIA","ATENDIMENTO","VISTORIADOR","CONSULTA"]);
-
-  var props = PropertiesService.getScriptProperties();
-  var pendente = props.getProperty("ROTEIRO_SYNC_PENDENTE");
-  if (!pendente) return {sucesso:true, sincronizado:false};
-
-  var lock = LockService.getScriptLock();
-  if (!lock.tryLock(1000)) return {sucesso:true, sincronizado:false, ocupado:true};
-
-  try {
-    pendente = props.getProperty("ROTEIRO_SYNC_PENDENTE");
-    if (!pendente) return {sucesso:true, sincronizado:false};
-
-    gerarPlanilhaDiariaVistoriadores_();
-    props.deleteProperty("ROTEIRO_SYNC_PENDENTE");
-    return {sucesso:true, sincronizado:true};
-  } finally {
-    try { lock.releaseLock(); } catch (e) {}
+  exigirPerfil_(token,['CONFERENCIA','ATENDIMENTO','VISTORIADOR','CONSULTA']);
+  return sincronizarRoteiroPendenteInterno_();
+}
+var roteiroGeracaoEmExecucao_=false;
+function sincronizarRoteiroPendenteInterno_(bloqueioAtual){
+  var props=PropertiesService.getScriptProperties(),revisao=props.getProperty('ROTEIRO_SYNC_PENDENTE');
+  if(!revisao)return {sucesso:true,sincronizado:false};
+  var lock=bloqueioAtual||LockService.getScriptLock(),bloqueioJaExistia=!!bloqueioAtual;if(!bloqueioJaExistia&&!lock.tryLock(1000))return {sucesso:true,sincronizado:false,ocupado:true};
+  var posse=null;
+  try{
+    revisao=props.getProperty('ROTEIRO_SYNC_PENDENTE');if(!revisao)return {sucesso:true,sincronizado:false};
+    var anterior=null;try{anterior=JSON.parse(props.getProperty('ROTEIRO_SYNC_EM_EXECUCAO')||'null');}catch(e){}
+    // A posse expira após o limite normal de execução para recuperar interrupções.
+    if(anterior&&Date.now()-Number(anterior.inicio)<7*60*1000)return {sucesso:true,sincronizado:false,ocupado:true};
+    posse=JSON.stringify({id:Utilities.getUuid(),inicio:Date.now()});props.setProperty('ROTEIRO_SYNC_EM_EXECUCAO',posse);
+  }finally{if(!bloqueioJaExistia)lock.releaseLock();}
+  var concluiu=false;
+  try{
+    // Só escreve ROTEIRO/MODELO derivados. A base canônica continua protegida
+    // nas rotinas de gravação; gerar a apresentação não segura novas distribuições.
+    roteiroGeracaoEmExecucao_=true;
+    try{gerarPlanilhaDiariaVistoriadores_();SpreadsheetApp.flush();concluiu=true;}finally{roteiroGeracaoEmExecucao_=false;}
+  }finally{
+    if(!bloqueioJaExistia)lock.waitLock(5000);
+    try{
+      if(props.getProperty('ROTEIRO_SYNC_EM_EXECUCAO')===posse){
+        if(concluiu&&props.getProperty('ROTEIRO_SYNC_PENDENTE')===revisao)props.deleteProperty('ROTEIRO_SYNC_PENDENTE');
+        props.deleteProperty('ROTEIRO_SYNC_EM_EXECUCAO');
+      }
+    }finally{if(!bloqueioJaExistia)lock.releaseLock();}
   }
+  return {sucesso:true,sincronizado:true};
 }
 
 function lancarDistribuicaoRoteiroSiapi(itens, token) {
@@ -6599,32 +6574,12 @@ function lancarDistribuicaoRoteiroSiapi(itens, token) {
   itens = Array.isArray(itens) ? itens : [];
   if (!itens.length) throw new Error("Nenhum protocolo selecionado.");
 
-  var abas = garantirAbasEssenciaisRoteiroRapido_();
-  var roteiro = abas.roteiro;
-  var hist = abas.hist;
-
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
 
   try {
-    var protocolos = [];
-    itens.forEach(function(item) {
-      var p = normalizarProtocoloRoteiro_(item.protocolo);
-      if (p && protocolos.indexOf(p) === -1) protocolos.push(p);
-    });
-
-    // Procura somente os protocolos selecionados, não a planilha inteira.
-    var linhasPorProtocolo = localizarLinhasProtocolosRoteiro_(roteiro, 2, protocolos);
-    var existentes = {};
-    var dadosExistentes = lerLinhasProtocolosRoteiro_(roteiro, linhasPorProtocolo, 11);
-
-    protocolos.forEach(function(p) {
-      (linhasPorProtocolo[p] || []).forEach(function(linha) {
-        var r = dadosExistentes[linha];
-        if (String(r[10] || "").trim().toUpperCase() === "CANCELADO") return;
-        existentes[String(r[0] || "").trim() + "|" + p] = true;
-      });
-    });
+    var abas=garantirAbasEssenciaisRoteiroRapido_(),roteiro=abas.roteiro,hist=abas.hist;
+    var existentes=localizarDistribuicoesExistentesRapido_(roteiro,itens);
 
     // Afastamentos são carregados uma única vez por data do lote.
     var afastamentosPorData = mapaAfastamentosPorDataRoteiro_(itens);
@@ -7593,7 +7548,16 @@ function montarNomeMilitarRoteiro_(rg, nome) {
   return nome || rg;
 }
 
-function gerarPlanilhaDiariaVistoriadores_() {
+function gerarPlanilhaDiariaVistoriadores_(bloqueioAtual) {
+  if(roteiroGeracaoEmExecucao_)return gerarPlanilhaDiariaVistoriadoresConteudo_();
+  // Todas as entradas da geração compartilham a mesma posse, inclusive as
+  // chamadas antigas feitas por edições/cancelamentos com trava já adquirida.
+  var lock=bloqueioAtual||LockService.getScriptLock(),jaTinha=!!bloqueioAtual;
+  if(!jaTinha)lock.waitLock(5000);
+  try{marcarSincronizacaoRoteiroPendente_();}finally{if(!jaTinha)lock.releaseLock();}
+  return sincronizarRoteiroPendenteInterno_(bloqueioAtual);
+}
+function gerarPlanilhaDiariaVistoriadoresConteudo_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var origem = ss.getSheetByName("ROTEIRO_VISTORIAS");
   if (!origem) return;
@@ -8760,7 +8724,7 @@ function apagarVistoriaDia(dataRoteiro, protocolo, token) {
       ]);
     }
 
-    gerarPlanilhaDiariaVistoriadores_();
+    gerarPlanilhaDiariaVistoriadores_(lock);
 
     return {
       sucesso:true,
@@ -9119,8 +9083,8 @@ function atualizarVistoriadoresVistoriasDiaEmLote(itens, equipe, token) {
 
 function atualizarPlanilhaDiariaVistoriadores(token) {
   exigirPerfil_(token, ["CONFERENCIA"]);
-  gerarPlanilhaDiariaVistoriadores_();
-  return {sucesso:true, mensagem:"Planilha ROTEIRO atualizada."};
+  var r=gerarPlanilhaDiariaVistoriadores_();
+  return {sucesso:true, mensagem:r&&r.ocupado?"Atualização do ROTEIRO ficou pendente enquanto outra geração termina.":"Planilha ROTEIRO atualizada."};
 }
 
 

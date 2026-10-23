@@ -9503,7 +9503,9 @@
       sincronizarRoteiroPendenteEmSegundoPlano_();
     }
 
+    var distribuicaoRoteiroEnviando=false;
     function confirmarLancamentoSelecionadosRoteiro() {
+      if(distribuicaoRoteiroEnviando)return;
       if (!indicesLancamentoRoteiro.length) return;
 
       var data = (document.getElementById('rot-modal-data-roteiro') || {}).value || '';
@@ -9567,18 +9569,23 @@
       if (!itens.length) return;
 
       var btn = document.getElementById('btn-confirmar-distribuicao');
+      distribuicaoRoteiroEnviando=true;
+      var controlesDistribuicao=Array.from(document.querySelectorAll('#modal-distribuicao-roteiro input,#modal-distribuicao-roteiro select,#modal-distribuicao-roteiro button')).map(function(el){var estado={el:el,disabled:el.disabled};el.disabled=true;return estado;});
+      function liberarDistribuicao(){distribuicaoRoteiroEnviando=false;controlesDistribuicao.forEach(function(x){x.el.disabled=x.disabled;});}
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Confirmando...';
 
       google.script.run
         .withSuccessHandler(function(r) {
+          if(!r||!r.sucesso){liberarDistribuicao();btn.disabled=false;btn.innerHTML='Confirmar lançamento';alert('Não foi possível confirmar a distribuição. Confira a lista antes de repetir.');return;}
+          liberarDistribuicao();
           btn.disabled = false;
           btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Confirmar lançamento';
 
           var modal = bootstrap.Modal.getInstance(document.getElementById('modal-distribuicao-roteiro'));
-          if (modal) modal.hide();
+          if(modal){var modalEl=document.getElementById('modal-distribuicao-roteiro');modal.hide();if(modalEl.classList.contains('show'))modalEl.addEventListener('shown.bs.modal',function(){modal.hide();},{once:true});}
 
-          alert(r.mensagem || 'Distribuição registrada.');
+
 
           indicesLancamentoRoteiro = [];
 
@@ -9597,12 +9604,14 @@
           });
 
           renderizarPreviewSiapi();
+          var statusDistribuicao=document.getElementById('roteiro-status');if(statusDistribuicao){statusDistribuicao.className='alert alert-success mb-4';statusDistribuicao.textContent=r.mensagem||'Distribuição registrada.';}
 
           // Não sincroniza planilhas derivadas imediatamente.
           // Elas ficam marcadas como pendentes e serão atualizadas em uma
           // próxima ação natural do usuário, sem segurar esta confirmação.
         })
         .withFailureHandler(function(err) {
+          liberarDistribuicao();
           btn.disabled = false;
           btn.innerHTML = '<i class="bi bi-check2-circle me-1"></i>Confirmar lançamento';
           capturarErroServidor(err);
