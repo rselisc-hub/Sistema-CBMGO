@@ -341,6 +341,7 @@
       background:#fff;
       height:100%;
     }
+    .docs-protocolo-evento { background:#F062B0; color:#111111; border-radius:5px; padding:4px 6px; }
     .cred-resumo-numero { font-size:1.8rem; font-weight:800; line-height:1; }
     .cred-table th {
       background:#f4d9e7;
@@ -1144,6 +1145,7 @@
       <div class="col-md-2"><label class="form-label fw-bold">Data do Documento *</label><input type="date" class="form-control" id="docs-data"></div>
       <div class="col-md-6"><label class="form-label fw-bold">Razão Social ou Nome Fantasia *</label><input class="form-control" id="docs-razao"></div>
       <div class="col-md-6"><label class="form-label fw-bold">Observação</label><input class="form-control" id="docs-observacao"></div>
+      <div class="col-12"><label class="form-check-label"><input class="form-check-input me-2" type="checkbox" id="docs-evento-temporario">Evento temporário — destacar o protocolo em rosa</label></div>
       <div class="col-12"><button class="btn btn-dark" onclick="salvarNovoDocDespacho()"><i class="bi bi-floppy me-1"></i>Salvar DOC</button></div>
     </div></div>
 <div class="card card-custom p-4"><div class="d-flex flex-wrap justify-content-between gap-3 mb-3"><div><h5 class="fw-bold mb-1" id="docs-lista-titulo">Documentos</h5><span id="docs-copia-aviso" class="small text-success fw-semibold" style="display:none;"></span><div class="small text-muted">Prazo somente para documentos em aberto: <span class="badge bg-success">0–8 dias</span> <span class="badge" style="background:#f0a23a;">9–17 dias</span> <span class="badge bg-danger">18+ dias</span></div><div class="d-flex flex-wrap gap-2 mt-2"><span class="badge text-bg-light border" id="docs-resumo-abertos">Em aberto: 0</span><span class="badge text-bg-light border" id="docs-resumo-aguardando">Aguardando resposta: 0</span><span class="badge text-bg-light border" id="docs-resumo-concluidos">Concluídos: 0</span></div></div><div class="d-flex gap-2 flex-wrap"><select class="form-select" id="docs-filtro-status" onchange="carregarDocsDespacho()" style="width:auto;min-width:170px;"><option value="ABERTOS" selected>Em aberto</option><option value="CONCLUIDOS">Concluídos / OK</option><option value="TODOS">Todos</option></select><input type="search" class="form-control" id="docs-pesquisa-protocolo" placeholder="Pesquisar protocolo..." oninput="renderizarDocsDespacho()" style="width:220px;max-width:100%;"><button class="btn btn-outline-secondary" onclick="carregarDocsDespacho()" title="Atualizar lista"><i class="bi bi-arrow-repeat"></i></button></div></div><div class="table-responsive"><table class="table table-sm table-hover align-middle"><thead><tr><th>Prazo</th><th>Tipo</th><th>Protocolo</th><th>Vistoriador</th><th>Data</th><th>Preenchido por</th><th>Razão Social</th><th>Origem</th><th>Andamento</th><th id="docs-col-gestao">Gestão</th></tr></thead><tbody id="docs-tbody"><tr><td colspan="10" class="text-muted">Carregando...</td></tr></tbody></table></div></div>
@@ -1173,6 +1175,7 @@
         <div class="col-md-5"><label class="form-label fw-bold">Vistoriador</label><select class="form-select" id="doc-editar-vistoriador"><option value="">Não informado</option></select></div>
         <div class="col-md-3"><label class="form-label fw-bold">Data do Documento *</label><input type="date" class="form-control" id="doc-editar-data"></div>
         <div class="col-md-9"><label class="form-label fw-bold">Razão Social ou Nome Fantasia *</label><input class="form-control" id="doc-editar-razao"></div>
+        <div class="col-12"><label><input type="checkbox" class="form-check-input me-2" id="doc-editar-evento-temporario">Evento temporário</label></div>
         <div class="col-12"><label class="form-label fw-bold">Observação</label><textarea class="form-control" id="doc-editar-observacao" rows="3"></textarea></div>
       </div><div class="alert alert-light border mt-3 mb-0 small">Origem, usuário que cadastrou, status, andamento e histórico não são alterados por esta edição.</div></div>
       <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-warning" onclick="salvarEdicaoDadosDocGestao()"><i class="bi bi-pencil-square me-1"></i>Salvar dados</button></div>
@@ -1636,6 +1639,7 @@
           <div class="col-md-2">
             <label class="form-label small fw-bold">Movimentação</label>
             <input class="form-control" id="conf-cons-movimentacao">
+          </div><div class="col-md-3"><label class="form-label small fw-bold" for="conf-cons-conferente">Último conferente</label><input class="form-control" id="conf-cons-conferente" list="conf-cons-conferentes" placeholder="Nome ou RG"><datalist id="conf-cons-conferentes"></datalist>
           </div>
           <div class="col-md-1 d-grid">
             <button class="btn btn-dark" onclick="carregarConsultaConferencia()">
@@ -2374,6 +2378,7 @@
         <span><strong>Obs.:</strong> protocolo com observação ficará vermelho na planilha e terá comentário.</span>
       </div>
 
+      <div class="small mb-2" role="status" id="rot-rascunho-gravacao-status"></div><button id="rot-rascunho-repetir" class="btn btn-sm btn-outline-primary mb-2" style="display:none" onclick="gravarPreferenciasRascunhoPendentes()">Tentar salvar rascunho novamente</button>
       <div class="table-responsive border rounded">
         <table class="table table-sm table-hover align-middle mb-0 roteiro-table" style="font-size:.98rem; table-layout:fixed; width:100%;">
           <thead class="table-dark">
@@ -3641,12 +3646,12 @@
     }
     function voltarDocsDespacho(){if(docsOrigemTela==='atendimento'){abrirModuloAtendimento();return;}if(docsOrigemTela==='conferencia'){abrirModuloConferencia();return;}if(docsOrigemTela==='gestor'){abrirModuloGestor();return;}voltarInicio();}
     function carregarVistoriadoresDocs(){google.script.run.withSuccessHandler(function(r){docsVistoriadores=(r&&r.militares)||[];var s=document.getElementById('docs-vistoriador');if(!s)return;s.innerHTML='<option value="">Não informado</option>'+docsVistoriadores.map(function(m){return '<option value="'+encodeURIComponent(JSON.stringify(m))+'">'+escaparHtmlRoteiro(((m.graduacao||'')+' '+(m.nome||'')).trim())+'</option>';}).join('');}).withFailureHandler(capturarErroServidor).obterVistoriadoresDocs(sessaoToken);}
-    function salvarNovoDocDespacho(){var v={},sel=document.getElementById('docs-vistoriador'),raw=sel?sel.value:'';if(raw){try{v=JSON.parse(decodeURIComponent(raw));}catch(e){}}var d={tipoDocumento:document.getElementById('docs-tipo').value,protocolo:document.getElementById('docs-protocolo').value,vistoriadorRg:v.rg||'',vistoriador:v.nome||'',dataDocumento:document.getElementById('docs-data').value,razaoSocial:document.getElementById('docs-razao').value,observacao:document.getElementById('docs-observacao').value};google.script.run.withSuccessHandler(function(r){alert(r.mensagem||'Salvo.');['docs-protocolo','docs-data','docs-razao','docs-observacao'].forEach(function(id){document.getElementById(id).value='';});document.getElementById('docs-tipo').value='';document.getElementById('docs-vistoriador').value='';carregarDocsDespacho();}).withFailureHandler(capturarErroServidor).cadastrarDocDespacho(d,sessaoToken);}
+    function salvarNovoDocDespacho(){var v={},sel=document.getElementById('docs-vistoriador'),raw=sel?sel.value:'';if(raw){try{v=JSON.parse(decodeURIComponent(raw));}catch(e){}}var d={tipoDocumento:document.getElementById('docs-tipo').value,protocolo:document.getElementById('docs-protocolo').value,vistoriadorRg:v.rg||'',vistoriador:v.nome||'',dataDocumento:document.getElementById('docs-data').value,razaoSocial:document.getElementById('docs-razao').value,observacao:document.getElementById('docs-observacao').value,eventoTemporario:document.getElementById('docs-evento-temporario').checked};google.script.run.withSuccessHandler(function(r){alert(r.mensagem||'Salvo.');['docs-protocolo','docs-data','docs-razao','docs-observacao'].forEach(function(id){document.getElementById(id).value='';});document.getElementById('docs-tipo').value='';document.getElementById('docs-evento-temporario').checked=false;document.getElementById('docs-vistoriador').value='';carregarDocsDespacho();}).withFailureHandler(capturarErroServidor).cadastrarDocDespacho(d,sessaoToken);}
     function classePrazoDoc(x){if(x==='FINALIZADO')return 'text-bg-light border';return x==='VERDE'?'bg-success':(x==='LARANJA'?'':'bg-danger');}
     function estiloPrazoDoc(x){return x==='LARANJA'?'background:#f0a23a;color:white;':'';}
     function carregarDocsDespacho(){var st=(document.getElementById('docs-filtro-status')||{}).value||'ABERTOS',t=document.getElementById('docs-tbody');if(t)t.innerHTML='<tr><td colspan="10" class="text-muted py-4 text-center"><span class="spinner-border spinner-border-sm me-2"></span>Carregando DOCs...</td></tr>';google.script.run.withSuccessHandler(function(r){docsCache=(r&&r.registros)||[];var z=(r&&r.resumo)||{};var a=document.getElementById('docs-resumo-abertos'),g=document.getElementById('docs-resumo-aguardando'),c=document.getElementById('docs-resumo-concluidos');if(a)a.textContent='Em aberto: '+(z.abertos||0);if(g)g.textContent='Aguardando resposta: '+(z.aguardandoResposta||0);if(c)c.textContent='Concluídos: '+(z.concluidos||0);renderizarDocsDespacho();}).withFailureHandler(function(err){if(t)t.innerHTML='<tr><td colspan="10" class="text-danger py-4 text-center">Não foi possível carregar os DOCs. Tente novamente.</td></tr>';capturarErroServidor(err);}).listarDocsDespacho({situacao:st},sessaoToken);}
     function copiarProtocoloDoc(texto){texto=String(texto||'').trim();if(!texto)return;function ok(){var el=document.getElementById('docs-copia-aviso');if(el){el.textContent='Protocolo '+texto+' copiado.';el.style.display='inline';setTimeout(function(){el.style.display='none';},1800);}}function fallback(){var ta=document.createElement('textarea');ta.value=texto;ta.setAttribute('readonly','');ta.style.position='absolute';ta.style.left='-9999px';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');ok();}catch(e){alert('Protocolo: '+texto);}document.body.removeChild(ta);}if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(texto).then(ok).catch(fallback);}else{fallback();}}
-    function renderizarDocsDespacho(){var t=document.getElementById('docs-tbody');if(!t)return;var gestor=docsOrigemTela==='gestor';var busca=String((document.getElementById('docs-pesquisa-protocolo')||{}).value||'').trim().toUpperCase();var indicesDocs=new Map();docsCache.forEach(function(x,i){if(!indicesDocs.has(x))indicesDocs.set(x,i);});var lista=docsCache.filter(function(x){return !busca||String(x.protocolo||'').toUpperCase().indexOf(busca)!==-1;});if(!lista.length){t.innerHTML='<tr><td colspan="10" class="text-muted">'+(busca?'Nenhum protocolo encontrado para a pesquisa informada.':'Nenhum documento encontrado.')+'</td></tr>';return;}t.innerHTML=lista.map(function(x){var i=indicesDocs.get(x);var finalizado=(x.status==='CONCLUÍDO'||x.status==='ARQUIVADO');var prazo=finalizado?'<span class="text-muted">—</span>':'<span class="badge docs-prazo-badge '+classePrazoDoc(x.faixaPrazo)+'" style="'+estiloPrazoDoc(x.faixaPrazo)+'">'+((x.diasDocumento===null||x.diasDocumento===undefined)?'—':x.diasDocumento+' d')+'</span>';var protocolo=escaparHtmlRoteiro(x.protocolo||'');var protocoloJs=String(x.protocolo||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");var celProtocolo='<div class="d-flex align-items-center gap-2 flex-wrap"><span class="fw-semibold">'+protocolo+'</span><button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="copiarProtocoloDoc(\''+protocoloJs+'\')" title="Copiar protocolo"><i class="bi bi-copy"></i></button><button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="abrirHistoricoDocDespacho('+i+')" title="Histórico de trâmites"><i class="bi bi-clock-history"></i></button></div>';var andamento=String(x.andamento||'').trim();if(!andamento){if(x.status==='CONCLUÍDO')andamento='CONCLUÍDO';else if(x.status==='ARQUIVADO')andamento='ARQUIVADO';else if(x.status==='AGUARDANDO RESPOSTA')andamento='AGUARDANDO RESPOSTA';else if(x.status==='EM ANDAMENTO')andamento='EM ANÁLISE';else andamento='AGUARDANDO ANÁLISE';}var gestao=gestor?'<div class="d-flex flex-wrap gap-1"><button class="btn btn-sm btn-outline-warning" onclick="editarDadosDocGestao('+i+')"><i class="bi bi-pencil-square me-1"></i>Editar</button><button class="btn btn-sm btn-outline-primary" onclick="editarDocGestao('+i+')">Atualizar</button></div>':'';return '<tr><td>'+prazo+'</td><td>'+escaparHtmlRoteiro(x.tipoDocumento||'')+'</td><td>'+celProtocolo+'</td><td>'+escaparHtmlRoteiro(x.vistoriador||'')+'</td><td>'+escaparHtmlRoteiro(x.dataDocumento||'')+'</td><td>'+escaparHtmlRoteiro(x.preenchidoPor||'')+'</td><td>'+escaparHtmlRoteiro(x.razaoSocial||'')+'</td><td>'+escaparHtmlRoteiro(x.origem||'')+'</td><td><span class="fw-semibold">'+escaparHtmlRoteiro(andamento)+'</span></td><td'+(gestor?'':' style="display:none;"')+'>'+gestao+'</td></tr>';}).join('');}
+    function renderizarDocsDespacho(){var t=document.getElementById('docs-tbody');if(!t)return;var gestor=docsOrigemTela==='gestor';var busca=String((document.getElementById('docs-pesquisa-protocolo')||{}).value||'').trim().toUpperCase();var indicesDocs=new Map();docsCache.forEach(function(x,i){if(!indicesDocs.has(x))indicesDocs.set(x,i);});var lista=docsCache.filter(function(x){return !busca||String(x.protocolo||'').toUpperCase().indexOf(busca)!==-1;});if(!lista.length){t.innerHTML='<tr><td colspan="10" class="text-muted">'+(busca?'Nenhum protocolo encontrado para a pesquisa informada.':'Nenhum documento encontrado.')+'</td></tr>';return;}t.innerHTML=lista.map(function(x){var i=indicesDocs.get(x);var finalizado=(x.status==='CONCLUÍDO'||x.status==='ARQUIVADO');var prazo=finalizado?'<span class="text-muted">—</span>':'<span class="badge docs-prazo-badge '+classePrazoDoc(x.faixaPrazo)+'" style="'+estiloPrazoDoc(x.faixaPrazo)+'">'+((x.diasDocumento===null||x.diasDocumento===undefined)?'—':x.diasDocumento+' d')+'</span>';var protocolo=escaparHtmlRoteiro(x.protocolo||'');var protocoloJs=String(x.protocolo||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");var celProtocolo='<div class="d-flex align-items-center gap-2 flex-wrap"><span class="fw-semibold '+(x.eventoTemporario?'docs-protocolo-evento':'')+'"'+(x.eventoTemporario?' title="Evento temporário"':'')+'>'+protocolo+'</span><button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="copiarProtocoloDoc(\''+protocoloJs+'\')" title="Copiar protocolo"><i class="bi bi-copy"></i></button><button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="abrirHistoricoDocDespacho('+i+')" title="Histórico de trâmites"><i class="bi bi-clock-history"></i></button></div>';var andamento=String(x.andamento||'').trim();if(!andamento){if(x.status==='CONCLUÍDO')andamento='CONCLUÍDO';else if(x.status==='ARQUIVADO')andamento='ARQUIVADO';else if(x.status==='AGUARDANDO RESPOSTA')andamento='AGUARDANDO RESPOSTA';else if(x.status==='EM ANDAMENTO')andamento='EM ANÁLISE';else andamento='AGUARDANDO ANÁLISE';}var gestao=gestor?'<div class="d-flex flex-wrap gap-1"><button class="btn btn-sm btn-outline-warning" onclick="editarDadosDocGestao('+i+')"><i class="bi bi-pencil-square me-1"></i>Editar</button><button class="btn btn-sm btn-outline-primary" onclick="editarDocGestao('+i+')">Atualizar</button></div>':'';return '<tr><td>'+prazo+'</td><td>'+escaparHtmlRoteiro(x.tipoDocumento||'')+'</td><td>'+celProtocolo+'</td><td>'+escaparHtmlRoteiro(x.vistoriador||'')+'</td><td>'+escaparHtmlRoteiro(x.dataDocumento||'')+'</td><td>'+escaparHtmlRoteiro(x.preenchidoPor||'')+'</td><td>'+escaparHtmlRoteiro(x.razaoSocial||'')+'</td><td>'+escaparHtmlRoteiro(x.origem||'')+'</td><td><span class="fw-semibold">'+escaparHtmlRoteiro(andamento)+'</span></td><td'+(gestor?'':' style="display:none;"')+'>'+gestao+'</td></tr>';}).join('');}
     function abrirHistoricoDocDespacho(i){
       var x=docsCache[i];if(!x)return;
       var titulo=document.getElementById('doc-historico-titulo');
@@ -3668,8 +3673,8 @@
     }
     function dataBrParaInputDocs_(s){var m=String(s||'').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);if(m)return m[3]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0');if(/^\d{4}-\d{2}-\d{2}$/.test(String(s||'')))return String(s);return '';}
     function preencherSelectVistoriadorEdicao_(rg,nome){var s=document.getElementById('doc-editar-vistoriador');if(!s)return;s.innerHTML='<option value="">Não informado</option>'+docsVistoriadores.map(function(m){var v=encodeURIComponent(JSON.stringify(m));return '<option value="'+v+'">'+escaparHtmlRoteiro(((m.graduacao||'')+' '+(m.nome||'')).trim())+'</option>';}).join('');for(var i=0;i<s.options.length;i++){if(!s.options[i].value)continue;try{var o=JSON.parse(decodeURIComponent(s.options[i].value));if((rg&&String(o.rg||'')===String(rg))||(!rg&&nome&&String(o.nome||'').toUpperCase()===String(nome).toUpperCase())){s.selectedIndex=i;break;}}catch(e){}}}
-    function editarDadosDocGestao(i){var x=docsCache[i];if(!x)return;document.getElementById('doc-editar-id').value=x.id||'';document.getElementById('doc-editar-identificacao').textContent=(x.protocolo||'')+' — '+(x.razaoSocial||'');var st=document.getElementById('doc-editar-tipo');st.innerHTML='<option value="">Selecione...</option>'+TIPOS_DOCS.map(function(t){return '<option>'+t+'</option>';}).join('');st.value=x.tipoDocumento||'';document.getElementById('doc-editar-protocolo').value=x.protocolo||'';document.getElementById('doc-editar-data').value=dataBrParaInputDocs_(x.dataDocumento);document.getElementById('doc-editar-razao').value=x.razaoSocial||'';document.getElementById('doc-editar-observacao').value=x.observacao||'';preencherSelectVistoriadorEdicao_(x.vistoriadorRg||'',x.vistoriador||'');new bootstrap.Modal(document.getElementById('modal-doc-editar-dados')).show();}
-    function salvarEdicaoDadosDocGestao(){var sel=document.getElementById('doc-editar-vistoriador'),v={};if(sel&&sel.value){try{v=JSON.parse(decodeURIComponent(sel.value));}catch(e){}}var d={id:document.getElementById('doc-editar-id').value,tipoDocumento:document.getElementById('doc-editar-tipo').value,protocolo:document.getElementById('doc-editar-protocolo').value,vistoriadorRg:v.rg||'',vistoriador:v.nome||'',dataDocumento:document.getElementById('doc-editar-data').value,razaoSocial:document.getElementById('doc-editar-razao').value,observacao:document.getElementById('doc-editar-observacao').value};google.script.run.withSuccessHandler(function(r){var modal=bootstrap.Modal.getInstance(document.getElementById('modal-doc-editar-dados'));if(modal)modal.hide();alert((r&&r.mensagem)||'Dados atualizados.');carregarDocsDespacho();}).withFailureHandler(capturarErroServidor).editarDadosDocDespachoGestao(d,sessaoToken);}
+    function editarDadosDocGestao(i){var x=docsCache[i];if(!x)return;document.getElementById('doc-editar-id').value=x.id||'';document.getElementById('doc-editar-identificacao').textContent=(x.protocolo||'')+' — '+(x.razaoSocial||'');var st=document.getElementById('doc-editar-tipo');st.innerHTML='<option value="">Selecione...</option>'+TIPOS_DOCS.map(function(t){return '<option>'+t+'</option>';}).join('');st.value=x.tipoDocumento||'';document.getElementById('doc-editar-protocolo').value=x.protocolo||'';document.getElementById('doc-editar-data').value=dataBrParaInputDocs_(x.dataDocumento);document.getElementById('doc-editar-razao').value=x.razaoSocial||'';document.getElementById('doc-editar-observacao').value=x.observacao||'';document.getElementById('doc-editar-evento-temporario').checked=!!x.eventoTemporario;preencherSelectVistoriadorEdicao_(x.vistoriadorRg||'',x.vistoriador||'');new bootstrap.Modal(document.getElementById('modal-doc-editar-dados')).show();}
+    function salvarEdicaoDadosDocGestao(){var sel=document.getElementById('doc-editar-vistoriador'),v={};if(sel&&sel.value){try{v=JSON.parse(decodeURIComponent(sel.value));}catch(e){}}var d={id:document.getElementById('doc-editar-id').value,tipoDocumento:document.getElementById('doc-editar-tipo').value,protocolo:document.getElementById('doc-editar-protocolo').value,vistoriadorRg:v.rg||'',vistoriador:v.nome||'',dataDocumento:document.getElementById('doc-editar-data').value,razaoSocial:document.getElementById('doc-editar-razao').value,observacao:document.getElementById('doc-editar-observacao').value,eventoTemporario:document.getElementById('doc-editar-evento-temporario').checked};google.script.run.withSuccessHandler(function(r){var modal=bootstrap.Modal.getInstance(document.getElementById('modal-doc-editar-dados'));if(modal)modal.hide();alert((r&&r.mensagem)||'Dados atualizados.');carregarDocsDespacho();}).withFailureHandler(capturarErroServidor).editarDadosDocDespachoGestao(d,sessaoToken);}
     function editarDocGestao(i){var x=docsCache[i];if(!x)return;document.getElementById('doc-gestao-id').value=x.id||'';document.getElementById('doc-gestao-identificacao').textContent=(x.protocolo||'')+' — '+(x.razaoSocial||'');document.getElementById('doc-gestao-status-atual').value=x.status||'';var andEl=document.getElementById('doc-gestao-andamento');var atual=String(x.andamento||'').toUpperCase();andEl.value=ANDAMENTOS_DOCS.indexOf(atual)!==-1?atual:(x.status==='CONCLUÍDO'?'CONCLUÍDO':(x.status==='ARQUIVADO'?'ARQUIVADO':'AGUARDANDO ANÁLISE'));document.getElementById('doc-gestao-resposta').value=x.respostaOficiais||'';document.getElementById('doc-gestao-justificativa').value=x.justificativa||'';new bootstrap.Modal(document.getElementById('modal-doc-gestao')).show();}
     function salvarAtualizacaoDocGestao(){var andamento=document.getElementById('doc-gestao-andamento').value;if(!andamento){alert('Selecione o andamento.');return;}var d={id:document.getElementById('doc-gestao-id').value,andamento:andamento,respostaOficiais:document.getElementById('doc-gestao-resposta').value,justificativa:document.getElementById('doc-gestao-justificativa').value};google.script.run.withSuccessHandler(function(r){var modal=bootstrap.Modal.getInstance(document.getElementById('modal-doc-gestao'));if(modal)modal.hide();alert(r.mensagem||'Atualizado.');carregarDocsDespacho();}).withFailureHandler(capturarErroServidor).atualizarDocDespachoGestao(d,sessaoToken);}
     function abrirIsencoesTaxa(){esconderTelasPrincipais();document.getElementById('isencoes-screen').style.display='block';registrarTelaAtual('isencoes');carregarIsencoesTaxa();}
@@ -7268,7 +7273,7 @@
     var conferenciaConclusaoEmAndamento = false;
     var conferenciaConclusaoNaoConfirmada = null;
     window.addEventListener('beforeunload',function(event){
-      if(conferenciaConclusaoEmAndamento || conferenciaConclusaoNaoConfirmada){event.preventDefault();event.returnValue='';}
+      if(conferenciaConclusaoEmAndamento || conferenciaConclusaoNaoConfirmada || Object.keys(preferenciasRascunhoPendentes||{}).length){event.preventDefault();event.returnValue='';}
     });
     function informarGravacaoConferencia(texto,erro) {
       var el=document.getElementById('conf-gravacao-status');
@@ -7447,7 +7452,9 @@
     }
 
 
+    var conferenciaConsultaSequencia=0;
     function carregarConsultaConferencia() {
+      var sequencia=++conferenciaConsultaSequencia;
       var filtros = {
         modo:document.getElementById('conf-cons-modo').value || 'TODOS',
         status:document.getElementById('conf-cons-status').value || '',
@@ -7456,16 +7463,19 @@
         protocolo:document.getElementById('conf-cons-protocolo').value || '',
         razaoSocial:document.getElementById('conf-cons-razao').value || '',
         movimentacao:document.getElementById('conf-cons-movimentacao').value || '',
+        ultimoConferente:document.getElementById('conf-cons-conferente').value || '',
         dataIni:document.getElementById('conf-cons-data-ini').value || '',
         dataFim:document.getElementById('conf-cons-data-fim').value || ''
       };
 
       var tb = document.getElementById('conf-cons-tbody');
-      tb.innerHTML = '<tr><td colspan="9" class="text-center py-4"><div class="spinner-border spinner-border-sm"></div></td></tr>';
+      tb.innerHTML = '<tr><td colspan="10" class="text-center py-4"><div class="spinner-border spinner-border-sm"></div></td></tr>';
 
       google.script.run
         .withSuccessHandler(function(r) {
+          if(sequencia!==conferenciaConsultaSequencia)return;
           var itens = (r && r.itens) ? r.itens : [];
+          document.getElementById('conf-cons-conferentes').innerHTML=((r&&r.conferentes)||[]).map(function(n){return '<option value="'+escaparHtmlRoteiro(n)+'"></option>';}).join('');
 
           if (!itens.length) {
             tb.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">Nenhum protocolo encontrado.</td></tr>';
@@ -7479,7 +7489,7 @@
               '<td>' + escaparHtmlRoteiro(x.movimentacao || '-') + '</td>' +
               '<td class="text-center">' + escaparHtmlRoteiro(x.divisao || '-') + '</td>' +
               '<td><span class="badge text-bg-light border">' + escaparHtmlRoteiro(x.statusSiapi || '-') + '</span></td>' +
-              '<td>' + escaparHtmlRoteiro(x.conferente || '-') + '</td>' +
+              '<td>' + escaparHtmlRoteiro(x.ultimoConferente || '-') + '</td>' +
               '<td>' + escaparHtmlRoteiro(x.concluidoEm || '-') + '</td>' +
               '<td>' + escaparHtmlRoteiro(x.atualizadoEm || '-') + '</td>' +
               '<td><button class="btn btn-sm btn-outline-secondary" onclick="abrirHistoricoConferencia(\'' +
@@ -7487,7 +7497,7 @@
             '</tr>';
           }).join('');
         })
-        .withFailureHandler(capturarErroServidor)
+        .withFailureHandler(function(err){if(sequencia===conferenciaConsultaSequencia)capturarErroServidor(err);})
         .consultarProtocolosConferencia(filtros, sessaoToken);
     }
 
@@ -7500,6 +7510,7 @@
       document.getElementById('conf-cons-protocolo').value = '';
       document.getElementById('conf-cons-razao').value = '';
       document.getElementById('conf-cons-movimentacao').value = '';
+      document.getElementById('conf-cons-conferente').value = '';
       document.getElementById('conf-cons-data-ini').value = '';
       document.getElementById('conf-cons-data-fim').value = '';
       carregarConsultaConferencia();
@@ -8930,17 +8941,17 @@
       var prioridade = String((item && item.prioridade) || 'NORMAL').toUpperCase();
       var temObs = !!String((item && item.observacao) || '').trim();
 
-      // Observação e ATRASADA/NÃO REALIZADA têm precedência em vermelho.
-      if (temObs || prioridade === 'ATRASADA' || prioridade === 'NÃO REALIZADA' || prioridade === 'NAO REALIZADA') {
-        return 'background:#FF6B6B;color:#000;font-weight:800;border-radius:6px;padding:5px 7px;display:inline-block;';
-      }
-
       if (prioridade === 'PEDIDO CEL' || prioridade === 'PEDIDO DO CEL' || prioridade === 'CORONEL') {
         return 'background:#F4B183;color:#000;font-weight:800;border-radius:6px;padding:5px 7px;display:inline-block;';
       }
 
       if (prioridade === 'EVENTO TEMPORÁRIO' || prioridade === 'EVENTO TEMPORARIO') {
         return 'background:#F062B0;color:#000;font-weight:800;border-radius:6px;padding:5px 7px;display:inline-block;';
+      }
+
+      // Observação e ATRASADA/NÃO REALIZADA têm precedência em vermelho.
+      if (temObs || prioridade === 'ATRASADA' || prioridade === 'NÃO REALIZADA' || prioridade === 'NAO REALIZADA') {
+        return 'background:#FF6B6B;color:#000;font-weight:800;border-radius:6px;padding:5px 7px;display:inline-block;';
       }
 
       // Se a Data do Andamento copiada do SIAPI estiver há mais de 20 dias
@@ -8965,11 +8976,43 @@
     }
 
 
+    var preferenciasRascunhoPendentes={};
+    var preferenciasRascunhoVersao=0;
+    var preferenciasRascunhoEnviando=false;
+    var preferenciasRascunhoTimer=null;
+    function informarPreferenciasRascunho(texto,erro) {
+      var el=document.getElementById('rot-rascunho-gravacao-status');if(el)el.textContent=texto;
+      var retry=document.getElementById('rot-rascunho-repetir');if(retry)retry.style.display=erro?'inline-block':'none';
+    }
+    function agendarPreferenciasRascunho(item) {
+      var data=document.getElementById('rot-data-roteiro').value;if(!data)return;
+      var chave=data+'|'+String(item.protocolo).trim().toUpperCase();
+      preferenciasRascunhoPendentes[chave]={protocolo:item.protocolo,dataRoteiro:data,prioridade:item.prioridade||'NORMAL',observacao:item.observacao||'',versao:++preferenciasRascunhoVersao};
+      informarPreferenciasRascunho('Salvando prioridades e observações no rascunho...',false);
+      clearTimeout(preferenciasRascunhoTimer);preferenciasRascunhoTimer=setTimeout(gravarPreferenciasRascunhoPendentes,300);
+    }
+    function gravarPreferenciasRascunhoPendentes() {
+      if(preferenciasRascunhoEnviando)return;
+      var chaves=Object.keys(preferenciasRascunhoPendentes);if(!chaves.length)return;
+      var lote=chaves.map(function(c){return Object.assign({},preferenciasRascunhoPendentes[c]);});
+      preferenciasRascunhoEnviando=true;
+      google.script.run.withSuccessHandler(function(r){
+        preferenciasRascunhoEnviando=false;
+        lote.forEach(function(x,i){var c=chaves[i];if(preferenciasRascunhoPendentes[c]&&preferenciasRascunhoPendentes[c].versao===x.versao)delete preferenciasRascunhoPendentes[c];});
+        if(Object.keys(preferenciasRascunhoPendentes).length)gravarPreferenciasRascunhoPendentes();
+        else informarPreferenciasRascunho(r&&r.ignorados&&r.ignorados.length?'As preferências dos protocolos que ainda estão em rascunho foram salvas.':'Prioridades e observações salvas no rascunho.',false);
+      }).withFailureHandler(function(err){
+        preferenciasRascunhoEnviando=false;if(!Object.keys(preferenciasRascunhoPendentes).length){informarPreferenciasRascunho('Nenhuma preferência pendente de rascunho.',false);return;}informarPreferenciasRascunho('Não foi possível salvar o rascunho. As escolhas continuam nesta tela. '+(err.message||String(err)),true);
+      }).atualizarPreferenciasRascunhosRoteiro(lote,sessaoToken);
+    }
     function atualizarCampoManualRoteiro(idx, campo, valor) {
       if (!dadosSiapiRoteiro[idx]) return;
-      dadosSiapiRoteiro[idx][campo] = valor;
+      var item=dadosSiapiRoteiro[idx];item[campo]=valor;
+      if(campo==='prioridade'||campo==='observacao'){
+        var destaque=document.getElementById('rot-protocolo-cor-'+idx);if(destaque)destaque.style.cssText=estiloProtocoloRoteiro(item);
+        agendarPreferenciasRascunho(item);
+      }
     }
-
 
     function ehCadastroManualRoteiro(item) {
       return String((item && item.origemPendencia) || '').trim().toUpperCase() === 'CADASTRO MANUAL';
@@ -9161,7 +9204,7 @@
 
           h += '<tr>';
           h += '<td><input type="checkbox" class="rot-check-protocolo" data-idx="' + n + '"></td>';
-          h += '<td><span style="' + estiloProtocoloRoteiro(i) + '">' +
+          h += '<td><span id="rot-protocolo-cor-'+n+'" style="' + estiloProtocoloRoteiro(i) + '">' +
             escaparHtmlRoteiro(i.protocolo) + '</span>' +
             (ehCadastroManualRoteiro(i) ? '<div class="small text-danger fw-bold mt-1">DADOS EDITÁVEIS</div>' : '') +
             '</td>';
@@ -9411,7 +9454,9 @@
           // sem fazer nova leitura do servidor só para redesenhar o rascunho.
           var processados = {};
           ((r && r.protocolosProcessados) || []).forEach(function(p) {
-            processados[String(p || '').trim().toUpperCase()] = true;
+            var protocolo=String(p || '').trim().toUpperCase();
+            processados[protocolo] = true;
+            delete preferenciasRascunhoPendentes[data+'|'+protocolo];
           });
 
           dadosSiapiRoteiro = (dadosSiapiRoteiro || []).filter(function(item) {
@@ -9503,6 +9548,7 @@
 
     function carregarRascunhosRoteiro() {
       var data = document.getElementById('rot-data-roteiro').value;
+      var versaoConsulta=preferenciasRascunhoVersao;
       if (!data) {
         renderizarPreviewSiapi();
         return;
@@ -9510,7 +9556,10 @@
 
       google.script.run
         .withSuccessHandler(function(r) {
+          if(document.getElementById('rot-data-roteiro').value!==data)return;
           var lista = (r && r.itens) ? r.itens : [];
+          if(versaoConsulta!==preferenciasRascunhoVersao){var locais={};dadosSiapiRoteiro.forEach(function(x){locais[String(x.protocolo).trim().toUpperCase()]=x;});lista.forEach(function(x){var local=locais[String(x.protocolo).trim().toUpperCase()];if(local){x.prioridade=local.prioridade;x.observacao=local.observacao;}});}
+          lista.forEach(function(x){var p=preferenciasRascunhoPendentes[data+'|'+String(x.protocolo).trim().toUpperCase()];if(p){x.prioridade=p.prioridade;x.observacao=p.observacao;}});
           dadosSiapiRoteiro = lista;
           renderizarPreviewSiapi();
 
@@ -9547,6 +9596,7 @@
 
 
     function sairDoSistema() {
+      if(Object.keys(preferenciasRascunhoPendentes).length){alert('Há prioridades ou observações ainda não salvas. Aguarde ou use Tentar salvar rascunho novamente.');return;}
       if(conferenciaConclusaoEmAndamento){alert('Aguarde a confirmação da gravação antes de sair.');return;}
       if(conferenciaConclusaoNaoConfirmada && !confirm('Há uma anotação de Conferência não confirmada. Sair e descartá-la?'))return;
       conferenciaConclusaoNaoConfirmada=null;

@@ -16,7 +16,7 @@ Se o projeto não for vinculado, configure RASCUNHO_ORIGEM_ID nas propriedades. 
 CONFERÊNCIA: ao concluir, a tela responde imediatamente com Salvando na planilha. Só mostra salvo e atualiza contadores após confirmação do servidor. Se falhar, o protocolo volta e a anotação pode ser reaberta durante a sessão. Confira a fila antes de repetir se houver falha de comunicação. A anotação local não sobrevive ao fechamento da página. Reservas continuam confirmadas no servidor para evitar conflito entre usuários.
 
 Assumir lotes, históricos, resumos, indicadores, filtros e listas receberam otimizações adicionais. O tratamento de Vistoriado por foi preservado.
-105 testes locais e 17 cenários no Chromium passaram, com serviços Google simulados. Nenhuma ativação ou medição real no Google foi feita neste ambiente. Nenhum dado da planilha enviada está incluído no pacote.
+114 testes locais e 23 cenários no Chromium passaram, com serviços Google simulados. Nenhuma ativação ou medição real no Google foi feita neste ambiente. Nenhum dado da planilha enviada está incluído no pacote.
 
 ATUALIZAÇÃO VISUAL: rosa dos eventos temporários no roteiro mais forte (#F062B0), com texto escuro. Atualizar WebApp.gs e Index.html para manter a mesma cor na tela e nas próximas gerações da planilha. Cores antigas já gravadas continuam reconhecidas na tela.
 
@@ -25,3 +25,7 @@ CREDENCIAMENTO — CONSULTA GERAL: ordena pela última atualização, incluindo 
 CREDENCIAMENTO SIAPI/SEI: mantenha ambos os arquivos atualizados. Alimentação agora tem quadros separados para a tabela nova do SIAPI e para o cabeçalho rotulado usado na entrada SEI. Ler e conferir mostra a prévia; Adicionar à fila de análise salva e abre Análise. O campo antigo de importação histórica foi retirado; os dados já importados permanecem.
 Na Análise de registros do SEI, digite Número do processo SEI. Use Salvar número SEI para guardar antes de concluir; concluir também salva o número preenchido. O número CBMGO do cabeçalho é outro campo e não substitui o número SEI.
 Ao concluir, o protocolo vai para Consulta geral, com origem e processo SEI. A aba CREDENCIAMENTO_COMPLEMENTOS é criada automaticamente na mesma planilha, preservando as colunas anteriores. Nenhuma configuração manual de colunas é necessária. A leitura de Vistorias permanece separada.
+
+DOCs PARA DESPACHO: nova caixa Evento temporário no cadastro e na edição pelo Gestor. O protocolo marcado aparece em rosa. O programa acrescenta a coluna 24 EVENTO_TEMPORARIO em DOCS_DESPACHO, preservando as 23 anteriores.
+RASCUNHO DE VISTORIAS: prioridades e observações são salvas automaticamente com indicação na tela e botão de repetição se houver falha. Permanecem ao acrescentar novos protocolos SIAPI e reabrir o rascunho. AO DISTRIBUIR, o protocolo sai do rascunho e segue o fluxo normal, levando a prioridade. Gravações atrasadas não alteram registros LANÇADO nem reabrem o rascunho.
+CONFERÊNCIA: Consulta geral ganha Último conferente (nome ou RG), incluindo a última conclusão de F-7 liberado de volta à fila.
