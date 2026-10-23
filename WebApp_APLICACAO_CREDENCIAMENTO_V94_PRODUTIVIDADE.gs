@@ -1191,7 +1191,7 @@ function obterIndicadoresGestor(token) {
 
   var docsPendentes=0, isencoesPendentes=0, tacsVigentes=0;
   var docs=garantirEstruturaDocsDespacho_();
-  if(docs.getLastRow()>=2){docs.getRange(2,3,docs.getLastRow()-1,16).getDisplayValues().forEach(function(r){var st=String(r[0]||"").trim().toUpperCase(),tp=String(r[1]||"").trim().toUpperCase();if(st!=="CONCLUÍDO"&&st!=="ARQUIVADO")docsPendentes++;if(tp==="ISENÇÃO DE TAXA"&&!String(r[15]||"").trim())isencoesPendentes++;});}
+  if(docs.getLastRow()>=2){docs.getRange(2,3,docs.getLastRow()-1,16).getDisplayValues().forEach(function(r){var st=String(r[0]||"").trim().toUpperCase(),tp=String(r[1]||"").trim().toUpperCase();if(st==="EXCLUÍDO")return;if(st!=="CONCLUÍDO"&&st!=="ARQUIVADO")docsPendentes++;if(tp==="ISENÇÃO DE TAXA"&&!String(r[15]||"").trim())isencoesPendentes++;});}
   var tacs=garantirEstruturaTacs_();
   if(tacs.getLastRow()>=2)tacs.getRange(2,9,tacs.getLastRow()-1,1).getDisplayValues().forEach(function(r){if(String(r[0]||"").trim().toUpperCase()==="VIGENTE")tacsVigentes++;});
 
@@ -13577,4 +13577,70 @@ function obterTextosPadraoConferencia(token){
     "adaptado": false
   }
 ]};
+}
+
+// Indicadores operacionais: somente leitura, uma área por consulta.
+function dataIndicador_(valor){
+  if(Object.prototype.toString.call(valor)==='[object Date]')return isNaN(valor.getTime())?'':Utilities.formatDate(valor,'America/Sao_Paulo','yyyy-MM-dd');
+  var s=String(valor||'').trim(),m=s.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|[T ])/),a,mes,dia;
+  if(m){a=+m[1];mes=+m[2];dia=+m[3];}else {m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:$|\s)/);if(!m)return '';a=+m[3];mes=+m[2];dia=+m[1];}
+  var d=new Date(a,mes-1,dia);if(d.getFullYear()!==a||d.getMonth()!==mes-1||d.getDate()!==dia)return '';
+  return a+'-'+('0'+mes).slice(-2)+'-'+('0'+dia).slice(-2);
+}
+function obterIndicadoresOperacionaisGestor(filtros,token){
+  exigirPerfil_(token,['GESTOR']);filtros=filtros||{};
+  var area=String(filtros.area||'atendimento'),inicio=dataIndicador_(filtros.inicio),fim=dataIndicador_(filtros.fim);
+  if(['atendimento','conferencia','vistorias','pse'].indexOf(area)<0)throw new Error('Área de indicadores inválida.');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(filtros.inicio||''))||!/^\d{4}-\d{2}-\d{2}$/.test(String(filtros.fim||''))||!inicio||!fim||inicio>fim)throw new Error('Informe um período válido, com início anterior ou igual ao fim.');
+  var ss=SpreadsheetApp.getActiveSpreadsheet(),hoje=Utilities.formatDate(new Date(),'America/Sao_Paulo','yyyy-MM-dd'),faltantes=[],avisos=[],grupos=Object.create(null),totais={},invalidas=0;
+  function ler(nome,colunas){var aba=ss.getSheetByName(nome);if(!aba){faltantes.push(nome);return [];}return aba.getLastRow()<2?[]:aba.getRange(2,1,aba.getLastRow()-1,colunas).getValues();}
+  function n(v){return String(v||'').trim();}
+  function norm(v){return n(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();}
+  function noPeriodo(d){return d&&d>=inicio&&d<=fim;}
+  function somar(alvo,metricas){Object.keys(metricas).forEach(function(k){alvo[k]=(alvo[k]||0)+metricas[k];});}
+  function contar(d,dimensoes,metricas){somar(totais,metricas);dimensoes.dia=d;dimensoes.mes=d.slice(0,7);Object.keys(dimensoes).forEach(function(campo){var chave=n(dimensoes[campo])||'Não informado';grupos[campo]=grupos[campo]||Object.create(null);var g=grupos[campo][chave]||(grupos[campo][chave]={nome:chave});somar(g,metricas);});}
+  if(area==='atendimento'){
+    ler('ATENDIMENTOS',8).forEach(function(r){var d=dataIndicador_(r[0]);if(!d){if(r.some(function(x){return n(x);}))invalidas++;return;}if(!noPeriodo(d))return;contar(d,{tipo:n(r[3]),motivo:n(r[7]),atendente:n(r[2])||n(r[1])},{quantidade:1});});
+  }else if(area==='conferencia'){
+    var protocolos=Object.create(null);
+    ler('HISTORICO_CONFERENCIA',12).forEach(function(r){if(norm(r[3])!=='CONCLUIDO')return;var d=dataIndicador_(r[0]);if(!d){invalidas++;return;}if(!noPeriodo(d))return;var snap={};try{snap=JSON.parse(r[11]||'{}')||{};}catch(e){}
+      var p=n(r[1]);if(p)protocolos[p]=true;contar(d,{protocolo:p,divisao:n(snap.divisao),resultado:n(r[9])||n(snap.statusSiapi),conferente:n(r[5])||n(r[4])},{quantidade:1});
+    });totais.protocolosDistintos=Object.keys(protocolos).length;
+    avisos.push('Cada evento CONCLUÍDO conta como uma conferência. Divisão não registrada no histórico aparece como Não informado.');
+  }else if(area==='vistorias'){
+    var roteiro=ler('ROTEIRO_VISTORIAS',26),pendencias=ler('PENDENCIAS_VISTORIAS',15),tentativas=[],porChave=Object.create(null),porProtocoloData=Object.create(null),origens=Object.create(null),semVinculo=0;
+    roteiro.forEach(function(r,i){var d=dataIndicador_(r[0]),p=n(r[1]);if(!d||!p){if(r.some(function(x){return n(x);}))invalidas++;return;}
+      var t={r:r,d:d,p:p,i:i,naoRealizada:false,cancelada:norm(r[10])==='CANCELADO'},base=d+'|'+p,chave=base+'|'+n(r[2])+'|'+n(r[4]);tentativas.push(t);(porChave[chave]||(porChave[chave]=[])).push(t);(porProtocoloData[base]||(porProtocoloData[base]=[])).push(t);if(n(r[21]))origens[n(r[21])]=Math.min(origens[n(r[21])]===undefined?Infinity:origens[n(r[21])],i);
+    });
+    var pendIds=Object.create(null);
+    pendencias.forEach(function(r){if(norm(r[3])!=='NAO REALIZADA')return;var id=n(r[0]);if(id&&pendIds[id])return;if(id)pendIds[id]=true;
+      var d=dataIndicador_(r[5]),base=d+'|'+n(r[2]),chave=base+'|'+n(r[6])+'|'+n(r[8]),limite=origens[id]===undefined?Infinity:origens[id];
+      var lista=porChave[chave]||porProtocoloData[base]||[],t=null;
+      for(var i=lista.length-1;i>=0;i--){if(lista[i].i<limite&&!lista[i].naoRealizada){t=lista[i];break;}}
+      if(t)t.naoRealizada=true;else if(noPeriodo(d))semVinculo++;
+    });
+    var realizadasAntes=Object.create(null);
+    tentativas.sort(function(a,b){return a.d.localeCompare(b.d)||a.i-b.i;}).forEach(function(t){
+      var r=t.r;if(t.cancelada){if(noPeriodo(t.d))somar(totais,{canceladas:1});return;}
+      var futura=t.d>hoje,realizada=!t.naoRealizada&&!futura,retorno=realizada&&!!realizadasAntes[t.p];
+      if(realizada)realizadasAntes[t.p]=(realizadasAntes[t.p]||0)+1;
+      if(!noPeriodo(t.d))return;
+      contar(t.d,{divisao:n(r[16]),setor:n(r[6]),bairro:n(r[14]),equipe:[n(r[3])||n(r[2]),n(r[5])||n(r[4])].filter(Boolean).join(' / '),servico:n(r[9])},{distribuidas:1,realizadas:realizada?1:0,naoRealizadas:t.naoRealizada?1:0,futuras:futura&&!t.naoRealizada?1:0,retornos:retorno?1:0});
+    });
+    if(semVinculo)avisos.push(semVinculo+' registro(s) de não realizada no período sem distribuição identificável; não foram descontados de outra visita.');
+    avisos.push('Realizadas = distribuições não canceladas até hoje, sem registro de não realizada nas Pendências. Cores não interferem. Futuras ficam separadas. Retorno = nova visita realizada após outra realizada do mesmo protocolo registrada no sistema; redistribuição após não realizada não conta como retorno.');
+  }else{
+    var config=null,linhas=ler('CONTROLE_ESCALAS',13);if(linhas.length){config=obterConfiguracaoPeriodo();var configAba=ss.getSheetByName('CONFIG');if(!configAba||configAba.getLastRow()<2)avisos.push('Configuração financeira não preenchida: cálculo usa os valores padrão do sistema.');}var errosValor=0;
+    linhas.forEach(function(r){if(norm(r[6])!=='ESCALADO')return;var d=dataIndicador_(r[0]);if(!d){invalidas++;return;}if(!noPeriodo(d))return;
+      var valor=0,horas=0;try{var calc=calcularHorasEValoresAC4(d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4),n(r[7])||'07:00',n(r[8])||'13:00',config);if(!calc||!isFinite(Number(calc.valorTotal)))throw Error('Valor inválido');valor=Math.round(Number(calc.valorTotal)*100);horas=Number(calc.horasDiurnas||0)+Number(calc.horasNoturnas||0);}catch(e){errosValor++;}
+      var m=n(r[11]).match(/(?:^|\|)\s*RAI:\s*([^|]*)/i),rai=m?norm(m[1]):'',lancado=!!rai&&['N/A','NA','-','NÃO','NAO','PENDENTE','0'].indexOf(rai)<0;
+      contar(d,{militar:n(r[2])||n(r[1]),funcao:n(r[4]),servico:n(r[9])||'DIC',turno:n(r[3]),pagamento:lancado?'Lançado para pagamento (RAI)':'Sem RAI'},{quantidade:1,horas:horas,valorCentavos:valor,lancadoCentavos:lancado?valor:0,semRaiCentavos:lancado?0:valor,comRai:lancado?1:0});
+    });
+    if(errosValor)avisos.push(errosValor+' escala(s) não tiveram o valor calculado; o total financeiro está incompleto.');
+    avisos.push('RAI preenchido indica lançado para pagamento, não confirmação bancária. Valores são recalculados pela configuração vigente; não constituem comprovante histórico de pagamento.');
+  }
+  if(invalidas)avisos.push(invalidas+' registro(s) com data ou identificação inválida foram desconsiderados.');
+  if(faltantes.length)avisos.push('Base ainda ausente: '+faltantes.join(', ')+'.');
+  var saida={};Object.keys(grupos).forEach(function(k){saida[k]=Object.keys(grupos[k]).sort(function(a,b){return a.localeCompare(b,'pt-BR',{numeric:true});}).map(function(x){return grupos[k][x];});});
+  return {sucesso:true,area:area,inicio:inicio,fim:fim,atualizadoEm:dataHoraSaoPauloTexto_(),totais:totais,grupos:saida,avisos:avisos};
 }

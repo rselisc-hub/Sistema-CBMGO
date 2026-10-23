@@ -2683,8 +2683,15 @@
     </div>
 
     <div id="gestor-indicadores" style="display:none;" class="mb-4">
+      <div class="card card-custom p-4 mb-3"><div class="d-flex justify-content-between gap-2 flex-wrap"><div><h5 class="fw-bold">Indicadores por período</h5><div id="ind-op-atualizado" class="small text-muted" role="status"></div></div><button class="btn btn-outline-secondary" onclick="voltarMenuGestor()">Voltar</button></div>
+      <div class="row g-2 my-3"><div class="col-md-3"><label for="ind-op-periodo" class="form-label">Período</label><select id="ind-op-periodo" class="form-select" onchange="definirPeriodoIndicadores()"><option value="hoje">Hoje</option><option value="mes" selected>Este mês</option><option value="ano">Este ano</option><option value="personalizado">Personalizado</option></select></div><div class="col-md-3"><label for="ind-op-inicio" class="form-label">Início</label><input id="ind-op-inicio" type="date" class="form-control" onchange="document.getElementById('ind-op-periodo').value='personalizado'"></div><div class="col-md-3"><label for="ind-op-fim" class="form-label">Fim</label><input id="ind-op-fim" type="date" class="form-control" onchange="document.getElementById('ind-op-periodo').value='personalizado'"></div><div class="col-md-3 d-flex align-items-end"><button id="ind-op-atualizar" class="btn btn-primary w-100" onclick="carregarIndicadoresOperacionais(true)">Consultar / Atualizar</button></div></div>
+      <div class="d-flex flex-wrap gap-2" role="group" aria-label="Área dos indicadores"><button class="btn btn-outline-primary ind-op-area" data-area="atendimento" onclick="selecionarAreaIndicadores('atendimento')">Atendimento</button><button class="btn btn-outline-primary ind-op-area" data-area="conferencia" onclick="selecionarAreaIndicadores('conferencia')">Conferência</button><button class="btn btn-outline-primary ind-op-area" data-area="vistorias" onclick="selecionarAreaIndicadores('vistorias')">Vistorias</button><button class="btn btn-outline-primary ind-op-area" data-area="pse" onclick="selecionarAreaIndicadores('pse')">PSE</button></div></div>
+      <div id="ind-op-resultados" hidden><div id="ind-op-cards" class="row g-3 mb-3"></div><div id="ind-op-avisos" class="small text-muted mb-3"></div>
+      <div class="card card-custom p-4 mb-3"><h6>Evolução mensal no período</h6><div id="ind-op-grafico"></div></div>
+      <div class="card card-custom p-4"><div class="row g-2 mb-3"><div class="col-md-5"><label for="ind-op-agrupar" class="form-label">Detalhar por</label><select class="form-select" id="ind-op-agrupar" onchange="indOperacional.pagina=0;renderizarDetalhesIndicadores()"></select></div><div class="col-md-7"><label for="ind-op-busca" class="form-label">Pesquisar no detalhamento</label><input type="search" class="form-control" id="ind-op-busca" oninput="indOperacional.pagina=0;renderizarDetalhesIndicadores()"></div></div><div class="table-responsive"><table class="table table-sm align-middle"><thead id="ind-op-thead"></thead><tbody id="ind-op-tbody"></tbody></table></div><div class="d-flex align-items-center gap-2 flex-wrap"><button id="ind-op-anterior" class="btn btn-sm btn-outline-secondary" onclick="indOperacional.pagina--;renderizarDetalhesIndicadores()">Anterior</button><span id="ind-op-paginacao" class="small"></span><button id="ind-op-proxima" class="btn btn-sm btn-outline-secondary" onclick="indOperacional.pagina++;renderizarDetalhesIndicadores()">Próxima</button></div></div></div>
+      <details class="mt-3" ontoggle="if(this.open){document.getElementById('gestor-indicadores-antigos').style.display='block';carregarIndicadoresGestor();}"><summary>Situação atual das filas e acessos (fora do filtro de período)</summary>    <div id="gestor-indicadores-antigos" style="display:none;" class="mb-4">
       <div class="card card-custom p-4">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3"><div><h5 class="fw-bold mb-1"><i class="bi bi-bar-chart-fill text-primary me-2"></i>Indicadores</h5><div class="small text-muted" id="gestor-ind-atualizado">Carregando...</div></div><div class="d-flex gap-2"><button class="btn btn-outline-primary" onclick="carregarIndicadoresGestor()"><i class="bi bi-arrow-repeat me-1"></i>Atualizar</button><button class="btn btn-outline-secondary" onclick="voltarMenuGestor()"><i class="bi bi-arrow-left me-1"></i>Voltar</button></div></div>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3"><div><h5 class="fw-bold mb-1"><i class="bi bi-bar-chart-fill text-primary me-2"></i>Indicadores</h5><div class="small text-muted" id="gestor-ind-resumo-atualizado">Carregando...</div></div><div class="d-flex gap-2"><button class="btn btn-outline-primary" onclick="carregarIndicadoresGestor()"><i class="bi bi-arrow-repeat me-1"></i>Atualizar</button><button class="btn btn-outline-secondary" onclick="voltarMenuGestor()"><i class="bi bi-arrow-left me-1"></i>Voltar</button></div></div>
         <div class="row g-3">
           <div class="col-6 col-lg-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Usuários ativos</div><div class="fs-3 fw-bold" id="ind-usuarios-ativos">—</div></div></div>
           <div class="col-6 col-lg-3"><div class="border rounded p-3 h-100"><div class="text-muted small">Vistoriadores</div><div class="fs-3 fw-bold" id="ind-vistoriadores">—</div></div></div>
@@ -2698,6 +2705,9 @@
           <div class="col-6 col-lg-4"><div class="border rounded p-3 h-100"><div class="text-muted small">TACs vigentes</div><div class="fs-3 fw-bold" id="ind-tacs-vigentes">—</div></div></div>
         </div>
       </div>
+    </div>
+
+</details>
     </div>
 
     <div id="gestor-escala-area" style="display:none;">
@@ -3859,7 +3869,44 @@
       if(menu)menu.style.display='none';
       if(esc)esc.style.display='none';
       if(ind)ind.style.display='block';
-      carregarIndicadoresGestor();
+      iniciarIndicadoresOperacionais();
+    }
+
+    var indOperacional={area:'atendimento',cache:{},token:null,seq:0,dados:null,pagina:0,emCurso:null};
+    var indRotulos={dia:'Dia',mes:'Mês',tipo:'Tipo de atendimento',motivo:'Motivo',atendente:'Atendente',protocolo:'Protocolo',divisao:'Divisão da edificação',resultado:'Resultado',conferente:'Conferente',setor:'Setor / Região',bairro:'Bairro',equipe:'Equipe',servico:'Serviço',militar:'Militar',funcao:'Função',turno:'Turno',pagamento:'Pagamento'};
+    function iniciarIndicadoresOperacionais(){indOperacional.cache={};indOperacional.dados=null;indOperacional.emCurso=null;indOperacional.seq++;if(!document.getElementById('ind-op-inicio').value)definirPeriodoIndicadores(false);carregarIndicadoresOperacionais(false);}
+    function definirPeriodoIndicadores(consultar){var hoje=dataHojeInput_(),p=document.getElementById('ind-op-periodo').value;if(p!=='personalizado'){document.getElementById('ind-op-inicio').value=p==='mes'?hoje.slice(0,7)+'-01':p==='ano'?hoje.slice(0,4)+'-01-01':hoje;document.getElementById('ind-op-fim').value=hoje;}if(consultar!==false)carregarIndicadoresOperacionais(false);}
+    function selecionarAreaIndicadores(area){indOperacional.area=area;carregarIndicadoresOperacionais(false);}
+    function carregarIndicadoresOperacionais(forcar){
+      if(!usuarioLogado||!usuarioLogado.permissoes||!usuarioLogado.permissoes.gestor)return;
+      var e=indOperacional,token=sessaoToken,ini=document.getElementById('ind-op-inicio').value,fim=document.getElementById('ind-op-fim').value,st=document.getElementById('ind-op-atualizado');
+      if(!ini||!fim||ini>fim){st.textContent='Informe um período válido.';return;}
+      if(e.token!==token){e.cache={};e.token=token;e.dados=null;}
+      var area=e.area,chave=area+'|'+ini+'|'+fim;if(e.emCurso&&e.emCurso.chave===chave&&e.emCurso.token===token)return;var seq=++e.seq;e.emCurso=null;
+      document.querySelectorAll('.ind-op-area').forEach(function(b){b.className='btn '+(b.dataset.area===area?'btn-primary':'btn-outline-primary')+' ind-op-area';});
+      if(forcar)e.cache={};if(e.cache[chave]){e.dados=e.cache[chave];renderizarIndicadoresOperacionais();return;}
+      e.emCurso={chave:chave,token:token};st.textContent='Consultando '+({atendimento:'Atendimento',conferencia:'Conferência',vistorias:'Vistorias',pse:'PSE'}[area])+'…';document.getElementById('ind-op-resultados').hidden=true;
+      google.script.run.withSuccessHandler(function(r){if(seq!==e.seq||token!==sessaoToken)return;e.emCurso=null;if(!r||!r.sucesso){st.textContent='Não foi possível confirmar os indicadores. Tente Atualizar.';return;}e.cache[chave]=r;e.dados=r;renderizarIndicadoresOperacionais();}).withFailureHandler(function(err){if(seq!==e.seq||token!==sessaoToken)return;e.emCurso=null;st.textContent='Não foi possível consultar. Tente Atualizar. '+String(err&&err.message||err||'');}).obterIndicadoresOperacionaisGestor({area:area,inicio:ini,fim:fim},token);
+    }
+    function colunasIndicadores_(area){return area==='vistorias'?[['distribuidas','Distribuídas'],['realizadas','Realizadas'],['naoRealizadas','Não realizadas'],['futuras','Futuras'],['retornos','Retornos']]:area==='pse'?[['quantidade','Escalas'],['horas','Horas'],['valorCentavos','Valor calculado'],['lancadoCentavos','Lançado para pagamento'],['semRaiCentavos','Sem RAI']]:[['quantidade',area==='conferencia'?'Conferências':'Atendimentos']];}
+    function formatarIndicador_(chave,valor){var v=Number(valor)||0;return chave.indexOf('Centavos')!==-1?(v/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}):v.toLocaleString('pt-BR',{maximumFractionDigits:2});}
+    function renderizarIndicadoresOperacionais(){
+      var r=indOperacional.dados;if(!r)return;var cards=document.getElementById('ind-op-cards'),cols=colunasIndicadores_(r.area).slice();
+      if(r.area==='conferencia')cols.push(['protocolosDistintos','Protocolos distintos']);if(r.area==='vistorias')cols.push(['canceladas','Canceladas']);if(r.area==='pse')cols.push(['comRai','Escalas com RAI']);
+      cards.innerHTML=cols.map(function(c){return '<div class="col-6 col-lg-4"><div class="card card-custom p-3 h-100"><div class="small text-muted">'+c[1]+'</div><div class="fs-4 fw-bold">'+formatarIndicador_(c[0],r.totais[c[0]])+'</div></div></div>';}).join('');
+      var aviso=document.getElementById('ind-op-avisos');aviso.textContent=(r.avisos||[]).join(' ');
+      document.getElementById('ind-op-atualizado').textContent='Período: '+r.inicio.split('-').reverse().join('/')+' a '+r.fim.split('-').reverse().join('/')+' · Consultado em '+r.atualizadoEm;
+      var sel=document.getElementById('ind-op-agrupar'),antes=sel.value;sel.textContent='';Object.keys(r.grupos).forEach(function(k){var o=document.createElement('option');o.value=k;o.textContent=indRotulos[k]||k;sel.appendChild(o);});sel.value=r.grupos[antes]?antes:r.grupos.dia?'dia':Object.keys(r.grupos)[0]||'';
+      indOperacional.pagina=0;document.getElementById('ind-op-busca').value='';renderizarDetalhesIndicadores();
+      var graf=document.getElementById('ind-op-grafico'),serie=r.grupos.mes||[],metrica=r.area==='vistorias'?'realizadas':r.area==='pse'?'valorCentavos':'quantidade',max=Math.max.apply(null,[1].concat(serie.map(function(x){return x[metrica]||0;})));graf.textContent='';
+      if(!serie.length)graf.textContent='Sem registros no período.';
+      serie.forEach(function(x){var linha=document.createElement('div');linha.className='mb-2';var rotulo=document.createElement('div');rotulo.className='small';rotulo.textContent=x.nome+' · '+formatarIndicador_(metrica,x[metrica])+(r.area==='pse'?' calculados':r.area==='vistorias'?' realizadas':'');var barra=document.createElement('div');barra.style.cssText='background:#2563eb;height:12px;border-radius:4px;width:'+Math.max(0,100*(x[metrica]||0)/max)+'%';linha.appendChild(rotulo);linha.appendChild(barra);graf.appendChild(linha);});
+      document.getElementById('ind-op-resultados').hidden=false;
+    }
+    function renderizarDetalhesIndicadores(){var e=indOperacional,r=e.dados;if(!r)return;var campo=document.getElementById('ind-op-agrupar').value,busca=normalizarBuscaTextoPadrao_(document.getElementById('ind-op-busca').value),lista=(r.grupos[campo]||[]).filter(function(x){return normalizarBuscaTextoPadrao_(x.nome).indexOf(busca)!==-1;}),cols=colunasIndicadores_(r.area),paginas=Math.max(1,Math.ceil(lista.length/50));e.pagina=Math.max(0,Math.min(e.pagina,paginas-1));
+      document.getElementById('ind-op-thead').innerHTML='<tr><th>'+escaparHtmlRoteiro(indRotulos[campo]||'Grupo')+'</th>'+cols.map(function(c){return '<th>'+c[1]+'</th>';}).join('')+'</tr>';
+      document.getElementById('ind-op-tbody').innerHTML=lista.slice(e.pagina*50,e.pagina*50+50).map(function(x){return '<tr><td>'+escaparHtmlRoteiro(x.nome)+'</td>'+cols.map(function(c){return '<td>'+formatarIndicador_(c[0],x[c[0]])+'</td>';}).join('')+'</tr>';}).join('')||'<tr><td colspan="6">Sem registros para esta consulta.</td></tr>';
+      document.getElementById('ind-op-paginacao').textContent=lista.length+' grupo(s) · Página '+(e.pagina+1)+' de '+paginas;document.getElementById('ind-op-anterior').disabled=e.pagina===0;document.getElementById('ind-op-proxima').disabled=e.pagina>=paginas-1;
     }
 
     function carregarIndicadoresGestor() {
@@ -3876,7 +3923,7 @@
         set('ind-docs-pendentes',i.docsPendentes);
         set('ind-isencoes-pendentes',i.isencoesPendentes);
         set('ind-tacs-vigentes',i.tacsVigentes);
-        var a=document.getElementById('gestor-ind-atualizado');if(a)a.textContent='Atualizado em '+((r&&r.atualizadoEm)||'agora');
+        var a=document.getElementById('gestor-ind-resumo-atualizado');if(a)a.textContent='Atualizado em '+((r&&r.atualizadoEm)||'agora');
       }).withFailureHandler(capturarErroServidor).obterIndicadoresGestor(sessaoToken);
     }
 
@@ -9673,6 +9720,7 @@
 
 
     function limparSessaoLocal() {
+      indOperacional.seq++;indOperacional.cache={};indOperacional.dados=null;indOperacional.emCurso=null;indOperacional.token=null;
       textosPadraoEstado.sequencia++;textosPadraoEstado.token=null;textosPadraoEstado.modelos=null;textosPadraoEstado.ajustes={};textosPadraoEstado.selecionado=null;textosPadraoEstado.enviando=false;
       sessaoToken = '';
       usuarioLogado = null;
