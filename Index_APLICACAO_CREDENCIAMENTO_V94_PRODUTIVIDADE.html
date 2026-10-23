@@ -977,61 +977,24 @@
     </div>
 
     <div id="cred-pane-alimentacao">
-      <div class="card card-custom p-4 mb-4">
-        <h5 class="fw-bold mb-2"><i class="bi bi-clipboard-plus text-danger me-2"></i>Alimentação pelo SIAPI</h5>
-        <p class="text-muted small">
-          Cole os dados no mesmo formato utilizado em Vistorias. O protocolo novo será identificado como <strong>NOVO</strong>;
-          se já existir, será atualizado sem criar uma segunda linha. A importação, por si só, não conta produtividade.
-        </p>
-        <textarea class="form-control font-monospace" id="cred-siapi-colado" rows="6"
-          placeholder="Protocolo | Serviço | Bairro | Data do Andamento | Último Andamento | Razão Social | Divisão | Vistoriado por | Área"></textarea>
-        <div class="d-flex flex-wrap gap-2 mt-3">
-          <button class="btn btn-danger" onclick="prepararAlimentacaoCredenciamento()">
-            <i class="bi bi-search me-1"></i>Ler e conferir
-          </button>
-          <button class="btn btn-success" id="btn-cred-salvar-alimentacao" onclick="salvarAlimentacaoCredenciamento()" disabled>
-            <i class="bi bi-database-check me-1"></i>Adicionar à fila de análise
-          </button>
-          <button class="btn btn-outline-secondary" onclick="limparAlimentacaoCredenciamento()">Limpar</button>
-        </div>
+      <div class="row g-4 mb-4">
+        <div class="col-lg-6"><div class="card card-custom p-4 h-100">
+          <h5 class="fw-bold">Alimentação via SIAPI</h5>
+          <p class="text-muted small">Copie a tabela de Credenciamento: Protocolo, Envio, Serviço, Razão social, Logradouro, Bairro e Cidade/UF.</p>
+          <textarea class="form-control font-monospace" id="cred-siapi-colado" rows="7" placeholder="Cole a tabela de Conferência de Credenciamentos do SIAPI"></textarea>
+          <button class="btn btn-danger mt-3 cred-btn-ler" onclick="prepararAlimentacaoCredenciamento('SIAPI')">Ler e conferir SIAPI</button>
+        </div></div>
+        <div class="col-lg-6"><div class="card card-custom p-4 h-100">
+          <h5 class="fw-bold">Alimentação via SEI</h5>
+          <p class="text-muted small">Cole o cabeçalho do protocolo com seus rótulos. O número do processo SEI poderá ser digitado na Análise.</p>
+          <textarea class="form-control font-monospace" id="cred-sei-colado" rows="7" placeholder="PROTOCOLO Nº: ... SERVIÇO: ... RAZÃO SOCIAL: ... MUNICÍPIO: ..."></textarea>
+          <button class="btn btn-danger mt-3 cred-btn-ler" onclick="prepararAlimentacaoCredenciamento('SEI')">Ler e conferir SEI</button>
+        </div></div>
       </div>
-
       <div class="card card-custom p-4 mb-4" id="cred-preview-card" style="display:none;">
-        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
-          <h5 class="fw-bold mb-0">Prévia da alimentação</h5>
-          <span class="badge text-bg-secondary" id="cred-preview-resumo">0 protocolo(s)</span>
-        </div>
-        <div class="table-responsive">
-          <table class="table table-sm table-bordered align-middle cred-table mb-0">
-            <thead>
-              <tr>
-                <th>Situação</th><th>Protocolo</th><th>Tipo de Credenciamento</th><th>Cidade</th><th>Estado</th><th>Razão Social</th>
-              </tr>
-            </thead>
-            <tbody id="cred-preview-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card card-custom p-4">
-        <h5 class="fw-bold mb-2"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Importar histórico existente</h5>
-        <p class="text-muted small mb-2">
-          Para a primeira carga, copie as linhas da planilha antiga e cole aqui. O sistema mantém <strong>uma linha por protocolo</strong>
-          no controle atual e usa as linhas repetidas apenas para reconstruir as movimentações e estatísticas históricas.
-        </p>
-        <textarea class="form-control font-monospace" id="cred-historico-colado" rows="7"
-          placeholder="DESPACHO | PROTOCOLO | TIPO DE CREDENCIAMENTO | ENDEREÇO | OBSERVAÇÕES | CIDADE | RAZÃO SOCIAL | ÁREA | CONFERENTE | DATA | MÊS"></textarea>
-        <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mt-3">
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" id="cred-substituir-historico">
-            <label class="form-check-label small" for="cred-substituir-historico">
-              Substituir a carga histórica anterior do Credenciamento
-            </label>
-          </div>
-          <button class="btn btn-outline-danger" id="btn-cred-importar-historico" onclick="importarHistoricoCredenciamento()">
-            <i class="bi bi-upload me-1"></i>Importar histórico existente
-          </button>
-        </div>
+        <div class="d-flex justify-content-between gap-2 flex-wrap mb-3"><h5 class="fw-bold" id="cred-preview-titulo">Prévia da alimentação</h5><span class="badge text-bg-secondary" id="cred-preview-resumo"></span></div>
+        <div class="table-responsive"><table class="table table-sm table-bordered align-middle cred-table"><thead><tr><th>Situação / origem</th><th>Protocolo</th><th>Tipo de Credenciamento</th><th>Cidade</th><th>Estado</th><th>Razão social</th><th>Dados da origem</th></tr></thead><tbody id="cred-preview-tbody"></tbody></table></div>
+        <div class="d-flex gap-2 mt-3"><button class="btn btn-success" id="btn-cred-salvar-alimentacao" onclick="salvarAlimentacaoCredenciamento()" disabled>Adicionar à fila de análise</button><button class="btn btn-outline-secondary" id="btn-cred-limpar-alimentacao" onclick="limparAlimentacaoCredenciamento()">Limpar prévia</button></div>
       </div>
     </div>
 
@@ -1072,7 +1035,7 @@
               <tr>
                 <th>DESPACHO</th>
                 <th>PROTOCOLO</th>
-                <th>TIPO DE CREDENCIAMENTO</th>
+                <th>ORIGEM</th><th>PROCESSO SEI</th><th>TIPO DE CREDENCIAMENTO</th>
                 <th>CIDADE</th>
                 <th>ESTADO</th>
                 <th>RAZÃO SOCIAL</th>
@@ -1083,7 +1046,7 @@
               </tr>
             </thead>
             <tbody id="cred-cons-tbody">
-              <tr><td colspan="10" class="text-center text-muted py-4">Nenhum dado carregado.</td></tr>
+              <tr><td colspan="12" class="text-center text-muted py-4">Nenhum dado carregado.</td></tr>
             </tbody>
           </table>
         </div>
@@ -1104,6 +1067,12 @@
         </div>
         <div class="modal-body">
           <input type="hidden" id="cred-modal-protocolo">
+          <div id="cred-modal-dados-origem" class="small border rounded p-3 mb-3"></div>
+          <div id="cred-modal-sei-grupo" class="mb-3" style="display:none">
+            <label class="form-label fw-bold" for="cred-modal-numero-sei">Número do processo SEI</label>
+            <div class="input-group"><input type="text" class="form-control" id="cred-modal-numero-sei" maxlength="40" placeholder="Digite o número do processo SEI"><button class="btn btn-outline-primary" id="btn-cred-salvar-sei" onclick="salvarNumeroSeiCredenciamentoTela()">Salvar número SEI</button></div>
+            <div id="cred-modal-sei-status" class="form-text" role="status"></div>
+          </div>
           <div class="row g-3">
             <div class="col-md-6">
               <label class="form-label fw-bold">Despacho *</label>
@@ -5632,8 +5601,12 @@
     // ======================================================
     var credenciamentoTelaAtual = 'alimentacao';
     var credenciamentoPreview = [];
+    var credenciamentoPreviewOrigem='SIAPI';
+    var credenciamentoEntradaOcupada=false;
     var credenciamentoConsultaCache = [];
     var credenciamentoFilaCache = [];
+    var credenciamentoFilaSequencia=0;
+    var credenciamentoConsultaSequencia=0;
 
     function abrirModuloCredenciamento(restaurando) {
       if (!usuarioLogado || !usuarioLogado.permissoes || !usuarioLogado.permissoes.credenciamento) {
@@ -5644,10 +5617,11 @@
       esconderTelasPrincipais();
       document.getElementById('credenciamento-screen').style.display = 'block';
       registrarTelaAtual('credenciamento');
+      configurarPasteCredenciamento();
 
       google.script.run
         .withSuccessHandler(function() {
-          atualizarCredenciamento();
+          atualizarResumoCredenciamentoSilencioso_();
           abrirTelaCredenciamento(credenciamentoTelaAtual || 'alimentacao');
         })
         .withFailureHandler(capturarErroServidor)
@@ -5719,36 +5693,106 @@
         .obterResumoCredenciamento(sessaoToken);
     }
 
-    function prepararAlimentacaoCredenciamento() {
-      var bruto = String(document.getElementById('cred-siapi-colado').value || '').trim();
-      if (!bruto) {
-        alert('Cole primeiro os dados copiados do SIAPI.');
-        return;
+    function normalizarCabecalhoCredenciamento(valor) {
+      return String(valor||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+    }
+    function extrairEntradaCredenciamento(texto,origem,htmlColado) {
+      texto=String(texto||'').replace(/\u00a0/g,' ').replace(/\r\n?/g,'\n').trim();
+      if(origem==='SEI')return extrairCabecalhosSeiCredenciamento(texto);
+      var registros=[];
+      if(htmlColado){
+        var doc=new DOMParser().parseFromString(htmlColado,'text/html'),mapa=null;
+        Array.from(doc.querySelectorAll('br')).forEach(function(br){br.replaceWith(' ');});
+        Array.from(doc.querySelectorAll('tr')).forEach(function(tr){
+          var cs=Array.from(tr.querySelectorAll('th,td')).map(function(c){return String(c.textContent||'').replace(/\s+/g,' ').trim();});
+          var norm=cs.map(normalizarCabecalhoCredenciamento);
+          if(norm.indexOf('PROTOCOLO')>=0 && norm.indexOf('SERVICO')>=0){
+            mapa={};['PROTOCOLO','ENVIO','SERVICO','RAZAOSOCIAL','LOGRADOURO','BAIRRO','CIDADEUF'].forEach(function(c){mapa[c]=norm.indexOf(c);});
+            if(Object.keys(mapa).some(function(c){return mapa[c]<0;}))throw new Error('Cabeçalhos do SIAPI diferentes do esperado. Copie Protocolo, Envio, Serviço, Razão social, Logradouro, Bairro e Cidade/UF.');
+          } else if(mapa && /^\d{3,12}\/\d{2,4}$/.test(cs[mapa.PROTOCOLO]||'')) {
+            registros.push(objetoEntradaSiapiCredenciamento(['PROTOCOLO','ENVIO','SERVICO','RAZAOSOCIAL','LOGRADOURO','BAIRRO','CIDADEUF'].map(function(c){return cs[mapa[c]]||'';})));
+          }
+        });
+        if(registros.length)return registros;
       }
-
-      var regs = extrairRegistrosSiapiRobusto(bruto);
-      if (!regs.length) {
-        alert('Não consegui identificar os protocolos no conteúdo colado.');
-        return;
+      var pendente=null,cabecalhos=['PROTOCOLO','ENVIO','SERVICO','RAZAOSOCIAL','LOGRADOURO','BAIRRO','CIDADEUF'];
+      function concluir(){
+        if(!pendente)return;
+        if(pendente.length===8 && /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(pendente[1]) && /^\d{1,2}:\d{2}(?::\d{2})?$/.test(pendente[2]))pendente.splice(1,2,pendente[1]+' '+pendente[2]);
+        if(pendente.length!==7)throw new Error('Protocolo '+pendente[0]+': esperadas 7 colunas do Credenciamento SIAPI. Confira a cópia.');
+        registros.push(objetoEntradaSiapiCredenciamento(pendente));pendente=null;
       }
-
-      var itens = regs.map(function(r) {
-        return {
-          protocolo:r.protocolo || '',
-          tipoCredenciamento:r.servico || '',
-          cidade:'',
-          estado:'',
-          razaoSocial:r.razaoSocial || ''
-        };
+      texto.split('\n').forEach(function(linha){
+        if(!linha.trim())return;
+        var cs=linha.indexOf('\t')>=0?linha.split('\t'):linha.trim().split(/ {2,}/);
+        cs=cs.map(function(c){return c.trim().replace(/^"|"$/g,'');});
+        if(cabecalhos.indexOf(normalizarCabecalhoCredenciamento(cs[0]))>=0 && !pendente)return;
+        if(/^\d{3,12}\/\d{2,4}$/.test(cs[0])){concluir();pendente=cs;}
+        else if(pendente)pendente=pendente.concat(cs);
+        else throw new Error('Não foi possível identificar a tabela de Credenciamento do SIAPI.');
       });
+      concluir();if(!registros.length)throw new Error('Nenhum protocolo do SIAPI identificado.');return registros;
+    }
+    function objetoEntradaSiapiCredenciamento(cs) {
+      var cidade=String(cs[6]||'').trim(),uf='',m=cidade.match(/^(.*?)\s*\/\s*([A-Za-z]{2})$/);
+      if(m){cidade=m[1].trim();uf=m[2].toUpperCase();}
+      return {protocolo:cs[0],dataEnvio:String(cs[1]||'').replace(/\s+/g,' ').trim(),tipoCredenciamento:cs[2],razaoSocial:cs[3],endereco:cs[4],bairro:cs[5],cidade:cidade,estado:uf,origem:'SIAPI'};
+    }
+    function extrairCabecalhosSeiCredenciamento(texto) {
+      // Os rótulos delimitam as células mesmo quando o cabeçalho é copiado em colunas.
+      var rx=/(PROTOCOLO\s*(?:N[º°oO.]*)?|N[º°oO.]*\s*CBMGO|SERVI[ÇC]O|RAZ[ÃA]O\s+SOCIAL|ENDERE[ÇC]O|MUNIC[ÍI]PIO|OBM\s+RESPONS[ÁA]VEL|CNPJ\s*\/\s*CPF|RESPONS[ÁA]VEL\s+T[ÉE]CNICO|[ÁA]REA)\s*:/gi;
+      var achados=[],m;while((m=rx.exec(texto)))achados.push({rotulo:normalizarCabecalhoCredenciamento(m[1]),inicio:m.index,fim:rx.lastIndex});
+      var nomes={NUMEROCBMGO:'numeroCbmgo',NCBMGO:'numeroCbmgo',CBMGO:'numeroCbmgo',SERVICO:'tipoCredenciamento',RAZAOSOCIAL:'razaoSocial',ENDERECO:'endereco',MUNICIPIO:'cidade',OBMRESPONSAVEL:'obmResponsavel',CNPJCPF:'cnpjCpf',RESPONSAVELTECNICO:'responsavelTecnico',AREA:'area'};
+      var saida=[],atual=null;
+      achados.forEach(function(a,i){
+        var valor=texto.slice(a.fim,i+1<achados.length?achados[i+1].inicio:texto.length).replace(/\s+/g,' ').trim();
+        if(a.rotulo.indexOf('PROTOCOLO')===0){
+          if(atual)saida.push(atual);
+          if(!/^\d{3,12}\/\d{2,4}$/.test(valor))throw new Error('Confira o protocolo no cabeçalho do SEI: '+valor);
+          atual={protocolo:valor,origem:'SEI',estado:''};
+        } else if(atual){
+          var campo=nomes[a.rotulo]||(a.rotulo.indexOf('CBMGO')>=0?'numeroCbmgo':'');
+          if(campo)atual[campo]=valor;
+        }
+      });
+      if(atual)saida.push(atual);
+      if(!saida.length)throw new Error('Cole o cabeçalho do protocolo, incluindo PROTOCOLO Nº, SERVIÇO e RAZÃO SOCIAL. O número SEI será preenchido manualmente na Análise.');
+      saida.forEach(function(x){if(x.tipoCredenciamento===undefined||x.razaoSocial===undefined)throw new Error('Cabeçalho incompleto do protocolo '+x.protocolo+': copie também SERVIÇO e RAZÃO SOCIAL.');});
+      return saida;
+    }
+    var credenciamentoClipboard={};
+    function configurarPasteCredenciamento() {
+      ['SIAPI','SEI'].forEach(function(origem){var el=document.getElementById('cred-'+origem.toLowerCase()+'-colado');
+        if(!el||el.dataset.credPaste)return;
+        el.addEventListener('input',function(){credenciamentoClipboard[origem]=null;});
+        el.addEventListener('paste',function(event){
+          var clip=event.clipboardData;if(!clip)return;
+          var texto=clip.getData('text/plain')||'',html=clip.getData('text/html')||'';
+          // Mantém o HTML apenas se o texto do campo continuar sendo a mesma cópia.
+          setTimeout(function(){credenciamentoClipboard[origem]={texto:el.value,html:html};},0);
+        });el.dataset.credPaste='1';
+      });
+    }
 
-      google.script.run
-        .withSuccessHandler(function(r) {
-          credenciamentoPreview = (r && r.itens) ? r.itens : [];
-          renderizarPreviewCredenciamento();
-        })
-        .withFailureHandler(capturarErroServidor)
-        .prepararAlimentacaoCredenciamento(itens, sessaoToken);
+    function prepararAlimentacaoCredenciamento(origem) {
+      if(credenciamentoEntradaOcupada)return;
+      origem=origem||'SIAPI';
+      var el=document.getElementById('cred-'+origem.toLowerCase()+'-colado'),texto=el.value,clip=credenciamentoClipboard[origem];
+      var itens;
+      try{itens=extrairEntradaCredenciamento(texto,origem,clip&&clip.texto===texto?clip.html:'');}catch(e){alert(e.message);return;}
+      bloquearEntradaCredenciamento(true);
+      google.script.run.withSuccessHandler(function(r){
+        credenciamentoPreviewOrigem=origem;credenciamentoPreview=r.itens||[];bloquearEntradaCredenciamento(false);renderizarPreviewCredenciamento();
+      }).withFailureHandler(function(err){bloquearEntradaCredenciamento(false);capturarErroServidor(err);}).prepararEntradaCredenciamento(itens,origem,sessaoToken);
+    }
+    function bloquearEntradaCredenciamento(ocupado) {
+      credenciamentoEntradaOcupada=ocupado;
+      document.querySelectorAll('.cred-btn-ler').forEach(function(b){b.disabled=ocupado;});
+      document.getElementById('btn-cred-salvar-alimentacao').disabled=ocupado||!credenciamentoPreview.length;
+      document.getElementById('btn-cred-limpar-alimentacao').disabled=ocupado;
+    }
+    function detalhesEntradaCredenciamento(x) {
+      return [['Origem',x.origem],['Número CBMGO',x.numeroCbmgo],['Envio',x.dataEnvio],['Endereço',x.endereco],['Bairro',x.bairro],['OBM responsável',x.obmResponsavel],['CNPJ/CPF',x.cnpjCpf],['Responsável técnico',x.responsavelTecnico],['Área',x.area]].filter(function(c){return !!c[1];}).map(function(c){return '<div><strong>'+c[0]+':</strong> '+escaparHtmlRoteiro(c[1])+'</div>';}).join('');
     }
 
     function renderizarPreviewCredenciamento() {
@@ -5758,6 +5802,7 @@
 
       card.style.display = credenciamentoPreview.length ? 'block' : 'none';
       resumo.textContent = credenciamentoPreview.length + ' protocolo(s)';
+      document.getElementById('cred-preview-titulo').textContent='Prévia da alimentação — '+credenciamentoPreviewOrigem;
       document.getElementById('btn-cred-salvar-alimentacao').disabled = !credenciamentoPreview.length;
 
       if (!credenciamentoPreview.length) {
@@ -5772,32 +5817,35 @@
           : '<span class="badge cred-badge-existente">JÁ CADASTRADO</span>';
 
         return '<tr>' +
-          '<td>' + badge + '</td>' +
+          '<td>' + badge + '<div>'+escaparHtmlRoteiro(x.origem||credenciamentoPreviewOrigem)+'</div></td>' +
           '<td class="fw-bold">' + escaparHtmlRoteiro(x.protocolo || '') + '</td>' +
           '<td><input class="form-control form-control-sm" value="' + escaparHtmlRoteiro(x.tipoCredenciamento || '') + '" oninput="credenciamentoPreview[' + idx + '].tipoCredenciamento=this.value"></td>' +
           '<td><input class="form-control form-control-sm" value="' + escaparHtmlRoteiro(x.cidade || '') + '" oninput="credenciamentoPreview[' + idx + '].cidade=this.value"></td>' +
           '<td><input class="form-control form-control-sm text-uppercase" maxlength="2" value="' + escaparHtmlRoteiro(x.estado || '') + '" oninput="credenciamentoPreview[' + idx + '].estado=this.value.toUpperCase()"></td>' +
           '<td><input class="form-control form-control-sm" value="' + escaparHtmlRoteiro(x.razaoSocial || '') + '" oninput="credenciamentoPreview[' + idx + '].razaoSocial=this.value"></td>' +
+          '<td class="small">'+detalhesEntradaCredenciamento(x)+'</td>' +
         '</tr>';
       }).join('');
     }
 
     function salvarAlimentacaoCredenciamento() {
-      if (!credenciamentoPreview.length) return;
+      if (!credenciamentoPreview.length || credenciamentoEntradaOcupada) return;
+      bloquearEntradaCredenciamento(true);
       var btn = document.getElementById('btn-cred-salvar-alimentacao');
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Salvando...';
 
       google.script.run
         .withSuccessHandler(function(r) {
-          btn.disabled = false;
+          bloquearEntradaCredenciamento(false);
           btn.innerHTML = '<i class="bi bi-database-check me-1"></i>Adicionar à fila de análise';
-          alert((r && r.mensagem) || 'Alimentação concluída.');
           limparAlimentacaoCredenciamento();
-          atualizarCredenciamento();
+          document.getElementById('cred-analise-status').textContent=(r&&r.mensagem)||'Alimentação concluída.';
+          abrirTelaCredenciamento('analise');
+          atualizarResumoCredenciamentoSilencioso_();
         })
         .withFailureHandler(function(err) {
-          btn.disabled = false;
+          bloquearEntradaCredenciamento(false);
           btn.innerHTML = '<i class="bi bi-database-check me-1"></i>Adicionar à fila de análise';
           capturarErroServidor(err);
         })
@@ -5805,45 +5853,16 @@
     }
 
     function limparAlimentacaoCredenciamento() {
+      if(credenciamentoEntradaOcupada)return;
       credenciamentoPreview = [];
-      var t = document.getElementById('cred-siapi-colado');
+      var t = document.getElementById('cred-'+credenciamentoPreviewOrigem.toLowerCase()+'-colado');
+      credenciamentoClipboard[credenciamentoPreviewOrigem]=null;
       if (t) t.value = '';
       renderizarPreviewCredenciamento();
     }
 
-    function importarHistoricoCredenciamento() {
-      var texto = String(document.getElementById('cred-historico-colado').value || '').trim();
-      if (!texto) {
-        alert('Cole primeiro as linhas da planilha histórica.');
-        return;
-      }
-      var substituir = !!(document.getElementById('cred-substituir-historico') && document.getElementById('cred-substituir-historico').checked);
-      var msgConf = substituir
-        ? 'Substituir a carga histórica anterior do Credenciamento e importar novamente os dados colados? Os registros criados pelo próprio sistema serão preservados.'
-        : 'Importar o histórico existente? Linhas já importadas serão ignoradas.';
-      if (!confirm(msgConf)) return;
-
-      var btn = document.getElementById('btn-cred-importar-historico');
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Importando...';
-
-      google.script.run
-        .withSuccessHandler(function(r) {
-          btn.disabled = false;
-          btn.innerHTML = '<i class="bi bi-upload me-1"></i>Importar histórico existente';
-          document.getElementById('cred-historico-colado').value = '';
-          alert((r && r.mensagem) || 'Histórico importado.');
-          atualizarCredenciamento();
-        })
-        .withFailureHandler(function(err) {
-          btn.disabled = false;
-          btn.innerHTML = '<i class="bi bi-upload me-1"></i>Importar histórico existente';
-          capturarErroServidor(err);
-        })
-        .importarHistoricoCredenciamento(texto, sessaoToken, substituir);
-    }
-
     function carregarFilaCredenciamento(silencioso) {
+      var minhaSequencia=++credenciamentoFilaSequencia;
       var status = document.getElementById('cred-analise-status');
       var lista = document.getElementById('cred-analise-lista');
 
@@ -5855,6 +5874,7 @@
 
       google.script.run
         .withSuccessHandler(function(r) {
+          if(minhaSequencia!==credenciamentoFilaSequencia)return;
           credenciamentoFilaCache = (r && r.itens) ? r.itens : [];
           status.className = credenciamentoFilaCache.length ? 'alert alert-info' : 'alert alert-success';
           status.textContent = credenciamentoFilaCache.length
@@ -5878,6 +5898,7 @@
           '<div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">' +
             '<div>' +
               '<div class="fw-bold fs-5">' + escaparHtmlRoteiro(x.protocolo || '') + '</div>' +
+              '<div class="small">Origem: '+escaparHtmlRoteiro(x.origem||'Não informada')+(x.numeroSei?' — SEI: '+escaparHtmlRoteiro(x.numeroSei):'')+'</div>' +
               '<div class="small text-muted">' + escaparHtmlRoteiro(x.tipoCredenciamento || '-') + '</div>' +
               '<div class="small mt-2"><strong>Razão Social:</strong> ' + escaparHtmlRoteiro(x.razaoSocial || '-') + '</div>' +
               '<div class="small"><strong>Cidade/UF:</strong> ' + escaparHtmlRoteiro(x.cidade || '-') + (x.estado ? ' / ' + escaparHtmlRoteiro(x.estado) : '') + '</div>' +
@@ -5900,7 +5921,21 @@
       document.getElementById('cred-modal-estado').value = x.estado || '';
       document.getElementById('cred-modal-razao').value = x.razaoSocial || '';
       document.getElementById('cred-modal-aviso').value = x.aviso || '';
+      document.getElementById('cred-modal-dados-origem').innerHTML=detalhesEntradaCredenciamento(x);
+      document.getElementById('cred-modal-sei-grupo').style.display=String(x.origem||'').indexOf('SEI')>=0?'block':'none';
+      document.getElementById('cred-modal-numero-sei').value=x.numeroSei||'';
+      document.getElementById('cred-modal-sei-status').textContent='O número pode ser salvo antes de concluir a análise.';
       bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-cred-analise')).show();
+    }
+
+    function salvarNumeroSeiCredenciamentoTela() {
+      var p=document.getElementById('cred-modal-protocolo').value,n=document.getElementById('cred-modal-numero-sei').value;
+      var b=document.getElementById('btn-cred-salvar-sei');if(b.disabled)return;b.disabled=true;
+      document.getElementById('cred-modal-sei-status').textContent='Salvando número SEI...';
+      google.script.run.withSuccessHandler(function(r){
+        b.disabled=false;credenciamentoFilaCache=credenciamentoFilaCache.map(function(x){return x.protocolo===p?r.item:x;});renderizarFilaCredenciamento();
+        if(document.getElementById('cred-modal-protocolo').value===p)document.getElementById('cred-modal-sei-status').textContent=r.mensagem;
+      }).withFailureHandler(function(err){b.disabled=false;document.getElementById('cred-modal-sei-status').textContent=err.message||String(err);}).salvarNumeroSeiCredenciamento(p,n,sessaoToken);
     }
 
     function salvarMovimentacaoCredenciamento() {
@@ -5913,6 +5948,7 @@
       }
 
       var btn = document.getElementById('btn-cred-salvar-movimentacao');
+      if(btn.disabled)return;
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Salvando...';
 
@@ -5927,6 +5963,8 @@
           );
           if (modal) modal.hide();
 
+          ++credenciamentoFilaSequencia;
+          ++credenciamentoConsultaSequencia;
           // Retira o protocolo imediatamente da fila local.
           credenciamentoFilaCache = (credenciamentoFilaCache || []).filter(
             function(x) {
@@ -6000,17 +6038,20 @@
           cidade:document.getElementById('cred-modal-cidade').value,
           estado:document.getElementById('cred-modal-estado').value,
           razaoSocial:document.getElementById('cred-modal-razao').value,
-          aviso:document.getElementById('cred-modal-aviso').value
+          aviso:document.getElementById('cred-modal-aviso').value,
+          numeroSei:document.getElementById('cred-modal-numero-sei').value
         }, sessaoToken);
     }
 
     function carregarConsultaCredenciamento() {
+      var minhaSequencia=++credenciamentoConsultaSequencia;
       var despacho = document.getElementById('cred-cons-despacho').value || '';
       var tbody = document.getElementById('cred-cons-tbody');
-      tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4"><div class="spinner-border spinner-border-sm"></div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="12" class="text-center py-4"><div class="spinner-border spinner-border-sm"></div></td></tr>';
 
       google.script.run
         .withSuccessHandler(function(r) {
+          if(minhaSequencia!==credenciamentoConsultaSequencia)return;
           credenciamentoConsultaCache = (r && r.itens) ? r.itens : [];
           filtrarConsultaCredenciamentoLocal();
         })
@@ -6032,7 +6073,7 @@
     function renderizarConsultaCredenciamento(itens) {
       var tbody = document.getElementById('cred-cons-tbody');
       if (!itens.length) {
-        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">Nenhum protocolo encontrado.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted py-4">Nenhum protocolo encontrado.</td></tr>';
         return;
       }
 
@@ -6047,6 +6088,7 @@
         return '<tr class="' + cls + '">' +
           '<td class="fw-bold">' + escaparHtmlRoteiro(x.despacho || '-') + '</td>' +
           '<td>' + protHtml + '</td>' +
+          '<td>'+escaparHtmlRoteiro(x.origem||'Não informada')+'</td><td>'+escaparHtmlRoteiro(x.numeroSei||'-')+'</td>' +
           '<td>' + escaparHtmlRoteiro(x.tipoCredenciamento || '-') + '</td>' +
           '<td>' + escaparHtmlRoteiro(x.cidade || '-') + '</td>' +
           '<td class="text-center">' + escaparHtmlRoteiro(x.estado || '-') + '</td>' +

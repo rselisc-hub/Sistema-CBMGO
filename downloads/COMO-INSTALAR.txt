@@ -1,4 +1,4 @@
-SISTEMA-CBMGO — CONTROLE DE DADOS NO GESTOR E FLUIDEZ
+SISTEMA-CBMGO — CREDENCIAMENTO COM ENTRADAS SIAPI E SEI
 
 1. Extraia o ZIP. Abra WebApp.txt no Bloco de Notas e substitua TODO o conteúdo de WebApp.gs no Apps Script.
 2. Abra Index.txt e substitua TODO o conteúdo de Index.html. O nome do HTML no editor deve continuar Index.
@@ -16,8 +16,12 @@ Se o projeto não for vinculado, configure RASCUNHO_ORIGEM_ID nas propriedades. 
 CONFERÊNCIA: ao concluir, a tela responde imediatamente com Salvando na planilha. Só mostra salvo e atualiza contadores após confirmação do servidor. Se falhar, o protocolo volta e a anotação pode ser reaberta durante a sessão. Confira a fila antes de repetir se houver falha de comunicação. A anotação local não sobrevive ao fechamento da página. Reservas continuam confirmadas no servidor para evitar conflito entre usuários.
 
 Assumir lotes, históricos, resumos, indicadores, filtros e listas receberam otimizações adicionais. O tratamento de Vistoriado por foi preservado.
-90 testes locais e 10 cenários no Chromium passaram, com serviços Google simulados. Nenhuma ativação ou medição real no Google foi feita neste ambiente. Nenhum dado da planilha enviada está incluído no pacote.
+105 testes locais e 17 cenários no Chromium passaram, com serviços Google simulados. Nenhuma ativação ou medição real no Google foi feita neste ambiente. Nenhum dado da planilha enviada está incluído no pacote.
 
 ATUALIZAÇÃO VISUAL: rosa dos eventos temporários no roteiro mais forte (#F062B0), com texto escuro. Atualizar WebApp.gs e Index.html para manter a mesma cor na tela e nas próximas gerações da planilha. Cores antigas já gravadas continuam reconhecidas na tela.
 
-CREDENCIAMENTO — CONSULTA GERAL: ordena pela última atualização, incluindo horário, com datas alternativas para registros antigos. Nova coluna Última atualização. Exigência permanece escrita, sem fundo amarelo. Esta correção ainda não inclui os novos formatos de colagem SIAPI/SEI.
+CREDENCIAMENTO — CONSULTA GERAL: ordena pela última atualização, incluindo horário, com datas alternativas para registros antigos. Nova coluna Última atualização. Exigência permanece escrita, sem fundo amarelo. Esta versão também inclui os novos formatos de entrada SIAPI/SEI descritos abaixo.
+
+CREDENCIAMENTO SIAPI/SEI: mantenha ambos os arquivos atualizados. Alimentação agora tem quadros separados para a tabela nova do SIAPI e para o cabeçalho rotulado usado na entrada SEI. Ler e conferir mostra a prévia; Adicionar à fila de análise salva e abre Análise. O campo antigo de importação histórica foi retirado; os dados já importados permanecem.
+Na Análise de registros do SEI, digite Número do processo SEI. Use Salvar número SEI para guardar antes de concluir; concluir também salva o número preenchido. O número CBMGO do cabeçalho é outro campo e não substitui o número SEI.
+Ao concluir, o protocolo vai para Consulta geral, com origem e processo SEI. A aba CREDENCIAMENTO_COMPLEMENTOS é criada automaticamente na mesma planilha, preservando as colunas anteriores. Nenhuma configuração manual de colunas é necessária. A leitura de Vistorias permanece separada.

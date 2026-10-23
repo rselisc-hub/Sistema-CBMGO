@@ -2091,12 +2091,18 @@ function salvarAlimentacaoCredenciamento(itens, token) {
   itens = Array.isArray(itens) ? itens : [];
   if (!itens.length) throw new Error("Nenhum protocolo para alimentar.");
 
+  var novosFormatos=itens.filter(function(x){return !!x.entradaCredenciamento;});
+  novosFormatos.forEach(function(x){
+    if(['SIAPI','SEI'].indexOf(x.origem)<0||!/^\d{3,12}\/\d{2,4}$/.test(String(x.protocolo||'')))throw new Error('Entrada inválida. Confira a prévia.');
+    validarNumeroSeiCredenciamento_(x.numeroSei);
+  });
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
 
   try {
     var aba = garantirEstruturaCredenciamentoProcessos_();
     var mapa = mapaCredenciamentoProcessos_(aba);
+    var complementosEntrada=novosFormatos.length?mapaComplementosCredenciamento_():null;
     var agora = dataHoraSaoPauloTexto_();
     var novos = 0;
     var existentes = 0;
@@ -2138,6 +2144,7 @@ function salvarAlimentacaoCredenciamento(itens, token) {
     });
 
     gravarLinhasAlteradasLeve_(aba, alteradas, 15);
+    if(novosFormatos.length)gravarComplementosCredenciamento_(novosFormatos,complementosEntrada);
     SpreadsheetApp.flush();
     return {
       sucesso:true,
@@ -2455,10 +2462,11 @@ function listarFilaCredenciamento(token) {
   exigirPerfil_(token, ["CONFERENCIA"]);
   var aba = garantirEstruturaCredenciamentoProcessos_();
   var itens = [];
+  var complementos=mapaComplementosCredenciamento_();
 
   if (aba.getLastRow() >= 2) {
     aba.getRange(2,1,aba.getLastRow()-1,15).getDisplayValues().forEach(function(r) {
-      var x = objetoCredenciamentoLinha_(r);
+      var x = complementarCredenciamento_(objetoCredenciamentoLinha_(r),complementos);
       if (normalizarTextoCredenciamento_(x.estadoInterno) === "AGUARDANDO") itens.push(x);
     });
   }
@@ -2476,6 +2484,7 @@ function registrarMovimentacaoCredenciamento(dados, token) {
 
   var p = normalizarProtocoloRoteiro_(dados.protocolo);
   var despacho = normalizarTextoCredenciamento_(dados.despacho);
+  if(despacho==='EXIGENCIA')despacho='EXIGÊNCIA';
 
   if (!p) throw new Error("Protocolo inválido.");
 
@@ -2483,6 +2492,7 @@ function registrarMovimentacaoCredenciamento(dados, token) {
     throw new Error("Selecione APROVADO ou EXIGÊNCIA.");
   }
 
+  if(dados.numeroSei!==undefined)validarNumeroSeiCredenciamento_(dados.numeroSei);
   var lock = LockService.getScriptLock();
 
   if (!lock.tryLock(8000)) {
@@ -2494,6 +2504,7 @@ function registrarMovimentacaoCredenciamento(dados, token) {
   try {
     var proc = garantirEstruturaCredenciamentoProcessos_();
     var hist = garantirEstruturaHistoricoCredenciamento_();
+    var complementos=mapaComplementosCredenciamento_();
 
     if (proc.getLastRow() < 2) {
       throw new Error("Protocolo não localizado no Credenciamento.");
@@ -2568,6 +2579,7 @@ function registrarMovimentacaoCredenciamento(dados, token) {
       .getRange(linhaProc, 1, 1, 15)
       .setValues([linha]);
 
+    if(String(dados.numeroSei||'').trim())gravarComplementosCredenciamento_([{protocolo:p,numeroSei:dados.numeroSei}],complementos);
     hist.appendRow([
       dataHora,
       p,
@@ -2590,7 +2602,7 @@ function registrarMovimentacaoCredenciamento(dados, token) {
       mensagem:"Movimentação registrada com sucesso.",
       protocolo:p,
       despacho:despacho,
-      item:objetoCredenciamentoLinha_(linha)
+      item:complementarCredenciamento_(objetoCredenciamentoLinha_(linha),complementos)
     };
   } finally {
     try { lock.releaseLock(); } catch (e) {}
@@ -2604,10 +2616,12 @@ function consultarCredenciamento(filtros, token) {
   var despachoFiltro = normalizarTextoCredenciamento_(filtros.despacho);
   var aba = garantirEstruturaCredenciamentoProcessos_();
   var itens = [];
+  var complementos=mapaComplementosCredenciamento_();
 
   if (aba.getLastRow() >= 2) {
     aba.getRange(2,1,aba.getLastRow()-1,15).getDisplayValues().forEach(function(r) {
-      var x = objetoCredenciamentoLinha_(r);
+      var x = complementarCredenciamento_(objetoCredenciamentoLinha_(r),complementos);
+      if(normalizarTextoCredenciamento_(x.estadoInterno)==='AGUARDANDO')return;
       if (despachoFiltro && normalizarTextoCredenciamento_(x.despacho) !== despachoFiltro) return;
       itens.push(x);
     });
@@ -2643,7 +2657,7 @@ function obterResumoCredenciamento(token) {
       var despacho = normalizarTextoCredenciamento_(x.despacho);
       if (estado === "AGUARDANDO") aguardando++;
       if (despacho === "APROVADO") aprovados++;
-      if (despacho === "EXIGÊNCIA") exigencia++;
+      if (despacho === "EXIGENCIA") exigencia++;
     });
   }
 
@@ -12635,4 +12649,94 @@ function timestampAtualizacaoCredenciamento_(valor) {
   var d=new Date(ano,mes,dia,hora,minuto,segundo);
   return d.getFullYear()===ano && d.getMonth()===mes && d.getDate()===dia &&
     d.getHours()===hora && d.getMinutes()===minuto && d.getSeconds()===segundo?d.getTime():0;
+}
+
+function camposComplementosCredenciamento_() {
+  return ['origem','numeroSei','numeroCbmgo','endereco','bairro','obmResponsavel','cnpjCpf','responsavelTecnico','area','dataEnvio'];
+}
+function cabecalhoComplementosCredenciamento_() {
+  return ['PROTOCOLO','ORIGEM','NUMERO_SEI','NUMERO_CBMGO','ENDERECO','BAIRRO','OBM_RESPONSAVEL','CNPJ_CPF','RESPONSAVEL_TECNICO','AREA','DATA_ENVIO','ATUALIZADO_EM'];
+}
+function conferirComplementosCredenciamento_(aba) {
+  if(aba&&aba.getLastRow()>0&&JSON.stringify(aba.getRange(1,1,1,12).getDisplayValues()[0])!==JSON.stringify(cabecalhoComplementosCredenciamento_()))throw new Error('Cabeçalho de CREDENCIAMENTO_COMPLEMENTOS incompatível. Confira a aba antes de importar.');
+}
+function mapaComplementosCredenciamento_() {
+  var a=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('CREDENCIAMENTO_COMPLEMENTOS'),mapa=Object.create(null);
+  conferirComplementosCredenciamento_(a);
+  if(a&&a.getLastRow()>=2)a.getRange(2,1,a.getLastRow()-1,12).getDisplayValues().forEach(function(r,i){
+    var p=normalizarProtocoloRoteiro_(r[0]);if(!p)return;
+    var x={};camposComplementosCredenciamento_().forEach(function(c,k){x[c]=String(r[k+1]||'');});
+    if(mapa[p])throw new Error('Protocolo duplicado na aba de complementos: '+p);
+    mapa[p]={linha:i+2,dados:x};
+  });
+  return mapa;
+}
+function complementarCredenciamento_(item,mapa) {
+  var entrada=mapa[normalizarProtocoloRoteiro_(item.protocolo)];
+  if(entrada)Object.keys(entrada.dados).forEach(function(c){item[c]=entrada.dados[c];});
+  return item;
+}
+function validarNumeroSeiCredenciamento_(numero) {
+  var n=String(numero||'').trim();
+  if(n && (!/^[0-9.\/ -]+$/.test(n)||n.replace(/\D/g,'').length<5||n.length>40))throw new Error('Informe um número de processo SEI válido, mantendo os zeros iniciais.');
+  return n;
+}
+function gravarComplementosCredenciamento_(itens,mapa) {
+  if(!itens.length)return;
+  var ss=SpreadsheetApp.getActiveSpreadsheet(),a=ss.getSheetByName('CREDENCIAMENTO_COMPLEMENTOS');
+  if(!a)a=ss.insertSheet('CREDENCIAMENTO_COMPLEMENTOS');
+  conferirComplementosCredenciamento_(a);
+  prepararCabecalhoLeve_(a,cabecalhoComplementosCredenciamento_(),{primeiroVazio:true});
+  var alteradas={},proxima=a.getLastRow()+1,agora=dataHoraSaoPauloTexto_();
+  itens.forEach(function(item){
+    var p=normalizarProtocoloRoteiro_(item.protocolo),anterior=mapa[p],dados=Object.assign({},anterior?anterior.dados:{});
+    camposComplementosCredenciamento_().forEach(function(c){if(item[c]!==undefined&&String(item[c]).trim())dados[c]=String(item[c]).trim();});
+    if(anterior&&anterior.dados.origem&&item.origem){
+      dados.origem=anterior.dados.origem.split(' / ').concat(item.origem.split(' / ')).filter(function(v,i,t){return t.indexOf(v)===i;}).join(' / ');
+    }
+    dados.numeroSei=validarNumeroSeiCredenciamento_(dados.numeroSei);
+    var linha=anterior?anterior.linha:proxima++;
+    alteradas[linha]=[p].concat(camposComplementosCredenciamento_().map(function(c){return dados[c]||'';}),[agora]);
+    mapa[p]={linha:linha,dados:dados};
+  });
+  garantirLinhasArquivoRascunhos_(a,Math.max.apply(null,Object.keys(alteradas).map(Number)));
+  // Identificadores são texto: mantém zeros iniciais e números SEI extensos.
+  a.getRangeList(Object.keys(alteradas).map(function(l){return 'A'+l+':L'+l;})).setNumberFormat('@');
+  gravarLinhasAlteradasLeve_(a,alteradas,12);
+}
+function prepararEntradaCredenciamento(itens,origem,token) {
+  exigirPerfil_(token,['CONFERENCIA']);
+  if(['SIAPI','SEI'].indexOf(origem)<0)throw new Error('Origem inválida.');
+  if(!Array.isArray(itens)||!itens.length)throw new Error('Nenhum protocolo identificado.');
+  var vistos=Object.create(null);
+  itens.forEach(function(x){
+    var p=normalizarProtocoloRoteiro_(x.protocolo);
+    if(!/^\d{3,12}\/\d{2,4}$/.test(p))throw new Error('Protocolo inválido: '+p);
+    if(vistos[p])throw new Error('Protocolo repetido no lote: '+p+'. Confira a cópia antes de salvar.');vistos[p]=true;
+  });
+  var preparada=prepararAlimentacaoCredenciamento(itens,token),mapa=mapaComplementosCredenciamento_();
+  preparada.itens.forEach(function(x,i){
+    var entrada=itens[i];complementarCredenciamento_(x,mapa);
+    camposComplementosCredenciamento_().forEach(function(c){if(entrada[c]!==undefined&&String(entrada[c]).trim())x[c]=String(entrada[c]).trim();});
+    x.origem=origem;x.entradaCredenciamento=true;
+  });
+  return preparada;
+}
+function salvarNumeroSeiCredenciamento(protocolo,numero,token) {
+  var sessao=exigirPerfil_(token,['CONFERENCIA']),n=validarNumeroSeiCredenciamento_(numero);
+  if(!n)throw new Error('Preencha o número do processo SEI.');
+  var p=normalizarProtocoloRoteiro_(protocolo),lock=LockService.getScriptLock();lock.waitLock(15000);
+  try {
+    var a=garantirEstruturaCredenciamentoProcessos_(),mapa=mapaCredenciamentoProcessos_(a);
+    if(!mapa[p])throw new Error('Protocolo não encontrado.');
+    var extras=mapaComplementosCredenciamento_(),anterior=extras[p]&&extras[p].dados.numeroSei||'';
+    if(n!==anterior){
+      gravarComplementosCredenciamento_([{protocolo:p,numeroSei:n}],extras);
+      mapa[p].r[14]=dataHoraSaoPauloTexto_();
+      a.getRange(mapa[p].linha,15).setValue(mapa[p].r[14]);
+      garantirEstruturaHistoricoCredenciamento_().appendRow([dataHoraSaoPauloTexto_(),p,'PROCESSO_SEI_ATUALIZADO',mapa[p].r[1]||'',mapa[p].r[2]||'',mapa[p].r[3]||'',mapa[p].r[4]||'',mapa[p].r[5]||'',sessao.rg,sessao.nome||sessao.rg,'Processo SEI: '+n+(anterior?' (anterior: '+anterior+')':''),'','SEI']);
+    }
+    var item=complementarCredenciamento_(objetoCredenciamentoLinha_(mapa[p].r),extras);
+    return {sucesso:true,item:item,mensagem:'Número do processo SEI salvo.'};
+  } finally {lock.releaseLock();}
 }

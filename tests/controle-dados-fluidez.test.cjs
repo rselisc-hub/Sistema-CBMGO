@@ -82,7 +82,7 @@ test('histórico de documentos mantém eventos, normalização de IDs e ordem de
 test('resumo de credenciamento mantém contagens e autoria com histórico antigo volumoso',()=>{
  const data={P:[[],row(15,{1:'APROVADO',11:'AGUARDANDO'}),row(15,{1:'EXIGÊNCIA'})],H:[[],...Array.from({length:800},()=>row(13,{0:'01/09/2026',2:'MOVIMENTACAO'})),row(13,{0:'22/10/2026 10:00:00',2:'MOVIMENTACAO',8:'1'}),row(13,{0:'22/10/2026 11:00:00',2:'MOVIMENTACAO_HISTORICA',9:'TESTE'}),row(13,{0:'22/10/2026',2:'IMPORTACAO',8:'1'})]};
  function run(code){const f=fixture(code,data);f.context.garantirEstruturaCredenciamentoProcessos_=()=>f.sheets.P;f.context.garantirEstruturaHistoricoCredenciamento_=()=>f.sheets.H;return f.context.obterResumoCredenciamento('token');}
- const a=run(previous),b=run(current);assert.deepEqual(plain(b),plain(a));assert.equal(b.resumo.analisadosHoje,2);assert.equal(b.resumo.meusHoje,2);
+ const a=run(previous),b=run(current);a.resumo.exigencia=1;assert.deepEqual(plain(b),plain(a));assert.equal(b.resumo.exigencia,1);assert.equal(b.resumo.analisadosHoje,2);assert.equal(b.resumo.meusHoje,2);
 });
 test('resumo de Atendimento usa apenas data e usuário, mantendo as contagens',()=>{
  const now=new Date(),old=new Date(now.getTime()-86400000),data={A:[[],[now.toISOString(),'1','demais campos'],[now.toISOString(),'2'],[old.toISOString(),'1'],['inválida','1']]};

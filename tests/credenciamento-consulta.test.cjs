@@ -20,5 +20,5 @@ test('datas impossíveis não interferem na ordenação e filtro de despacho per
 test('exigência mantém o texto sem fundo amarelo e mostra a atualização usada na consulta',()=>{
  const tbody={innerHTML:''},c=vm.createContext({document:{getElementById:()=>tbody},escaparHtmlRoteiro:x=>String(x??'')});const a=html.indexOf('    function renderizarConsultaCredenciamento('),b=html.indexOf('    function abrirAvisoCredenciamento(',a);vm.runInContext(html.slice(a,b),c);
  c.renderizarConsultaCredenciamento([{protocolo:'10001/26',despacho:'EXIGÊNCIA',atualizadoEm:'23/10/2026 12:30:10'}]);assert.match(tbody.innerHTML,/EXIGÊNCIA/);assert.match(tbody.innerHTML,/23\/10\/2026 12:30:10/);assert.doesNotMatch(tbody.innerHTML,/cred-row-exigencia/);assert.doesNotMatch(html,/\.cred-row-exigencia/);
- c.renderizarConsultaCredenciamento([]);assert.match(tbody.innerHTML,/colspan="10"/);
+ c.renderizarConsultaCredenciamento([]);assert.match(tbody.innerHTML,/colspan="12"/);
 });
