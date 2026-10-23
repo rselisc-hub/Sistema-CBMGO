@@ -12866,3 +12866,715 @@ function atualizarPreferenciasRascunhosRoteiro(itens,token) {
     return {atualizados:linhas.length,ignorados:ignorados};
   } finally {lock.releaseLock();}
 }
+
+
+// Modelos de consulta e cópia; não são instruções executáveis.
+function obterTextosPadraoConferencia(token){
+  exigirPerfil_(token,["GESTOR","CONFERENCIA"]);
+  return {sucesso:true,modelos:[
+  {
+    "id": "TP-003",
+    "categoria": "ART / RRT / TRT",
+    "titulo": "CONTEÚDO DA ART/RRT/TRT",
+    "texto": "Especificar no campo \"Atividade Técnica\" da ART/RRT/TRT, de forma cristalina, o tipo de serviço realizado, bem como explanar no campo \"Observações\" as atividades realizadas, mencionando que o(s) sistema(s) está(ão) em conformidade com as Normas Técnicas do CBMGO",
+    "linha": 3,
+    "adaptado": false
+  },
+  {
+    "id": "TP-007",
+    "categoria": "Declarações e licenciamento",
+    "titulo": "INSERIR DECLARAÇÃO NO PROTOCOLO",
+    "texto": "Conforme NT 01/2022 item 7.10.4 essa edificação se enquadra na fiscalização intercalada entre inspeções e análise de documentos. O proprietário ou o responsável pelo uso da edificação e/ou área de risco deverá ANEXAR A ESSE PROCESSO O ANEXO T - DECLARAÇÃO DE CONFORMIDADE DA EDIFICAÇÃO DISPONÍVEL NO LINK: https://bit.ly/anexoTcbmgo preenchida e assinada, anexar ao processo cópia do documento de identificação.",
+    "linha": 7,
+    "adaptado": false
+  },
+  {
+    "id": "TP-008",
+    "categoria": "Declarações e licenciamento",
+    "titulo": "Colocar o link da declaraçao também",
+    "texto": "ANEXO T DISPONÍVEL NO LINK https://www.bombeiros.go.gov.br/wp-content/uploads/2023/08/NT-01_2023_-_Procedimentos_Administrativos-ANEXO-T.pdf",
+    "linha": 8,
+    "adaptado": false
+  },
+  {
+    "id": "TP-009",
+    "categoria": "Declarações e licenciamento",
+    "titulo": "LICENCIAMENTO FACILITADO",
+    "texto": "Este processo se enquadra no Licenciamento Facilitado e, por isso, a inpeção in loco não será realizada. O atual procedimento será adotado apenas para os protocolos remanescentes e desamparados após a atualização da Norma técnica 01/2024 que extinguiu o serviço de \"Certificação Prévia\".  Será efetuada apenas análise documental.",
+    "linha": 9,
+    "adaptado": false
+  },
+  {
+    "id": "TP-010",
+    "categoria": "Declarações e licenciamento",
+    "titulo": "Observação para Desconformidade no Facilitado",
+    "texto": "Conforme o item 13 da Norma Técnica 01 do CBMGO, o processo foi retirado da situação de Conformidade para a alteração de dados. (       ) Após a identificação da desconformidade, o solicitante deverá enviar o FAT (Anexo F) solicitando a alteração necessária. Além disso, é imprescindível entrar em contato via telefone 3286-1500 assim que o FAT for enviado, para confirmar o recebimento e dar seguimento ao processo.",
+    "linha": 10,
+    "adaptado": false
+  },
+  {
+    "id": "TP-013",
+    "categoria": "Denúncias",
+    "titulo": "QUANDO SE TRATAR DE REFORMAS EM APARTAMENTOS",
+    "texto": "Solicitar ao síndico do edifício que exija do condômino que realizou a reforma em seu apartamento a documentação de responsabilidade técnica relativa à reforma realizada, tendo-se em vista que o Corpo de Bombeiros não pode realizar vistorias nas unidades habitacionais (com exceção do \"Habite-se\"), a não ser sob mandado judicial.",
+    "linha": 13,
+    "adaptado": false
+  },
+  {
+    "id": "TP-015",
+    "categoria": "Processos e movimentação",
+    "titulo": "PROCESSO EXPIRADO",
+    "texto": "7.1.4 O processo de Licenciamento em aberto será considerado expirado após o período de 1 (um) ano, a contar do dia da primeira inspeção realizada após a última taxa paga, independente da possibilidade de renovação quando for suspenso.",
+    "linha": 15,
+    "adaptado": false
+  },
+  {
+    "id": "TP-016",
+    "categoria": "Processos e movimentação",
+    "titulo": "OBSERVAÇÃO SOBRE FALTA DE MOVIMENTAÇÃO DO PROCESSO",
+    "texto": "De acordo com o item 19.1 da Norma Técnica 01/2023: \"A qualquer tempo, os processos de Licenciamento (Facilitado, Habite-se, Análise de Projetos, Renovação) e os processos de Credenciamento  de Empresas, Comissão Técnica e Conselho Técnico Deliberativo serão considerados expirados após 120 (cento e vinte) dias sem nenhuma movimentação por responsabilidade do contribuinte, sem possibilidade de reabertura.\"",
+    "linha": 16,
+    "adaptado": false
+  },
+  {
+    "id": "TP-017",
+    "categoria": "Anexo G e documentos da edificação",
+    "titulo": "ANEXO G NÃO ENVIADO",
+    "texto": "ANEXO G PREENCHIDO, CONFORME MODELO DISPONÍVEL NO SITE: https://www.bombeiros.go.gov.br/wp-content/uploads/2020/06/NT-01_2020-Procedimentos-Administrativos-ANEXO-G.pdf",
+    "linha": 17,
+    "adaptado": false
+  },
+  {
+    "id": "TP-018",
+    "categoria": "Anexo G e documentos da edificação",
+    "titulo": "ANEXO G ANTIGO",
+    "texto": "REENVIAR ANEXO G PREENCHIDO, CONFORME MODELO DISPONÍVEL NO SITE: https://www.bombeiros.go.gov.br/wp-content/uploads/2020/06/NT-01_2020-Procedimentos-Administrativos-ANEXO-G.pdf",
+    "linha": 18,
+    "adaptado": false
+  },
+  {
+    "id": "TP-019",
+    "categoria": "Anexo G e documentos da edificação",
+    "titulo": "ANEXO G SEM TIPO DE EXTINTOR",
+    "texto": "REENVIAR ANEXO G COM QUADRO REFERENTE A EXTINTORES DEVIDAMENTE PREENCHIDO",
+    "linha": 19,
+    "adaptado": false
+  },
+  {
+    "id": "TP-020",
+    "categoria": "Anexo G e documentos da edificação",
+    "titulo": "ANEXO G SEM CPF",
+    "texto": "INSERIR O NÚMERO DO CPF DO PROPRIETÁRIO OU RESPONSÁVEL LEGAL NO ANEXO G E ENVIAR NOVAMENTE",
+    "linha": 20,
+    "adaptado": false
+  },
+  {
+    "id": "TP-021",
+    "categoria": "Anexo G e documentos da edificação",
+    "titulo": "ANEXO G SEM ASSINATURA",
+    "texto": "REENVIAR ANEXO G COM ASSINATURA DO RESPONSÁVEL.",
+    "linha": 21,
+    "adaptado": false
+  },
+  {
+    "id": "TP-022",
+    "categoria": "Anexo G e documentos da edificação",
+    "titulo": "ANEXO G SEM NÚMERO DE PROTOCOLO",
+    "texto": "INSERIR O NÚMERO DO PROTOCOLO DA INSPEÇÃO TÉCNICA NO ANEXO G  E ENVIAR NOVAMENTE",
+    "linha": 22,
+    "adaptado": false
+  },
+  {
+    "id": "TP-023",
+    "categoria": "Anexo G e documentos da edificação",
+    "titulo": "ANEXO G ILEGÍVEL",
+    "texto": "O ANEXO G ENVIADO ESTÁ ILEGÍVEL. REENVIAR ANEXO G PREENCHIDO, CONFORME MODELO DISPONÍVEL NO SITE: https://www.bombeiros.go.gov.br/wp-content/uploads/2020/06/NT-01_2020-Procedimentos-Administrativos-ANEXO-G.pdf",
+    "linha": 23,
+    "adaptado": false
+  },
+  {
+    "id": "TP-024",
+    "categoria": "Anexo G e documentos da edificação",
+    "titulo": "SALA SEM SAÍDA PARA VIA PÚBLICA",
+    "texto": "ENVIAR CERCON VÁLIDO DA EDIFICAÇÃO PRINCIPAL",
+    "linha": 24,
+    "adaptado": false
+  },
+  {
+    "id": "TP-025",
+    "categoria": "Anexo G e documentos da edificação",
+    "titulo": "PONTO DE REFERÊNCIA (QUANDO IDENTIFICADO ATRAVÉS DOS DADOS CADASTRADOS)",
+    "texto": "CASO O EMPREENDIMENTO SEJA ENDEREÇO RESIDENCIAL (PONTO DE REFERÊNCIA): MARCAR A TERCEIRA OPÇÃO DO ANEXO G (DISPONÍVEL NO SITE: https://www.bombeiros.go.gov.br/siapi/arquivos-siapi.html) E ENVIÁ-LO. NÃO NECESSITA ENVIAR NOTA FISCAL DE EXTINTOR.",
+    "linha": 25,
+    "adaptado": false
+  },
+  {
+    "id": "TP-026",
+    "categoria": "Anexo G e documentos da edificação",
+    "titulo": "ÁREA ≤ 250m²",
+    "texto": "ENVIAR NOTA FISCAL DE EXTINTOR CONFORME DISCRIMINADO NO ITEM 3 DO ANEXO G, EMITIDA POR EMPRESA CREDENCIADA NO CORPO DE BOMBEIROS DE GOIÁS (RELAÇÃO DE EMPRESAS DISPONÍVEL NO SITE: https://www.bombeiros.go.gov.br/empresas-credenciadas",
+    "linha": 26,
+    "adaptado": false
+  },
+  {
+    "id": "TP-027",
+    "categoria": "Anexo G e documentos da edificação",
+    "titulo": "250m² < ÁREA ≤ 500m²",
+    "texto": "ENVIAR NOTA FISCAL DE EXTINTOR CONFORME DISCRIMINADO NO ITEM 4 DO ANEXO G, EMITIDA POR EMPRESA CREDENCIADA NO CORPO DE BOMBEIROS DE GOIÁS (RELAÇÃO DE EMPRESAS DISPONÍVEL NO SITE: https://www.bombeiros.go.gov.br/empresas-credenciadas",
+    "linha": 27,
+    "adaptado": false
+  },
+  {
+    "id": "TP-028",
+    "categoria": "Anexo G e documentos da edificação",
+    "titulo": "500m² < ÁREA ≤ 750m²",
+    "texto": "ENVIAR NOTA FISCAL DE EXINTOR CONFORME DISCRIMINADO NO ITEM 5 DO ANEXO G, EMITIDA POR EMPRESA CREDENCIADA NO CORPO DE BOMBEIROS DE GOIÁS (RELAÇÃO DE EMPRESAS DISPONÍVEL NO SITE: https://www.bombeiros.go.gov.br/empresas-credenciadas",
+    "linha": 28,
+    "adaptado": false
+  },
+  {
+    "id": "TP-029",
+    "categoria": "Anexo G e documentos da edificação",
+    "titulo": "RESTRIÇÃO DE GLP",
+    "texto": "EXPRESSAMENTE PROIBIDO USO DE BOTIJÃO P-13 NO INTERIOR DA EDIFICAÇÃO COMERCIAL, EXCETO EM LOCAL ABERTO, EXTERNO, PROTEGIDO E VENTILADO. SE HOUVER CENTRAL DE GÁS NO LOCAL, DEVERÁ ANEXAR A ART DA MESMA.",
+    "linha": 29,
+    "adaptado": false
+  },
+  {
+    "id": "TP-030",
+    "categoria": "Anexo G e documentos da edificação",
+    "titulo": "FOTO DA FACHADA",
+    "texto": "FOTO DA FACHADA DA EDIFICAÇÃO. CONFORME A ALÍNEA \"C\" DO ITEM 6.3.3 DA NT-01.",
+    "linha": 30,
+    "adaptado": false
+  },
+  {
+    "id": "TP-031",
+    "categoria": "Retorno e conferência",
+    "titulo": "FINALIZAR CONFERÊNCIA",
+    "texto": "CUMPRIR COM AS EXIGÊNCIAS PENDENTES DO PROCESSO. EM CASO DE DÚVIDAS LIGAR NO (62) 3286-1500",
+    "linha": 31,
+    "adaptado": false
+  },
+  {
+    "id": "TP-033",
+    "categoria": "ART / RRT / TRT",
+    "titulo": "ART / RRT / TRT COM ENDEREÇO OU CNPJ DIVERGENTE",
+    "texto": "Enviar documentações de responsabilidade técnica com Endereço/CNPJ idênticos ao da edificação protocolada. Na impossibilidade de cumprir com a exigência solicitada, para validação das informações divergentes do PSCIP, o responsável pela edificação deverá enviar Declaração de Responsabilidade, conforme modelo disponível no link: https://docs.google.com/document/d/1wjO0XhKphtE8Tt-0g8bUZNA86_JN1_pe/edit?usp=sharing&ouid=109167940491943346771&rtpof=true&sd=true",
+    "linha": 33,
+    "adaptado": false
+  },
+  {
+    "id": "TP-034",
+    "categoria": "ART / RRT / TRT",
+    "titulo": "CONTEÚDO DA ART/RRT/TRT",
+    "texto": "Especificar no campo \"Atividade Técnica\" da ART/RRT/TRT, de forma cristalina, o tipo de serviço realizado, bem como explanar no campo \"Observações\" as atividades realizadas, mencionando que o(s) sistema(s) está(ão) em conformidade com as Normas Técnicas do CBMGO",
+    "linha": 34,
+    "adaptado": false
+  },
+  {
+    "id": "TP-035",
+    "categoria": "Anexo G e documentos da edificação",
+    "titulo": "Estabelecimento comercial ou endereço residencial",
+    "texto": "SE FOR UM ESTABELECIMENTO COMERCIAL E DE FRENTE PARA A VIA PÚBLICA, FAVOR MARCAR SOMENTE A PRIMEIRA OPÇÃO DO ANEXO G E ENVIAR A NOTA FISCAL DO EXTINTOR. SE O ENDEREÇO FOR EXCLUSIVAMENTE RESIDENCIAL, FAVOR MARCAR SOMENTE A TERCEIRA OPÇÃO DO ANEXO G E DEIXAR EM BRANCO O CAMPO DOS EXTINTORES.",
+    "linha": 35,
+    "adaptado": false
+  },
+  {
+    "id": "TP-038",
+    "categoria": "Notas fiscais de extintores",
+    "titulo": "NOTA FISCAL DE EXTINTOR",
+    "texto": "Enviar Nota Fiscal com Endereço/CNPJ/RAZÃO SOCIAL idênticos ao da edificação protocolada. Na impossibilidade de efetuar a exigência solicitada, para validar a Nota Fiscal com endereço e/ou CNPJ divergente(s) do PSCIP, o responsável pela edificação deverá enviar Declaração de Responsabilidade, conforme modelo disponível no link: https://docs.google.com/document/d/1wjO0XhKphtE8Tt-0g8bUZNA86_JN1_pe/edit?usp=sharing&ouid=109167940491943346771&rtpof=true&sd=true",
+    "linha": 38,
+    "adaptado": false
+  },
+  {
+    "id": "TP-039",
+    "categoria": "Notas fiscais de extintores",
+    "titulo": "NF DE EMPRESA NÃO CREDENCIADA",
+    "texto": "A NOTA FISCAL DO EXTINTOR ENVIADA NÃO PERTENCE A EMPRESA CREDENCIADA PELO CORPO DE BOMBEIROS. FAVOR ANEXAR NOTA FISCAL DE EXTINTOR EMITIDA POR EMPRESA CREDENCIADA NO CORPO DE BOMBEIROS DE GOIÁS (RELAÇÃO DE EMPRESAS DISPONÍVEL NO SITE: https://www.bombeiros.go.gov.br/empresas-credenciadas)",
+    "linha": 39,
+    "adaptado": false
+  },
+  {
+    "id": "TP-040",
+    "categoria": "Notas fiscais de extintores",
+    "titulo": "NF C/ ENDEREÇO ou CNPJ DIVERGENTE",
+    "texto": "Enviar Nota Fiscal com Endereço/CNPJ/RAZÃO SOCIAL idênticos ao da edificação protocolada. Na impossibilidade de efetuar a exigência solicitada, para validar a Nota Fiscal com endereço e/ou CNPJ divergente(s) do PSCIP, o responsável pela edificação deverá enviar Declaração de Responsabilidade, conforme modelo disponível no link: https://bit.ly/declaracaonf",
+    "linha": 40,
+    "adaptado": false
+  },
+  {
+    "id": "TP-044",
+    "categoria": "Notas fiscais de produtos e equipamentos",
+    "titulo": "NOTA FISCAL DE SERVIÇO / ART",
+    "texto": "A Nota Fiscal enviada é relativa à compra do material/equipamento, que não atesta que este foi executado/instalado na edificação. Enviar Nota Fiscal de Serviço de execução/manutenção, ou enviar documentação de responsabilidade técnica que ateste a execução/manutenção do material/equipamento. ",
+    "linha": 44,
+    "adaptado": false
+  },
+  {
+    "id": "TP-048",
+    "categoria": "Isenção de taxas",
+    "titulo": "MEI",
+    "texto": "O MEI optante pelo Simples Nacional e enquadrado no SIMEI possui direito a isenção de taxa conforme o Art 4°, § 3° da Lei Federal nº 123/2006, complementada pela Lei Federal nº 147/2014 e Portaria n. 151/2021 - CBMGO.",
+    "linha": 48,
+    "adaptado": false
+  },
+  {
+    "id": "TP-049",
+    "categoria": "Isenção de taxas",
+    "titulo": "MEI",
+    "texto": "ENVIAR O CERTIFICADO MEI ATUALIZADO PARA ISENÇÃO DA TAXA DE VISTORIA",
+    "linha": 49,
+    "adaptado": false
+  },
+  {
+    "id": "TP-050",
+    "categoria": "Isenção de taxas",
+    "titulo": "Entidade filantrópica",
+    "texto": "Para a isenção de taxa de vistoria é necessário uma solicitação formal por meio de ofício. Anexar a este processo o Certificado de Entidade Beneficente de Assistência Social - CEBAS  com a validade vigente.",
+    "linha": 50,
+    "adaptado": false
+  },
+  {
+    "id": "TP-051",
+    "categoria": "Isenção de taxas",
+    "titulo": "Indeferimento - Isenção de taxa (parte 1)",
+    "texto": "Resposta ao Ofício n. 31/2021 - Conforme orientações da Procuradoria-Geral do Estado de Goiás através do Parecer nº 11/2021 da Gerência do Contencioso Tributário, em relação à isenção do pagamento de taxas, prevista no art. 116, II, da Lei nº 11.651/1991, é necessário que a entidade seja classificada como entidade filantrópica e possuir o Certificado de Entidade Beneficente de Assistência Social - CEBAS, conforme disposto na Lei nº 12.101/2009.",
+    "linha": 51,
+    "adaptado": false
+  },
+  {
+    "id": "TP-052",
+    "categoria": "Isenção de taxas",
+    "titulo": "Indeferimento - Isenção de taxa (parte 2)",
+    "texto": "Continuação da resposta ao Ofício n. 31/2021. Portanto, no presente caso, considerando que não existe nos autos nenhum documento comprovando que a associação privada inscrita no CNPJ 25041971000453 ostente de forma individualizada a condição de entidade filantrópica mediante certificação CEBAS, afastando, assim, pressuposto indispensável à concessão da benesse legal. Ante o exposto, opina-se pelo indeferimento do pedido de isenção de taxa de vistoria.\n",
+    "linha": 52,
+    "adaptado": false
+  },
+  {
+    "id": "TP-053",
+    "categoria": "Isenção de taxas",
+    "titulo": "Indeferimento - Isenção de taxa (parte 3)",
+    "texto": "Parecer n. 11/2021 – A filial deve apresentar nos autos documento no seu próprio CNPJ que ostente de forma individualizada a condição de entidade filantrópica mediante certificação CEBAS. Nos casos em que apresentar o CEBAS apenas da Matriz, afasta, assim, pressuposto indispensável à concessão da benesse legal, será indeferido o pedido de isenção de taxa de vistoria. Os benefícios da Matriz não se estende para a filial.",
+    "linha": 53,
+    "adaptado": false
+  },
+  {
+    "id": "TP-054",
+    "categoria": "Isenção de taxas",
+    "titulo": "Indeferimento - Empresa Pública",
+    "texto": "Segundo o Art 2° da Portaria 151/2020 - CBM, são isentos das taxas citadas no artigo 1º , nos termos do Código Tributário do Estado de Goiás: I - entidades filantrópicas;II - instituições públicas pertencentes à administração direta nas esferas federal, estadual e municipal, bem como suas autarquias e fundações, não se incluindo neste rol as empresas públicas, sindicatos e demais entidades da administração indireta. A CMTC é uma empresa pública. Se possuir CEBAS, favor anexar ao processo.",
+    "linha": 54,
+    "adaptado": false
+  },
+  {
+    "id": "TP-055",
+    "categoria": "Isenção de taxas",
+    "titulo": "Observações",
+    "texto": "Pedido de isenção foi indeferido. Entrei em contato em [DATAS E HORÁRIOS DAS TENTATIVAS], porém sem sucesso. Favor transferir a ligação para possíveis orientações. [POSTO E NOME].",
+    "linha": 55,
+    "adaptado": true
+  },
+  {
+    "id": "TP-056",
+    "categoria": "Isenção de taxas",
+    "titulo": "Observações",
+    "texto": "Após anexar os documentos solicitados, favor ligar no (62) 3286-1500.",
+    "linha": 56,
+    "adaptado": false
+  },
+  {
+    "id": "TP-057",
+    "categoria": "Isenção de taxas",
+    "titulo": "ISENÇÃO DE TAXA - Problema no MOPI",
+    "texto": "Ao vincular o Mopi, foi gerado um boleto de forma inadequada em decorrência da atualização de valores das taxas que aconteceu após a data em que este processo foi protocolado.",
+    "linha": 57,
+    "adaptado": false
+  },
+  {
+    "id": "TP-058",
+    "categoria": "Isenção de taxas",
+    "titulo": "SOLICITAÇÃO DE ISENÇÃO DE TAXAS",
+    "texto": "Anexar o CEBAS com o CNPJ específico da filial.  Cumpre aclarar que caso a Matriz possua certificação de entidade filantrópica pelo CEBAS essa\ncondição não abarca suas filiais pois as condições previstas na legislação impedem a extensão automática desses efeitos, haja\nvista que são analisados vários critérios para essa concessão, que fica adstrita unicamente ao CNPJ da entidade certificada.",
+    "linha": 58,
+    "adaptado": false
+  },
+  {
+    "id": "TP-059",
+    "categoria": "Isenção de taxas",
+    "titulo": "SOLICITAÇÃO DE ISENÇÃO DE TAXAS",
+    "texto": "Considerando que a isenção de taxa é apenas para a matriz possuidora do CEBAS, não se estendendo às filiais, anexar a este processo o Certificado de Entidade Beneficente de Assistência Social - CEBAS,  com a validade vigente, para o CNPJ",
+    "linha": 59,
+    "adaptado": false
+  },
+  {
+    "id": "TP-060",
+    "categoria": "Isenção de taxas",
+    "titulo": "SOLICITAÇÃO DE ISENÇÃO DE TAXAS",
+    "texto": "Isenção de taxa em função desta entidade filantrópica ter apresentado o CEBAS dentro do prazo de validade.",
+    "linha": 60,
+    "adaptado": false
+  },
+  {
+    "id": "TP-061",
+    "categoria": "Isenção de taxas",
+    "titulo": "Entidade Religiosa - ok",
+    "texto": "Isenção de taxa em função desta entidade religiosa cumprir todos os requisitos.",
+    "linha": 61,
+    "adaptado": false
+  },
+  {
+    "id": "TP-062",
+    "categoria": "Isenção de taxas",
+    "titulo": "SOLICITAÇÃO DE ISENÇÃO DE TAXAS",
+    "texto": "Isenção de taxa em função deste instituto pertencer à administração direta nas esferas federal, estadual ou municipal.",
+    "linha": 62,
+    "adaptado": false
+  },
+  {
+    "id": "TP-063",
+    "categoria": "Isenção de taxas",
+    "titulo": "SOLICITAÇÃO DE ISENÇÃO DE TAXAS",
+    "texto": "De acordo com o PARECER GECT- 05495 Nº 11/2021, de 08 de abril de 2021, deve-se anexar a este processo o Certificado de Entidade Beneficente de Assistência Social - CEBAS individualizado e no CNPJ da unidade de atendimento  em questão. O CEBAS deve estar com a validade vigente.",
+    "linha": 63,
+    "adaptado": false
+  },
+  {
+    "id": "TP-064",
+    "categoria": "Isenção de taxas",
+    "titulo": "SOLICITAÇÃO DE ISENÇÃO DE TAXAS",
+    "texto": "Anexar a este processo Ofício solicitando a isenção de taxa de vistoria.",
+    "linha": 64,
+    "adaptado": false
+  },
+  {
+    "id": "TP-065",
+    "categoria": "Isenção de taxas",
+    "titulo": "SOLICITAÇÃO DE ISENÇÃO DE TAXAS",
+    "texto": "Isenção de taxa em função deste instituto pertencer à Administração Autárquica e Fundacional do Poder Executivo de acordo com Lei 20.491 de 25 de junho de 2019 e por se enquadrar nos quesitos presentes na Portaria 151/2020 - CBM.",
+    "linha": 65,
+    "adaptado": false
+  },
+  {
+    "id": "TP-066",
+    "categoria": "Isenção de taxas",
+    "titulo": "CEBAS VENCIDO",
+    "texto": "Nos casos em que o CEBAS está com prazo vencido, deve ser apresentado o COMPROVANTE DE PROTOCOLO TEMPESTIVO DE REQUERIMENTO DE RENOVAÇÃO DA CERTIFICAÇÃO, estando este dentro do prazo final, conforme o § 2º do art. 24 da Lei n. 12.101 de 27 de novembro de 2009: \"§ 2o A certificação da entidade permanecerá válida até a data da decisão sobre o requerimento de renovação tempestivamente apresentado.\" ",
+    "linha": 66,
+    "adaptado": false
+  },
+  {
+    "id": "TP-067",
+    "categoria": "Anexo F e CERCON",
+    "titulo": "ANEXO F - Orientações",
+    "texto": "A solicitação de revisão de ato praticado pelo Serviço de Segurança Contra Incêndio e Pânico deve ser feita através do preenchimento do Formulário para\nAtendimento Técnico (Anexo F), conforme NT 01/2020 - CBMGO, disponível no site https://www.bombeiros.go.gov.br",
+    "linha": 67,
+    "adaptado": false
+  },
+  {
+    "id": "TP-068",
+    "categoria": "Anexo F e CERCON",
+    "titulo": "2ª VIA DE CERCON",
+    "texto": "Enviar anexo F da NT01/2020, explicando o motivo da solicitação de segunda via e quais alterações serão realizadas na 2ª via do CERCON.",
+    "linha": 68,
+    "adaptado": false
+  },
+  {
+    "id": "TP-070",
+    "categoria": "Brigada de incêndio",
+    "titulo": "No caso do Memorial de Cálculo de Brigada constante do Anexo P não ter sido anexado ou estar preenchido incorretamente.",
+    "texto": "Anexar ou Corrigir o preenchimento do Memorial de Cálculo constante do Anexo P da NT-01 (link: https://anexos.bombeiros.go.gov.br/firefightercalcmemorial) , informando a divisão e ocupação predominante, nível de risco (baixo, médio ou alto), número de  pavimentos, e o respectivo público fixo por turno de trabalho. Uma vez definida corretamente a quantidade de brigadistas exigidos e o nível de treinamento, Incluir o Anexo P (Link: https://anexos.bombeiros.go.gov.br/attachmentp) com a relação dos funcionários treinados por empresa credenciada no CBMGO. ",
+    "linha": 70,
+    "adaptado": false
+  },
+  {
+    "id": "TP-072",
+    "categoria": "Anexo F e CERCON",
+    "titulo": "ENVIAR RESPOSTA NO PROTOCOLO",
+    "texto": "O presente protocolo é refente ao Processo de Vistoria. O Formulário de Atendimento Técnico que foi enviado dia xx/xx/xxxx às hh:mm é referente a protocolo de Análise de Projeto. Enviar o FAT ao protocolo de destino.",
+    "linha": 72,
+    "adaptado": false
+  },
+  {
+    "id": "TP-076",
+    "categoria": "Retorno e conferência",
+    "titulo": "RETORNO",
+    "texto": "APÓS CUMPRIMENTO DAS EXIGÊNCIAS, SOLICITAR RETORNO DA VISTORIA ATRAVÉS DO SITE DO CORPO DE BOMBEIROS DE GOIÁS",
+    "linha": 76,
+    "adaptado": false
+  },
+  {
+    "id": "TP-077",
+    "categoria": "Retorno e conferência",
+    "titulo": "NECESSITA DE VISTORIA",
+    "texto": "AGUARDAR VISTORIA NO LOCAL",
+    "linha": 77,
+    "adaptado": false
+  },
+  {
+    "id": "TP-078",
+    "categoria": "Retorno e conferência",
+    "titulo": "NECESSIDADE DE PROJETO",
+    "texto": "Solicitar retorno pelo site do CBMGO com o projeto aprovado impresso no ato da vistoria conforme item 7.6.2 da NT-01/2024 \"Obrigatoriamente deve ser apresentado o projeto aprovado em formato impresso que representa a edificação na data da realização da vistoria pelo CBMGO.\"",
+    "linha": 78,
+    "adaptado": false
+  },
+  {
+    "id": "TP-082",
+    "categoria": "GLP",
+    "titulo": "CLASSE I",
+    "texto": "COMÉRCIO VAREJISTA DE GLP. ÁREA DE ARMAZENAMENTO CLASSE I (TOTAL DE 40 CILINDROS P-13 OU 520 KG)",
+    "linha": 82,
+    "adaptado": false
+  },
+  {
+    "id": "TP-083",
+    "categoria": "GLP",
+    "titulo": "CLASSE II",
+    "texto": "COMÉRCIO VAREJISTA DE GLP. ÁREA DE ARMAZENAMENTO CLASSE II (TOTAL DE 120 CILINDROS P-13 OU 1.560 KG)",
+    "linha": 83,
+    "adaptado": false
+  },
+  {
+    "id": "TP-084",
+    "categoria": "GLP",
+    "titulo": "CLASSE III",
+    "texto": "COMÉRCIO VAREJISTA DE GLP. ÁREA DE ARMAZENAMENTO CLASSE III (TOTAL DE 480 CILINDROS P-13 OU 6.240 KG)",
+    "linha": 84,
+    "adaptado": false
+  },
+  {
+    "id": "TP-085",
+    "categoria": "GLP",
+    "titulo": "CLASSE IV",
+    "texto": "COMÉRCIO VAREJISTA DE GLP. ÁREA DE ARMAZENAMENTO CLASSE IV (TOTAL DE 960 CILINDROS P-13 OU 12.480 KG)",
+    "linha": 85,
+    "adaptado": false
+  },
+  {
+    "id": "TP-086",
+    "categoria": "GLP",
+    "titulo": "CLASSE V",
+    "texto": "COMÉRCIO VAREJISTA DE GLP. ÁREA DE ARMAZENAMENTO CLASSE V (TOTAL DE 1.920 CILINDROS P-13 OU 24.960 KG)",
+    "linha": 86,
+    "adaptado": false
+  },
+  {
+    "id": "TP-087",
+    "categoria": "GLP",
+    "titulo": "CLASSE VI",
+    "texto": "COMÉRCIO VAREJISTA DE GLP. ÁREA DE ARMAZENAMENTO CLASSE VI (TOTAL DE 3.840 CILINDROS P-13 OU 49.920 KG)",
+    "linha": 87,
+    "adaptado": false
+  },
+  {
+    "id": "TP-088",
+    "categoria": "GLP",
+    "titulo": "CLASSE VII",
+    "texto": "COMÉRCIO VAREJISTA DE GLP. ÁREA DE ARMAZENAMENTO CLASSE VII (TOTAL DE 7.680 CILINDROS P-13 OU 99.840 KG)",
+    "linha": 88,
+    "adaptado": false
+  },
+  {
+    "id": "TP-089",
+    "categoria": "GLP",
+    "titulo": "CLASSE ESPECIAL",
+    "texto": "COMÉRCIO VAREJISTA DE GLP. ÁREA DE ARMAZENAMENTO CLASSE ESPECIAL (TOTAL DE _ CILINDROS P-13 OU _ KG)",
+    "linha": 89,
+    "adaptado": false
+  },
+  {
+    "id": "TP-097",
+    "categoria": "Análise e substituição de projetos",
+    "titulo": "Habilitação para tramitação de projetos",
+    "texto": "1) Apenas engenheiros civis e arquitetos estão legalmente habilitados para tramitar os processos de aprovação de projetos técnicos de prevenção e combate a incêndio e pânico.",
+    "linha": 97,
+    "adaptado": false
+  },
+  {
+    "id": "TP-099",
+    "categoria": "Análise e substituição de projetos",
+    "titulo": "Cadastro de responsável técnico no SIAPI",
+    "texto": "2) Os engenheiros civis e arquitetos devem se cadastrar no SIAPI através do link “Responsável Técnico”.",
+    "linha": 99,
+    "adaptado": false
+  },
+  {
+    "id": "TP-101",
+    "categoria": "Análise e substituição de projetos",
+    "titulo": "Regularidade nos conselhos profissionais",
+    "texto": "3) Para cadastro ao SIAPI os RTs (responsáveis técnicos) devem estar devidamente regularizados nos respectivos conselhos de classe profissional do Estado de Goiás (CREA/GO e CAU/GO) pois existe um cruzamento de dados do CBMGO com os conselhos.",
+    "linha": 101,
+    "adaptado": false
+  },
+  {
+    "id": "TP-103",
+    "categoria": "Análise e substituição de projetos",
+    "titulo": "Envio de senha do responsável técnico",
+    "texto": "4) A senha solicitada pelo RT é enviada ao mesmo e-mail cadastrado no conselho profissional.",
+    "linha": 103,
+    "adaptado": false
+  },
+  {
+    "id": "TP-105",
+    "categoria": "Análise e substituição de projetos",
+    "titulo": "Responsável técnico de outra unidade da federação",
+    "texto": "5) O RT de outra unidade da federação também deve se regularizar no respectivo conselho profissional do Estado de Goiás.",
+    "linha": 105,
+    "adaptado": false
+  },
+  {
+    "id": "TP-107",
+    "categoria": "Análise e substituição de projetos",
+    "titulo": "Alteração dos dados do responsável técnico",
+    "texto": "6) As solicitações de mudança de dados do RT (e-mail, cnpj...) devem ser realizadas no conselho profissional e 24h após a modificação no conselho o SIAPI já estará atualizado com as novas informações.",
+    "linha": 107,
+    "adaptado": false
+  },
+  {
+    "id": "TP-111",
+    "categoria": "Análise e substituição de projetos",
+    "titulo": "Modificação de projeto aprovado",
+    "texto": "7) Qualquer modificação no projeto aprovado, seja física ou documental, ensejará a substituição de projeto.",
+    "linha": 111,
+    "adaptado": false
+  },
+  {
+    "id": "TP-113",
+    "categoria": "Análise e substituição de projetos",
+    "titulo": "Substituição de projeto aprovado fisicamente",
+    "texto": "8) No caso de substituição de projeto aprovado fisicamente, o projeto físico completo (original ou cópia autenticada) deve ser encaminhado à OBM responsável para que seja analisado em conjunto com o arquivo digital.",
+    "linha": 113,
+    "adaptado": false
+  },
+  {
+    "id": "TP-115",
+    "categoria": "Análise e substituição de projetos",
+    "titulo": "Alteração de CNPJ com processo em andamento",
+    "texto": "9) Caso o processo já esteja em andamento (Anexo “L” já enviado) e o RT deve solicitar a mudança de CNPJ através do Anexo “F” – Formulário de Atendimento Técnico contextualizando o motivo da solicitação.",
+    "linha": 115,
+    "adaptado": false
+  },
+  {
+    "id": "TP-118",
+    "categoria": "ART / RRT / TRT",
+    "titulo": "TEXTO PADRÃO",
+    "texto": "Não é permitido aceitar documentações de responsabilidade técnica emitidas por conselhos de outras unidades federativas. Os conselhos permitidos são: CREA-GO, CAU-GO e TRT-GO. Favor, entrar em contato com o profissional emissor da documentação de responsabilidade técnica e informar que este deve procurar o conselho técnico afim para solucionar a questão.",
+    "linha": 118,
+    "adaptado": false
+  },
+  {
+    "id": "TP-120",
+    "categoria": "Retorno e conferência",
+    "titulo": "Cumprir exigências e solicitar retorno",
+    "texto": "CUMPRIR AS DEMAIS EXIGÊNCIAS, APÓS ISSO SOLICITAR RETORNO DO VISTORIADOR ATRAVÉS DO SITE DO CBMGO.",
+    "linha": 120,
+    "adaptado": false
+  },
+  {
+    "id": "TP-124",
+    "categoria": "Agendamento de vistoria",
+    "titulo": "Agendamento sem contato com o contribuinte",
+    "texto": "Vistoria marcada para o dia  XXXX.Tentamos contato por XX vezes através do telefone XXXXXX, por volta de XXh, mas a ligação chamou até cair na caixa. Favor deixar o projeto de combate a incêndio e o memorial descritivo no local.",
+    "linha": 124,
+    "adaptado": false
+  },
+  {
+    "id": "TP-127",
+    "categoria": "Agendamento de vistoria",
+    "titulo": "Agendamento com contato com o contribuinte",
+    "texto": "Vistoria agendada para o dia XXXX com a Sra XXXX (FUNÇÃO - FONE), foi orientada a deixar projeto de combate a incêndio e memorial descritivo no local.",
+    "linha": 127,
+    "adaptado": false
+  },
+  {
+    "id": "TP-129",
+    "categoria": "Credenciamento",
+    "titulo": "CREDENCIAMENTO EXTINTORES",
+    "texto": "Para fins de Credenciamento perante o Corpo de Bombeiros Militar do Estado de Goiás (CBMGO), a empresa interessada em VENDA/REVENDA DE EXTINTORES, PRESTAÇÃO DE SERVIÇOS DE PREVENÇÃO E COMBATE A INCÊNDIO, FORMAÇÃO DE BRIGADISTAS E GUARDA VIDAS, NÃO PODERÁ SER CADASTRADA NA RECEITA FEDERAL COMO MICROEMPREENDEDOR INDIVIDUAL. Conforme Resolução CGSN N. 140, de 22 de maio de 2018 Anexo XI - Ocupações Permitidas ao MEI, que traz o rol de empresas que estão autorizadas a se beneficiar com a condição de Microempreendedor Individual.",
+    "linha": 129,
+    "adaptado": false
+  },
+  {
+    "id": "TP-131",
+    "categoria": "Denúncias",
+    "titulo": "DENUNCIA DE ESTABELECIMENTO COM CERCON VENCIDO, COLOCAR NA OBSERVAÇÃO DA DENUNCIA  ESTE TEXTO",
+    "texto": "SENHOR VISTORIADOR: \"ESTE ESTABELECIMENTO ESTÁ COM CERCON VENCIDO, E AINDA NÃO FOI REALIZADA A RENOVAÇÃO DE CADASTRO NO SISTEMA. DEVERÁ REALIZAR A NOTIFICAÇÃO PARA REGULARIZAÇÃO DA EDIFICAÇÃO\".",
+    "linha": 131,
+    "adaptado": false
+  },
+  {
+    "id": "TP-139",
+    "categoria": "Brigada de incêndio",
+    "titulo": "Memorial de cálculo de brigada",
+    "texto": "Enviar Memorial de cálculo de brigada conforme NT 17/2023 TABELA \"A\".",
+    "linha": 139,
+    "adaptado": false
+  },
+  {
+    "id": "TP-140",
+    "categoria": "GLP",
+    "titulo": "Uso de GLP não previsto",
+    "texto": "Não está previsto o uso de GLP nesta Edificação",
+    "linha": 140,
+    "adaptado": false
+  },
+  {
+    "id": "TP-141",
+    "categoria": "Brigada de incêndio",
+    "titulo": "Correção do memorial de cálculo de brigada",
+    "texto": "Corrigir Memorial de Cálculo conforme NT17, nota 05 é aplicada  aos valores que exceder, acrescentando valores.",
+    "linha": 141,
+    "adaptado": false
+  },
+  {
+    "id": "TP-143",
+    "categoria": "Sistemas fotovoltaicos",
+    "titulo": "ART do sistema fotovoltaico",
+    "texto": "- Retificar ART do sistema fotovoltaico, para informar que a instalação atendeu a todos os requisito contidos na NT-44/2025-CBMGO e que possui todos os dispositivos de proteção elétrica exigidos para o tipo de sistema adotado (Se tipo 1: AFPE; GFCI e RSD; Se tipo 2: Disjuntor de desligamento).",
+    "linha": 143,
+    "adaptado": false
+  },
+  {
+    "id": "TP-145",
+    "categoria": "Sistemas fotovoltaicos",
+    "titulo": "Laudo estrutural da cobertura",
+    "texto": "- Retificar Laudo estrutural da cobertura de instalação de placas solares, por ter ficado inconclusivo. O mesmo deve atestar, categoricamente, que a estrutura sobre a qual foi montada as placas apresenta resistência mecânica necessária para suportar a carga sobre ela instalada.",
+    "linha": 145,
+    "adaptado": false
+  },
+  {
+    "id": "TP-148",
+    "categoria": "Sistemas fotovoltaicos",
+    "titulo": "SOBRE PLACAS VOLTAICAS SOBRE ALGUMA ESTRUTURA",
+    "texto": "Apresentar laudo técnico estrutural, acompanhado da respectiva ART/RRT, atestando sobre a montagem do sistema fotovoltaico sobre o telhado comprovando a resistência mecânica necessária para suportar a carga sobre ela instalada.",
+    "linha": 148,
+    "adaptado": false
+  },
+  {
+    "id": "TP-152",
+    "categoria": "Edificações existentes — NT 41",
+    "titulo": "Para enquadramento:",
+    "texto": "Para comprovação de Edificação Existente, deveis anexar um Documento de fé pública (projeto aprovado, registro em cartório, Termo de Habite-se, etc) que comprove a data de construção e a área total construída.",
+    "linha": 152,
+    "adaptado": false
+  },
+  {
+    "id": "TP-154",
+    "categoria": "Edificações existentes — NT 41",
+    "titulo": "No caso de aplicação de Anexo T, para protocolos abertos a partir de 20/08/2025, que tiveram vistoria in loco, no ano de 2024. Ainda pode aplicar a certificação intercalada, caso atenda aos requisitos, mas ao aprovar, deve lançar o texto ao lado. Explicação: o projeto somente é exigido no momento da vistoria, por isso, essas edificações acabaram se beneficiando da intercalada e do prazo da 41, em sequência, totalizando 2 anos.",
+    "texto": "Ao aprovar, lançar no campo de observação do CERCON: Edificação existente conforme NT-41. Para a próxima renovação, será obrigatória a vistoria in loco, com a apresentação de projeto aprovado de Aceite.",
+    "linha": 154,
+    "adaptado": false
+  },
+  {
+    "id": "TP-157",
+    "categoria": "Edificações existentes — NT 41",
+    "titulo": "Prazo de aprovação de edificações existentes",
+    "texto": "OUTRAS EXIGÊNCIAS E ORIENTAÇÕES: Obs: Conforme item 7.3 da NT-41 vigente a partir de 07/09/2024 \"Edificações existentes que ainda não possuam projeto de aceite aprovado terão prazo de 1 ano, a contar da data de vigência da presente NT, para efetuarem a devida aprovação.\"",
+    "linha": 157,
+    "adaptado": false
+  }
+]};
+}

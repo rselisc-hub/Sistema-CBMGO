@@ -1366,9 +1366,21 @@
       <button class="btn btn-outline-dark conf-nav-btn" onclick="abrirDocsDespacho('conferencia')">
         <i class="bi bi-file-earmark-text me-1"></i>DOCs para Despacho
       </button>
+      <button class="btn btn-outline-primary conf-nav-btn" id="conf-nav-textos" onclick="abrirTextosPadraoConferencia()"><i class="bi bi-files me-1"></i>DOCS – TEXTO PADRÃO</button>
       <button class="btn btn-outline-secondary" onclick="atualizarModuloConferencia()">
         <i class="bi bi-arrow-repeat me-1"></i>Atualizar
       </button>
+    </div>
+
+    <div id="conf-pane-textos" style="display:none;">
+      <div class="card card-custom p-4 mb-4">
+        <h5 class="fw-bold">DOCS – TEXTO PADRÃO</h5>
+        <p class="text-muted">Escolha um modelo, ajuste os campos necessários e copie. As alterações nesta tela não modificam o modelo original e duram somente durante este acesso.</p>
+        <div class="row g-2"><div class="col-md-7"><label for="textos-busca" class="form-label">Buscar nos títulos e textos</label><input type="search" id="textos-busca" class="form-control" placeholder="Ex.: anexo G, GLP, isenção…" oninput="renderizarListaTextosPadrao()"></div><div class="col-md-5"><label for="textos-categoria" class="form-label">Assunto</label><select id="textos-categoria" class="form-select" onchange="renderizarListaTextosPadrao()"><option value="">Todos os assuntos</option></select></div></div>
+        <div id="textos-carregamento" class="small mt-3" role="status" aria-live="polite"></div>
+      </div>
+      <div class="row g-3"><div class="col-lg-5"><div class="card card-custom p-3"><div id="textos-total" class="small text-muted mb-2"></div><div id="textos-lista" class="list-group" style="max-height:65vh;overflow-y:auto;"></div></div></div>
+      <div class="col-lg-7"><div class="card card-custom p-4"><h5 id="textos-titulo">Selecione um modelo</h5><div id="textos-assunto" class="small text-muted mb-2"></div><div id="textos-adaptado" class="small text-muted mb-2" style="display:none;">Modelo adaptado de uma anotação: preencha as datas e a identificação antes de usar.</div><label for="textos-conteudo" class="form-label">Texto para copiar</label><textarea class="form-control" id="textos-conteudo" rows="15" disabled oninput="guardarAjusteTextoPadrao()"></textarea><div class="d-flex gap-2 flex-wrap mt-3"><button type="button" class="btn btn-primary" id="textos-copiar" onclick="copiarTextoPadrao()" disabled>Copiar texto</button><button type="button" class="btn btn-outline-secondary" id="textos-restaurar" onclick="restaurarTextoPadrao()" disabled>Restaurar modelo</button></div><div id="textos-copia-status" class="small mt-2" role="status" aria-live="polite"></div></div></div></div>
     </div>
 
     <!-- TELA 1 — ATRIBUIÇÃO -->
@@ -6226,6 +6238,8 @@
       iniciarAtualizacaoAutomaticaConferencia();
       if (podeAtribuir && conferenciaTelaAtual === 'atribuicao') {
         abrirTelaAtribuicaoConferencia();
+      } else if (conferenciaTelaAtual === 'textos') {
+        abrirTextosPadraoConferencia();
       } else if (conferenciaTelaAtual === 'consulta') {
         abrirTelaConsultaConferencia();
       } else {
@@ -6251,12 +6265,53 @@
 
 
     function mostrarPaneConferencia(id) {
-      ['conf-pane-atribuicao','conf-pane-fila','conf-pane-consulta'].forEach(function(p) {
+      ['conf-pane-atribuicao','conf-pane-fila','conf-pane-consulta','conf-pane-textos'].forEach(function(p) {
         var el = document.getElementById(p);
         if (el) el.style.display = (p === id) ? 'block' : 'none';
       });
     }
 
+
+    var textosPadraoEstado={token:null,modelos:null,ajustes:{},selecionado:null,enviando:false,sequencia:0};
+    function abrirTextosPadraoConferencia(){
+      if(!usuarioLogado||!usuarioLogado.permissoes||!usuarioLogado.permissoes.conferencia){alert('Você não possui permissão para acessar a Conferência.');return;}
+      conferenciaTelaAtual='textos';mostrarPaneConferencia('conf-pane-textos');marcarNavConferencia('conf-nav-textos');carregarTextosPadraoConferencia(false);
+    }
+    function carregarTextosPadraoConferencia(forcar){
+      var token=sessaoToken,e=textosPadraoEstado;
+      if(e.token!==token){e.token=token;e.modelos=null;e.ajustes={};e.selecionado=null;e.enviando=false;e.sequencia++;document.getElementById('textos-busca').value='';document.getElementById('textos-categoria').innerHTML='<option value="">Todos os assuntos</option>';document.getElementById('textos-lista').textContent='';selecionarTextoPadrao(null);}
+      if(e.enviando)return;if(e.modelos&&!forcar){renderizarListaTextosPadrao();return;}
+      e.enviando=true;var seq=++e.sequencia;document.getElementById('textos-carregamento').textContent='Carregando modelos…';
+      google.script.run.withSuccessHandler(function(r){
+        if(seq!==e.sequencia||token!==sessaoToken)return;e.enviando=false;e.modelos=(r&&r.modelos)||[];
+        e.modelos.forEach(function(x){x.busca=normalizarBuscaTextoPadrao_(x.categoria+' '+x.titulo+' '+x.texto);});
+        var select=document.getElementById('textos-categoria'),atual=select.value;select.innerHTML='<option value="">Todos os assuntos</option>';
+        Array.from(new Set(e.modelos.map(function(x){return x.categoria;}))).sort(function(a,b){return a.localeCompare(b,'pt-BR');}).forEach(function(x){var o=document.createElement('option');o.value=x;o.textContent=x;select.appendChild(o);});select.value=atual;
+        document.getElementById('textos-carregamento').textContent=e.modelos.length+' modelos disponíveis.';renderizarListaTextosPadrao();
+      }).withFailureHandler(function(err){if(seq!==e.sequencia||token!==sessaoToken)return;e.enviando=false;document.getElementById('textos-carregamento').textContent='Não foi possível carregar os modelos. Use Atualizar para tentar novamente. '+String(err&&err.message||err||'');}).obterTextosPadraoConferencia(token);
+    }
+    function normalizarBuscaTextoPadrao_(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();}
+    function renderizarListaTextosPadrao(){
+      var e=textosPadraoEstado,busca=normalizarBuscaTextoPadrao_(document.getElementById('textos-busca').value).trim().split(/\s+/).filter(Boolean),categoria=document.getElementById('textos-categoria').value;
+      var lista=(e.modelos||[]).filter(function(x){return (!categoria||x.categoria===categoria)&&busca.every(function(t){return x.busca.indexOf(t)!==-1;});});
+      var alvo=document.getElementById('textos-lista');alvo.textContent='';document.getElementById('textos-total').textContent=lista.length+' modelo(s) encontrado(s)';
+      if(!lista.length){alvo.textContent=e.enviando?'Carregando…':'Nenhum modelo encontrado.';return;}
+      lista.forEach(function(x){var b=document.createElement('button');b.type='button';b.className='list-group-item list-group-item-action'+(e.selecionado===x.id?' active':'');b.setAttribute('aria-pressed',e.selecionado===x.id?'true':'false');b.dataset.modelo=x.id;var titulo=document.createElement('div');titulo.className='fw-semibold';titulo.textContent=x.titulo;var categoria=document.createElement('small');categoria.textContent=x.categoria;b.appendChild(titulo);b.appendChild(categoria);var previa=document.createElement('div');previa.className='small mt-1';previa.style.opacity='0.85';previa.textContent=x.texto.replace(/\s+/g,' ').slice(0,140)+(x.texto.length>140?'…':'');b.appendChild(previa);b.addEventListener('click',function(){selecionarTextoPadrao(x.id);renderizarListaTextosPadrao();});alvo.appendChild(b);});
+    }
+    function selecionarTextoPadrao(id){
+      var e=textosPadraoEstado,x=(e.modelos||[]).find(function(x){return x.id===id;});e.selecionado=x?x.id:null;
+      document.getElementById('textos-titulo').textContent=x?x.titulo:'Selecione um modelo';document.getElementById('textos-assunto').textContent=x?x.categoria:'';document.getElementById('textos-adaptado').style.display=x&&x.adaptado?'block':'none';
+      var campo=document.getElementById('textos-conteudo');campo.disabled=!x;campo.value=x?(Object.prototype.hasOwnProperty.call(e.ajustes,x.id)?e.ajustes[x.id]:x.texto):'';
+      document.getElementById('textos-copiar').disabled=!x;document.getElementById('textos-restaurar').disabled=!x;document.getElementById('textos-copia-status').textContent='';
+    }
+    function guardarAjusteTextoPadrao(){var e=textosPadraoEstado;if(e.selecionado)e.ajustes[e.selecionado]=document.getElementById('textos-conteudo').value;document.getElementById('textos-copia-status').textContent='Ajuste mantido somente neste acesso.';}
+    function restaurarTextoPadrao(){var e=textosPadraoEstado;if(!e.selecionado)return;delete e.ajustes[e.selecionado];selecionarTextoPadrao(e.selecionado);}
+    async function copiarTextoPadrao(){
+      var campo=document.getElementById('textos-conteudo'),status=document.getElementById('textos-copia-status');if(campo.disabled||!campo.value){status.textContent='Selecione um modelo com texto para copiar.';return;}
+      var texto=campo.value,copiado=false;try{if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(texto);copiado=true;}}catch(e){}
+      if(!copiado){campo.focus();campo.select();try{copiado=document.execCommand('copy');}catch(e){}}
+      status.textContent=copiado?'Texto copiado.':'A cópia automática não foi permitida. O texto foi selecionado; use Ctrl+C ou o comando Copiar.';
+    }
 
     function abrirTelaAtribuicaoConferencia() {
       conferenciaTelaAtual = 'atribuicao';
@@ -6313,7 +6368,8 @@
 
 
     function atualizarModuloConferencia() {
-      if (conferenciaTelaAtual === 'atribuicao') carregarAtribuicaoConferencia();
+      if (conferenciaTelaAtual === 'textos') carregarTextosPadraoConferencia(true);
+      else if (conferenciaTelaAtual === 'atribuicao') carregarAtribuicaoConferencia();
       else if (conferenciaTelaAtual === 'consulta') carregarConsultaConferencia();
       else carregarFilaConferencia();
     }
@@ -9617,6 +9673,7 @@
 
 
     function limparSessaoLocal() {
+      textosPadraoEstado.sequencia++;textosPadraoEstado.token=null;textosPadraoEstado.modelos=null;textosPadraoEstado.ajustes={};textosPadraoEstado.selecionado=null;textosPadraoEstado.enviando=false;
       sessaoToken = '';
       usuarioLogado = null;
       localStorage.removeItem('cbmgo_sessao_token');
