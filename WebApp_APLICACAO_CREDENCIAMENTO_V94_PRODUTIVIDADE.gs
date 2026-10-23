@@ -1392,7 +1392,7 @@ function garantirEstruturaDocsDespacho_() {
     "ID","ORIGEM","STATUS","TIPO_DOCUMENTO","PROTOCOLO","VISTORIADOR_RG","VISTORIADOR",
     "DATA_DOCUMENTO","PREENCHIDO_POR_RG","PREENCHIDO_POR","RAZAO_SOCIAL","OBSERVACAO_ORIGEM",
     "RESPOSTA_OFICIAIS","ANDAMENTO","JUSTIFICATIVA_GESTAO","RESPONSAVEL_GESTAO_RG","RESPONSAVEL_GESTAO",
-    "DECISAO_ISENCAO","JUSTIFICATIVA_ISENCAO","CADASTRADO_EM","ATUALIZADO_EM","CHAVE_IMPORTACAO","FONTE","EVENTO_TEMPORARIO","OFICIAL_DESPACHO"
+    "DECISAO_ISENCAO","JUSTIFICATIVA_ISENCAO","CADASTRADO_EM","ATUALIZADO_EM","CHAVE_IMPORTACAO","FONTE","EVENTO_TEMPORARIO","OFICIAL_DESPACHO","ASSINATURA_CADASTRO"
   ];
   if (!aba) aba = ss.insertSheet("DOCS_DESPACHO");
   prepararCabecalhoLeve_(aba,cab,{cor:"#355a8a",texto:"#fff"});
@@ -1403,8 +1403,8 @@ function garantirHistoricoDocsDespacho_() {
   var ss=SpreadsheetApp.getActiveSpreadsheet(), aba=ss.getSheetByName("HISTORICO_DOCS_DESPACHO");
   var cab=["ID","DOC_ID","DATA_HORA","EVENTO","STATUS_ANTERIOR","STATUS_NOVO","ANDAMENTO","JUSTIFICATIVA","USUARIO_RG","USUARIO"];
   if(!aba) aba=ss.insertSheet("HISTORICO_DOCS_DESPACHO");
-  if(aba.getLastRow()===0) aba.getRange(1,1,1,cab.length).setValues([cab]);
-  aba.setFrozenRows(1); return aba;
+  if(aba.getLastRow()===0){aba.getRange(1,1,1,cab.length).setValues([cab]);aba.setFrozenRows(1);}
+  return aba;
 }
 
 function tiposDocsDespacho_() {
@@ -1554,39 +1554,58 @@ function obterVistoriadoresDocs(token) {
 }
 
 function cadastrarDocDespacho(dados, token) {
-  var sessao=exigirPerfil_(token,["GESTOR","CONFERENCIA","ATENDIMENTO"]); dados=dados||{};
-  var tipo=normalizarTipoDoc_(dados.tipoDocumento), protocolo=String(dados.protocolo||"").trim(), razao=String(dados.razaoSocial||"").trim();
-  var data=criarDataSegura(dados.dataDocumento);
-  if(!tipo||tiposDocsDespacho_().indexOf(tipo)===-1) throw new Error("Selecione um tipo de documento válido.");
-  if(!protocolo) throw new Error("Informe o protocolo.");
-  if(!data) throw new Error("Informe a Data do Documento.");
-  if(!razao) throw new Error("Informe a Razão Social ou Nome Fantasia.");
-
-  var perfil=String(sessao.perfil||"").toUpperCase();
-  var origem=perfil==="ATENDIMENTO"?"ATENDIMENTO":(perfil==="CONFERENCIA"?"CONFERÊNCIA":"GESTÃO");
-  var aba=garantirEstruturaDocsDespacho_(), agora=dataHoraSaoPauloTexto_(), id=Utilities.getUuid();
-  var dataTxt=formatarDataTexto(data);
-  var chaveNova=chaveDuplicidadeDoc_(tipo,protocolo,dataTxt,razao);
-
-  if(aba.getLastRow()>=2){
-    var atuais=aba.getRange(2,1,aba.getLastRow()-1,23).getDisplayValues();
-    for(var i=0;i<atuais.length;i++){
-      var ch=chaveDuplicidadeDoc_(atuais[i][3],atuais[i][4],atuais[i][7],atuais[i][10]);
-      if(ch===chaveNova){
-        throw new Error("Já existe um DOC com o mesmo tipo, protocolo, data e razão social.");
-      }
+  var sessao=exigirPerfil_(token,['GESTOR','CONFERENCIA','ATENDIMENTO']);dados=dados||{};
+  var tipo=normalizarTipoDoc_(dados.tipoDocumento),protocolo=String(dados.protocolo||'').trim(),razao=String(dados.razaoSocial||'').trim(),data=criarDataSegura(dados.dataDocumento);
+  if(!tipo||tiposDocsDespacho_().indexOf(tipo)<0)throw new Error('Selecione um tipo de documento válido.');
+  if(!protocolo)throw new Error('Informe o protocolo.');
+  if(!data)throw new Error('Informe a Data do Documento.');
+  if(!razao)throw new Error('Informe a Razão Social ou Nome Fantasia.');
+  var chave=String(dados.chaveRequisicao||'').trim();
+  if(chave&&!/^[A-Za-z0-9_-]{10,100}$/.test(chave))throw new Error('Identificador do envio inválido.');
+  var dataTxt=formatarDataTexto(data),perfil=String(sessao.perfil||'').toUpperCase();
+  var origem=perfil==='ATENDIMENTO'?'ATENDIMENTO':(perfil==='CONFERENCIA'?'CONFERÊNCIA':'GESTÃO');
+  var campos=[tipo,protocolo,dataTxt,razao,String(dados.vistoriadorRg||'').trim(),String(dados.vistoriador||'').trim(),String(dados.observacao||'').trim(),dados.eventoTemporario===true?'SIM':'NÃO',String(dados.oficialDespacho||'').trim()];
+  var assinatura=hashCadastroDoc_(JSON.stringify(campos));
+  var id=chave?'DOC-'+hashCadastroDoc_(String(sessao.rg)+'|'+chave):Utilities.getUuid();
+  var lock=LockService.getScriptLock();
+  if(!lock.tryLock(3000))throw new Error('Outro processamento está em andamento. Aguarde e tente salvar novamente; os campos foram mantidos.');
+  try {
+    var aba=garantirEstruturaDocsDespacho_(),r=null,repetido=false;
+    if(chave&&aba.getLastRow()>=2){
+      var encontrados=aba.getRange(2,1,aba.getLastRow()-1,1).createTextFinder(id).matchEntireCell(true).findAll();
+      if(encontrados.length>1)throw new Error('Identificador de cadastro duplicado na base. Confira este DOC antes de repetir.');
+      if(encontrados.length){r=aba.getRange(encontrados[0].getRow(),1,1,26).getDisplayValues()[0];if(r[25]!==assinatura)throw new Error('Este envio já foi utilizado com outros dados. Confira o documento salvo antes de cadastrar outro.');repetido=true;}
     }
-  }
-
-  aba.appendRow([
-    id,origem,"PENDENTE",tipo,String(protocolo),String(dados.vistoriadorRg||"").trim(),String(dados.vistoriador||"").trim(),
-    dataTxt,String(sessao.rg||"").trim(),String(sessao.nome||"").trim(),razao,String(dados.observacao||"").trim(),
-    "","AGUARDANDO ANÁLISE","","","","","",agora,agora,"","SISTEMA",dados.eventoTemporario===true?"SIM":"NÃO",String(dados.oficialDespacho||"").trim()
-  ]);
-  var detalheCadastro=String(dados.observacao||"").trim();
-  if(String(dados.oficialDespacho||"").trim())detalheCadastro+=(detalheCadastro?" | ":"")+"Oficial que despachou: "+String(dados.oficialDespacho).trim();
-  garantirHistoricoDocsDespacho_().appendRow([Utilities.getUuid(),id,agora,"CADASTRADO","","PENDENTE","AGUARDANDO ANÁLISE",detalheCadastro,sessao.rg,sessao.nome]);
-  return {sucesso:true,mensagem:"DOC para despacho cadastrado com sucesso."};
+    // Compatibilidade com versões antigas: busca somente os candidatos do protocolo.
+    // A interface atual identifica cada envio e permite mais de um DOC do mesmo projeto.
+    if(!chave&&aba.getLastRow()>=2){
+      var alvo=normalizarChaveDocDuplicado_(protocolo),linhas=[];
+      aba.getRange(2,5,aba.getLastRow()-1,1).getDisplayValues().forEach(function(v,i){if(normalizarChaveDocDuplicado_(v[0])===alvo)linhas.push(i+2);});
+      var candidatas=lerLinhasProtocolosRoteiro_(aba,{protocolo:linhas},26),chaveAntiga=chaveDuplicidadeDoc_(tipo,protocolo,dataTxt,razao);
+      linhas.some(function(l){var x=candidatas[l];if(chaveDuplicidadeDoc_(x[3],x[4],x[7],x[10])===chaveAntiga){r=x;id=x[0];repetido=true;return true;}return false;});
+    }
+    var agora=dataHoraSaoPauloTexto_();
+    if(!r){
+      r=[id,origem,'PENDENTE',tipo,protocolo,campos[4],campos[5],dataTxt,String(sessao.rg||''),String(sessao.nome||''),razao,campos[6],'','AGUARDANDO ANÁLISE','','','','','',agora,agora,'','SISTEMA',campos[7],campos[8],assinatura];
+      aba.appendRow(r);
+    }
+    // ID de histórico determinístico: repetir após falha entre as duas escritas
+    // completa o histórico, sem recriar o documento nem o evento.
+    if(!repetido||chave||r[25]){
+      var hist=garantirHistoricoDocsDespacho_(),idHist='CAD-'+id;
+      var jaHist=hist.getLastRow()>=2?hist.getRange(2,1,hist.getLastRow()-1,1).createTextFinder(idHist).matchEntireCell(true).findAll():[];
+      if(!jaHist.length){var detalhe=campos[6];if(campos[8])detalhe+=(detalhe?' | ':'')+'Oficial que despachou: '+campos[8];hist.appendRow([idHist,id,r[19]||agora,'CADASTRADO','','PENDENTE','AGUARDANDO ANÁLISE',detalhe,sessao.rg,sessao.nome]);}
+    }
+    SpreadsheetApp.flush();
+    return {sucesso:true,id:id,criado:!repetido,repetido:repetido,registro:objetoDocDespachoLeve_(r),mensagem:repetido?'Cadastro já confirmado. Nenhum DOC adicional foi criado.':'DOC para despacho cadastrado com sucesso.'};
+  } finally {lock.releaseLock();}
+}
+function hashCadastroDoc_(texto) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,texto,Utilities.Charset.UTF_8).map(function(b){return ('0'+((b+256)%256).toString(16)).slice(-2);}).join('');
+}
+function objetoDocDespachoLeve_(r) {
+  var status=String(r[2]||'').trim().toUpperCase(),fim=status==='CONCLUÍDO'||status==='ARQUIVADO',dias=fim?null:diasDocumentoDoc_(r[7]);
+  return {id:r[0],origem:r[1],status:r[2],tipoDocumento:normalizarTipoDoc_(r[3]),protocolo:r[4],vistoriadorRg:r[5],vistoriador:r[6],dataDocumento:r[7],preenchidoPor:r[9],razaoSocial:r[10],observacao:r[11],respostaOficiais:r[12],andamento:r[13],justificativa:r[14],responsavelGestao:r[16],decisaoIsencao:r[17],justificativaIsencao:r[18],oficialDespacho:r[24]||'',eventoTemporario:String(r[23]||'').trim().toUpperCase()==='SIM',cadastradoEm:r[19],atualizadoEm:r[20],diasDocumento:dias,faixaPrazo:fim?'FINALIZADO':faixaPrazoDoc_(dias)};
 }
 
 function listarDocsDespacho(filtros, token) {
@@ -1604,15 +1623,17 @@ function listarDocsDespacho(filtros, token) {
   // Quando existem duplicados, mantém na visualização o registro mais recentemente
   // atualizado. Isso permite que uma correção/linha manual substitua visualmente
   // uma importação antiga, sem precisar apagar o histórico da planilha.
-  var naoHistoricos=[], gruposHistoricos={};
+  var naoHistoricos=[], gruposHistoricos=Object.create(null),cacheDatas=Object.create(null);
   vals.forEach(function(r,idx){
     if(!linhaEhHistoricaDoc_(r)){
       naoHistoricos.push({r:r,idx:idx});
       return;
     }
-    var k=chaveDuplicidadeDoc_(r[3],r[4],r[7],r[10]);
-    if(!gruposHistoricos[k]) gruposHistoricos[k]=[];
-    gruposHistoricos[k].push({r:r,idx:idx});
+    var dataChave=String(r[7]||'');
+    if(cacheDatas[dataChave]===undefined)cacheDatas[dataChave]=normalizarDataChaveDoc_(r[7]);
+    var k=[normalizarChaveDocDuplicado_(r[3]),normalizarChaveDocDuplicado_(r[4]),cacheDatas[dataChave],normalizarChaveDocDuplicado_(r[10])].join('|');
+    var candidato={r:r,idx:idx};candidato.peso=pesoRegistroHistoricoDoc_(candidato);
+    var antigo=gruposHistoricos[k];if(!antigo||candidato.peso>=antigo.peso)gruposHistoricos[k]=candidato;
   });
 
   function dataHoraDocMs_(v){
@@ -1635,16 +1656,7 @@ function listarDocsDespacho(filtros, token) {
     return p;
   }
 
-  var selecionadosHistoricos=[];
-  Object.keys(gruposHistoricos).forEach(function(k){
-    var grupo=gruposHistoricos[k];
-    grupo.sort(function(a,b){
-      var pa=pesoRegistroHistoricoDoc_(a), pb=pesoRegistroHistoricoDoc_(b);
-      if(pa!==pb) return pb-pa;
-      return b.idx-a.idx; // última linha ganha em empate
-    });
-    selecionadosHistoricos.push(grupo[0]);
-  });
+  var selecionadosHistoricos=Object.keys(gruposHistoricos).map(function(k){return gruposHistoricos[k];});
 
   vals=naoHistoricos.concat(selecionadosHistoricos).sort(function(a,b){return a.idx-b.idx;}).map(function(x){return x.r;});
 
@@ -1685,24 +1697,16 @@ function listarDocsDespacho(filtros, token) {
     var d=criarDataSegura(s); return d?d.getTime():0;
   }
 
-  registros.sort(function(a,b){
-    var af=(String(a.status||"").toUpperCase()==="CONCLUÍDO"||String(a.status||"").toUpperCase()==="ARQUIVADO");
-    var bf=(String(b.status||"").toUpperCase()==="CONCLUÍDO"||String(b.status||"").toUpperCase()==="ARQUIVADO");
-
-    if(situacao==="TODOS"){
-      if(af!==bf) return af?-1:1;
-      if(af&&bf){
-        var atuB=dataHoraDocMs_(b.atualizadoEm),atuA=dataHoraDocMs_(a.atualizadoEm);
-        if(atuB!==atuA) return atuB-atuA;
-      }
-    } else if(situacao==="CONCLUIDOS"){
-      var cb=dataHoraDocMs_(b.atualizadoEm),ca=dataHoraDocMs_(a.atualizadoEm);
-      if(cb!==ca) return cb-ca;
-    }
-
-    var da=criarDataSegura(a.dataDocumento),db=criarDataSegura(b.dataDocumento);
-    return (da&&db)?db.getTime()-da.getTime():0;
-  });
+  registros=registros.map(function(item){
+    var d=criarDataSegura(item.dataDocumento);
+    return {item:item,finalizado:String(item.status||'').toUpperCase()==='CONCLUÍDO'||String(item.status||'').toUpperCase()==='ARQUIVADO',atualizacao:dataHoraDocMs_(item.atualizadoEm),data:d?d.getTime():null};
+  }).sort(function(a,b){
+    if(situacao==='TODOS'){
+      if(a.finalizado!==b.finalizado)return a.finalizado?-1:1;
+      if(a.finalizado&&b.finalizado&&a.atualizacao!==b.atualizacao)return b.atualizacao-a.atualizacao;
+    }else if(situacao==='CONCLUIDOS'&&a.atualizacao!==b.atualizacao)return b.atualizacao-a.atualizacao;
+    return a.data!==null&&b.data!==null?b.data-a.data:0;
+  }).map(function(x){return x.item;});
   return {sucesso:true,registros:registros,resumo:resumo};
 }
 

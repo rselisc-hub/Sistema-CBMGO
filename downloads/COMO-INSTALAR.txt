@@ -16,7 +16,7 @@ Se o projeto não for vinculado, configure RASCUNHO_ORIGEM_ID nas propriedades. 
 CONFERÊNCIA: ao concluir, a tela responde imediatamente com Salvando na planilha. Só mostra salvo e atualiza contadores após confirmação do servidor. Se falhar, o protocolo volta e a anotação pode ser reaberta durante a sessão. Confira a fila antes de repetir se houver falha de comunicação. A anotação local não sobrevive ao fechamento da página. Reservas continuam confirmadas no servidor para evitar conflito entre usuários.
 
 Assumir lotes, históricos, resumos, indicadores, filtros e listas receberam otimizações adicionais. O tratamento de Vistoriado por foi preservado.
-116 testes locais e 25 cenários no Chromium passaram, com serviços Google simulados. Nenhuma ativação ou medição real no Google foi feita neste ambiente. Nenhum dado da planilha enviada está incluído no pacote.
+128 testes locais e 29 cenários no Chromium passaram, com serviços Google simulados. Nenhuma ativação ou medição real no Google foi feita neste ambiente. Nenhum dado da planilha enviada está incluído no pacote.
 
 ATUALIZAÇÃO VISUAL: rosa dos eventos temporários no roteiro mais forte (#F062B0), com texto escuro. Atualizar WebApp.gs e Index.html para manter a mesma cor na tela e nas próximas gerações da planilha. Cores antigas já gravadas continuam reconhecidas na tela.
 
@@ -31,3 +31,5 @@ RASCUNHO DE VISTORIAS: prioridades e observações são salvas automaticamente c
 CONFERÊNCIA: Consulta geral ganha Último conferente (nome ou RG), incluindo a última conclusão de F-7 liberado de volta à fila.
 
 OFICIAL QUE DESPACHOU: novo campo manual no cadastro de DOC e na atualização pelo Gestor; aparece em coluna própria na lista de abertos e concluídos. Informe posto e nome do oficial que efetivamente despachou. Não se confunde com quem digitou a atualização. Registros antigos mostram Não informado até o preenchimento. A coluna 25 OFICIAL_DESPACHO é acrescentada automaticamente; as anteriores são preservadas.
+
+DOCs — SALVAMENTO: bloqueio de clique duplo, identificação por envio e recuperação após falha sem duplicação na mesma página. Vários documentos do mesmo protocolo continuam permitidos. A coluna 26 ASSINATURA_CADASTRO é acrescentada automaticamente. Em falha, mantenha os dados e repita Salvar DOC; antes de fechar/recarregar, confira a gravação. Duplicados antigos não são apagados. O documento confirmado aparece imediatamente e a lista é atualizada em segundo plano. Atualize os DOIS arquivos juntos.

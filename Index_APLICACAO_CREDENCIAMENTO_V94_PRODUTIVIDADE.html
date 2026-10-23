@@ -1147,7 +1147,7 @@
       <div class="col-md-6"><label class="form-label fw-bold">Observação</label><input class="form-control" id="docs-observacao"></div>
       <div class="col-md-6"><label class="form-label fw-bold" for="docs-oficial-despacho">Oficial que despachou</label><input class="form-control" id="docs-oficial-despacho" placeholder="Ex.: CAP NOME — preencha quando houver despacho"></div>
       <div class="col-12"><label class="form-check-label"><input class="form-check-input me-2" type="checkbox" id="docs-evento-temporario">Evento temporário — destacar o protocolo em rosa</label></div>
-      <div class="col-12"><button class="btn btn-dark" onclick="salvarNovoDocDespacho()"><i class="bi bi-floppy me-1"></i>Salvar DOC</button></div>
+      <div class="col-12"><button id="btn-docs-salvar" class="btn btn-dark" onclick="salvarNovoDocDespacho()"><i class="bi bi-floppy me-1"></i>Salvar DOC</button><span id="docs-salvar-status" class="ms-2" role="status" aria-live="polite"></span></div>
     </div></div>
 <div class="card card-custom p-4"><div class="d-flex flex-wrap justify-content-between gap-3 mb-3"><div><h5 class="fw-bold mb-1" id="docs-lista-titulo">Documentos</h5><span id="docs-copia-aviso" class="small text-success fw-semibold" style="display:none;"></span><div class="small text-muted">Prazo somente para documentos em aberto: <span class="badge bg-success">0–8 dias</span> <span class="badge" style="background:#f0a23a;">9–17 dias</span> <span class="badge bg-danger">18+ dias</span></div><div class="d-flex flex-wrap gap-2 mt-2"><span class="badge text-bg-light border" id="docs-resumo-abertos">Em aberto: 0</span><span class="badge text-bg-light border" id="docs-resumo-aguardando">Aguardando resposta: 0</span><span class="badge text-bg-light border" id="docs-resumo-concluidos">Concluídos: 0</span></div></div><div class="d-flex gap-2 flex-wrap"><select class="form-select" id="docs-filtro-status" onchange="carregarDocsDespacho()" style="width:auto;min-width:170px;"><option value="ABERTOS" selected>Em aberto</option><option value="CONCLUIDOS">Concluídos / OK</option><option value="TODOS">Todos</option></select><input type="search" class="form-control" id="docs-pesquisa-protocolo" placeholder="Pesquisar protocolo..." oninput="renderizarDocsDespacho()" style="width:220px;max-width:100%;"><button class="btn btn-outline-secondary" onclick="carregarDocsDespacho()" title="Atualizar lista"><i class="bi bi-arrow-repeat"></i></button></div></div><div class="table-responsive"><table class="table table-sm table-hover align-middle"><thead><tr><th>Prazo</th><th>Tipo</th><th>Protocolo</th><th>Vistoriador</th><th>Data</th><th>Preenchido por</th><th>Razão Social</th><th>Origem</th><th>Andamento</th><th>Oficial que despachou</th><th id="docs-col-gestao">Gestão</th></tr></thead><tbody id="docs-tbody"><tr><td colspan="11" class="text-muted">Carregando...</td></tr></tbody></table></div></div>
   </div>
@@ -3630,6 +3630,7 @@
     function salvarFuncoesPessoalTela(){salvarAcessosFuncoesPessoalTela();}
 
     var docsOrigemTela='gestor', docsCache=[], docsVistoriadores=[];
+    var docsCadastroEnviando=false, docsTentativaCadastro=null, docsListSequencia=0, docsRecargaTimer=null;
     var TIPOS_DOCS=['ANEXO C','ANEXO F','ANEXO H','ANEXO J','ISENÇÃO DE TAXA','PROTOCOLO SUSPENSO','PROTOCOLO EXPIRADO','CANCELAMENTO','DENÚNCIA','OUTROS','PRÉ HABITE-SE','HIDRANTE URBANO','FOTOS'];
     var ANDAMENTOS_DOCS=['AGUARDANDO ANÁLISE','EM ANÁLISE','ENCAMINHADO PARA DESPACHO','AGUARDANDO RESPOSTA','DEVOLVIDO PARA AJUSTE','CONCLUÍDO','ARQUIVADO'];
 
@@ -3648,10 +3649,52 @@
     }
     function voltarDocsDespacho(){if(docsOrigemTela==='atendimento'){abrirModuloAtendimento();return;}if(docsOrigemTela==='conferencia'){abrirModuloConferencia();return;}if(docsOrigemTela==='gestor'){abrirModuloGestor();return;}voltarInicio();}
     function carregarVistoriadoresDocs(){google.script.run.withSuccessHandler(function(r){docsVistoriadores=(r&&r.militares)||[];var s=document.getElementById('docs-vistoriador');if(!s)return;s.innerHTML='<option value="">Não informado</option>'+docsVistoriadores.map(function(m){return '<option value="'+encodeURIComponent(JSON.stringify(m))+'">'+escaparHtmlRoteiro(((m.graduacao||'')+' '+(m.nome||'')).trim())+'</option>';}).join('');}).withFailureHandler(capturarErroServidor).obterVistoriadoresDocs(sessaoToken);}
-    function salvarNovoDocDespacho(){var v={},sel=document.getElementById('docs-vistoriador'),raw=sel?sel.value:'';if(raw){try{v=JSON.parse(decodeURIComponent(raw));}catch(e){}}var d={tipoDocumento:document.getElementById('docs-tipo').value,protocolo:document.getElementById('docs-protocolo').value,vistoriadorRg:v.rg||'',vistoriador:v.nome||'',dataDocumento:document.getElementById('docs-data').value,razaoSocial:document.getElementById('docs-razao').value,observacao:document.getElementById('docs-observacao').value,eventoTemporario:document.getElementById('docs-evento-temporario').checked,oficialDespacho:document.getElementById('docs-oficial-despacho').value};google.script.run.withSuccessHandler(function(r){alert(r.mensagem||'Salvo.');['docs-protocolo','docs-data','docs-razao','docs-observacao','docs-oficial-despacho'].forEach(function(id){document.getElementById(id).value='';});document.getElementById('docs-tipo').value='';document.getElementById('docs-evento-temporario').checked=false;document.getElementById('docs-vistoriador').value='';carregarDocsDespacho();}).withFailureHandler(capturarErroServidor).cadastrarDocDespacho(d,sessaoToken);}
+    function salvarNovoDocDespacho(){
+      if(docsCadastroEnviando)return;
+      var v={},sel=document.getElementById('docs-vistoriador'),raw=sel?sel.value:'';
+      if(raw){try{v=JSON.parse(decodeURIComponent(raw));}catch(e){}}
+      var d={tipoDocumento:document.getElementById('docs-tipo').value,protocolo:document.getElementById('docs-protocolo').value.trim(),vistoriadorRg:v.rg||'',vistoriador:v.nome||'',dataDocumento:document.getElementById('docs-data').value,razaoSocial:document.getElementById('docs-razao').value.trim(),observacao:document.getElementById('docs-observacao').value,eventoTemporario:document.getElementById('docs-evento-temporario').checked,oficialDespacho:document.getElementById('docs-oficial-despacho').value};
+      var status=document.getElementById('docs-salvar-status'),btn=document.getElementById('btn-docs-salvar');
+      if(!d.tipoDocumento||!d.protocolo||!d.dataDocumento||!d.razaoSocial){status.textContent='Preencha tipo, protocolo, data e razão social.';return;}
+      var assinatura=JSON.stringify(d);
+      if(!docsTentativaCadastro||docsTentativaCadastro.assinatura!==assinatura){
+        if(docsTentativaCadastro&&!confirm('O envio anterior não foi confirmado. Alterar os dados inicia outro cadastro e pode criar um segundo documento. Deseja continuar?'))return;
+        docsTentativaCadastro={assinatura:assinatura,chave:(window.crypto&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)+'-'+Math.random().toString(36).slice(2)};
+      }
+      d.chaveRequisicao=docsTentativaCadastro.chave;
+      docsCadastroEnviando=true;
+      var controles=Array.from(document.querySelectorAll('#docs-form-area input,#docs-form-area select,#docs-form-area textarea,#docs-form-area button')).map(function(el){var x={el:el,disabled:el.disabled};el.disabled=true;return x;});
+      btn.disabled=true;status.textContent='Salvando na planilha…';
+      function liberar(){docsCadastroEnviando=false;controles.forEach(function(x){x.el.disabled=x.disabled;});btn.disabled=false;}
+      function falhou(err){liberar();status.textContent='Não foi possível confirmar. Mantenha os dados e clique em Salvar DOC para repetir com segurança. '+String(err&&err.message||err||'');}
+      google.script.run.withSuccessHandler(function(r){
+        if(!r||!r.sucesso||!r.registro){falhou('Resposta incompleta do servidor.');return;}
+        liberar();docsTentativaCadastro=null;docsListSequencia++;
+        ['docs-protocolo','docs-data','docs-razao','docs-observacao','docs-oficial-despacho'].forEach(function(id){document.getElementById(id).value='';});
+        document.getElementById('docs-tipo').value='';document.getElementById('docs-evento-temporario').checked=false;document.getElementById('docs-vistoriador').value='';
+        var st=(document.getElementById('docs-filtro-status')||{}).value||'ABERTOS',x=r.registro;
+        docsCache=docsCache.filter(function(item){return item.id!==x.id;});
+        if(st==='ABERTOS'||st==='TODOS'||st===x.status)docsCache.unshift(x);
+        renderizarDocsDespacho();status.textContent=r.mensagem||'DOC salvo na planilha.';
+        clearTimeout(docsRecargaTimer);docsRecargaTimer=setTimeout(function(){carregarDocsDespacho(true);},300);
+      }).withFailureHandler(falhou).cadastrarDocDespacho(d,sessaoToken);
+    }
     function classePrazoDoc(x){if(x==='FINALIZADO')return 'text-bg-light border';return x==='VERDE'?'bg-success':(x==='LARANJA'?'':'bg-danger');}
     function estiloPrazoDoc(x){return x==='LARANJA'?'background:#f0a23a;color:white;':'';}
-    function carregarDocsDespacho(){var st=(document.getElementById('docs-filtro-status')||{}).value||'ABERTOS',t=document.getElementById('docs-tbody');if(t)t.innerHTML='<tr><td colspan="10" class="text-muted py-4 text-center"><span class="spinner-border spinner-border-sm me-2"></span>Carregando DOCs...</td></tr>';google.script.run.withSuccessHandler(function(r){docsCache=(r&&r.registros)||[];var z=(r&&r.resumo)||{};var a=document.getElementById('docs-resumo-abertos'),g=document.getElementById('docs-resumo-aguardando'),c=document.getElementById('docs-resumo-concluidos');if(a)a.textContent='Em aberto: '+(z.abertos||0);if(g)g.textContent='Aguardando resposta: '+(z.aguardandoResposta||0);if(c)c.textContent='Concluídos: '+(z.concluidos||0);renderizarDocsDespacho();}).withFailureHandler(function(err){if(t)t.innerHTML='<tr><td colspan="10" class="text-danger py-4 text-center">Não foi possível carregar os DOCs. Tente novamente.</td></tr>';capturarErroServidor(err);}).listarDocsDespacho({situacao:st},sessaoToken);}
+    function carregarDocsDespacho(silencioso){
+      var st=(document.getElementById('docs-filtro-status')||{}).value||'ABERTOS',t=document.getElementById('docs-tbody'),seq=++docsListSequencia,token=sessaoToken;
+      if(t&&!silencioso&&!docsCache.length)t.innerHTML='<tr><td colspan="11" class="text-muted py-4 text-center">Carregando DOCs...</td></tr>';
+      google.script.run.withSuccessHandler(function(r){
+        if(seq!==docsListSequencia||token!==sessaoToken)return;
+        docsCache=(r&&r.registros)||[];var z=(r&&r.resumo)||{};
+        [['docs-resumo-abertos','Em aberto: ',z.abertos],['docs-resumo-aguardando','Aguardando resposta: ',z.aguardandoResposta],['docs-resumo-concluidos','Concluídos: ',z.concluidos]].forEach(function(x){var el=document.getElementById(x[0]);if(el)el.textContent=x[1]+(x[2]||0);});
+        renderizarDocsDespacho();
+      }).withFailureHandler(function(err){
+        if(seq!==docsListSequencia||token!==sessaoToken)return;
+        if(!docsCache.length&&t)t.innerHTML='<tr><td colspan="11" class="text-danger py-4 text-center">Não foi possível carregar os DOCs. Tente novamente.</td></tr>';
+        var status=document.getElementById('docs-salvar-status');if(status&&!docsCadastroEnviando)status.textContent='A lista não pôde ser atualizada. Tente atualizar a consulta.';
+      }).listarDocsDespacho({situacao:st},token);
+    }
     function copiarProtocoloDoc(texto){texto=String(texto||'').trim();if(!texto)return;function ok(){var el=document.getElementById('docs-copia-aviso');if(el){el.textContent='Protocolo '+texto+' copiado.';el.style.display='inline';setTimeout(function(){el.style.display='none';},1800);}}function fallback(){var ta=document.createElement('textarea');ta.value=texto;ta.setAttribute('readonly','');ta.style.position='absolute';ta.style.left='-9999px';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');ok();}catch(e){alert('Protocolo: '+texto);}document.body.removeChild(ta);}if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(texto).then(ok).catch(fallback);}else{fallback();}}
     function renderizarDocsDespacho(){var t=document.getElementById('docs-tbody');if(!t)return;var gestor=docsOrigemTela==='gestor';var busca=String((document.getElementById('docs-pesquisa-protocolo')||{}).value||'').trim().toUpperCase();var indicesDocs=new Map();docsCache.forEach(function(x,i){if(!indicesDocs.has(x))indicesDocs.set(x,i);});var lista=docsCache.filter(function(x){return !busca||String(x.protocolo||'').toUpperCase().indexOf(busca)!==-1;});if(!lista.length){t.innerHTML='<tr><td colspan="11" class="text-muted">'+(busca?'Nenhum protocolo encontrado para a pesquisa informada.':'Nenhum documento encontrado.')+'</td></tr>';return;}t.innerHTML=lista.map(function(x){var i=indicesDocs.get(x);var finalizado=(x.status==='CONCLUÍDO'||x.status==='ARQUIVADO');var prazo=finalizado?'<span class="text-muted">—</span>':'<span class="badge docs-prazo-badge '+classePrazoDoc(x.faixaPrazo)+'" style="'+estiloPrazoDoc(x.faixaPrazo)+'">'+((x.diasDocumento===null||x.diasDocumento===undefined)?'—':x.diasDocumento+' d')+'</span>';var protocolo=escaparHtmlRoteiro(x.protocolo||'');var protocoloJs=String(x.protocolo||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");var celProtocolo='<div class="d-flex align-items-center gap-2 flex-wrap"><span class="fw-semibold '+(x.eventoTemporario?'docs-protocolo-evento':'')+'"'+(x.eventoTemporario?' title="Evento temporário"':'')+'>'+protocolo+'</span><button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="copiarProtocoloDoc(\''+protocoloJs+'\')" title="Copiar protocolo"><i class="bi bi-copy"></i></button><button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="abrirHistoricoDocDespacho('+i+')" title="Histórico de trâmites"><i class="bi bi-clock-history"></i></button></div>';var andamento=String(x.andamento||'').trim();if(!andamento){if(x.status==='CONCLUÍDO')andamento='CONCLUÍDO';else if(x.status==='ARQUIVADO')andamento='ARQUIVADO';else if(x.status==='AGUARDANDO RESPOSTA')andamento='AGUARDANDO RESPOSTA';else if(x.status==='EM ANDAMENTO')andamento='EM ANÁLISE';else andamento='AGUARDANDO ANÁLISE';}var gestao=gestor?'<div class="d-flex flex-wrap gap-1"><button class="btn btn-sm btn-outline-warning" onclick="editarDadosDocGestao('+i+')"><i class="bi bi-pencil-square me-1"></i>Editar</button><button class="btn btn-sm btn-outline-primary" onclick="editarDocGestao('+i+')">Atualizar</button></div>':'';return '<tr><td>'+prazo+'</td><td>'+escaparHtmlRoteiro(x.tipoDocumento||'')+'</td><td>'+celProtocolo+'</td><td>'+escaparHtmlRoteiro(x.vistoriador||'')+'</td><td>'+escaparHtmlRoteiro(x.dataDocumento||'')+'</td><td>'+escaparHtmlRoteiro(x.preenchidoPor||'')+'</td><td>'+escaparHtmlRoteiro(x.razaoSocial||'')+'</td><td>'+escaparHtmlRoteiro(x.origem||'')+'</td><td><span class="fw-semibold">'+escaparHtmlRoteiro(andamento)+'</span></td><td>'+escaparHtmlRoteiro(x.oficialDespacho||'Não informado')+'</td><td'+(gestor?'':' style="display:none;"')+'>'+gestao+'</td></tr>';}).join('');}
     function abrirHistoricoDocDespacho(i){
@@ -7275,7 +7318,7 @@
     var conferenciaConclusaoEmAndamento = false;
     var conferenciaConclusaoNaoConfirmada = null;
     window.addEventListener('beforeunload',function(event){
-      if(conferenciaConclusaoEmAndamento || conferenciaConclusaoNaoConfirmada || Object.keys(preferenciasRascunhoPendentes||{}).length){event.preventDefault();event.returnValue='';}
+      if(docsCadastroEnviando || docsTentativaCadastro || conferenciaConclusaoEmAndamento || conferenciaConclusaoNaoConfirmada || Object.keys(preferenciasRascunhoPendentes||{}).length){event.preventDefault();event.returnValue='';}
     });
     function informarGravacaoConferencia(texto,erro) {
       var el=document.getElementById('conf-gravacao-status');
@@ -9598,6 +9641,8 @@
 
 
     function sairDoSistema() {
+      if(docsCadastroEnviando){alert('Aguarde a confirmação do DOC antes de sair.');return;}
+      if(docsTentativaCadastro){alert('Há um DOC sem confirmação. Repita Salvar DOC com os mesmos dados antes de sair para conferir a gravação.');return;}
       if(Object.keys(preferenciasRascunhoPendentes).length){alert('Há prioridades ou observações ainda não salvas. Aguarde ou use Tentar salvar rascunho novamente.');return;}
       if(conferenciaConclusaoEmAndamento){alert('Aguarde a confirmação da gravação antes de sair.');return;}
       if(conferenciaConclusaoNaoConfirmada && !confirm('Há uma anotação de Conferência não confirmada. Sair e descartá-la?'))return;

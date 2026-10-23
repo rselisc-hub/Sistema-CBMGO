@@ -132,7 +132,7 @@ const schemas = [
 for (const [fn,sheet] of schemas)test('estrutura compatível e sem regravação desnecessária: '+sheet,()=>{
  const old=fixture(baseline,{[sheet]:[]}),now=fixture(current,{[sheet]:[]});
  old.context[fn]();now.context[fn]();
- if(sheet==='DOCS_DESPACHO')old.sheets[sheet].cells[0].push('EVENTO_TEMPORARIO','OFICIAL_DESPACHO');
+ if(sheet==='DOCS_DESPACHO')old.sheets[sheet].cells[0].push('EVENTO_TEMPORARIO','OFICIAL_DESPACHO','ASSINATURA_CADASTRO');
  assert.deepEqual(now.sheets[sheet].cells,old.sheets[sheet].cells);
  const writes=now.stats.write;const reads=now.stats.read;
  now.context[fn]();
