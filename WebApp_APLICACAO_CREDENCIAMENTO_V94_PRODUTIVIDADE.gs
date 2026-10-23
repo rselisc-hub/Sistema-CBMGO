@@ -5024,7 +5024,7 @@ function corPrioridadeRoteiro_(prioridade) {
   var p = String(prioridade || "").trim().toUpperCase();
   if (p === "CORONEL") return "#F4B183";
   if (p === "ATRASADA") return "#FF6B6B";
-  if (p === "EVENTO TEMPORÁRIO" || p === "EVENTO TEMPORARIO") return "#F4B6D2";
+  if (p === "EVENTO TEMPORÁRIO" || p === "EVENTO TEMPORARIO") return "#F062B0";
   return "#FFFFFF";
 }
 
@@ -7308,7 +7308,7 @@ function corPrioridadePlanilhaRoteiro_(prioridade, temObservacao) {
   var p = String(prioridade || "").trim().toUpperCase();
 
   // Evento temporário permanece rosa mesmo quando há observação.
-  if (p === "EVENTO TEMPORÁRIO" || p === "EVENTO TEMPORARIO") return "#F4CCCC";
+  if (p === "EVENTO TEMPORÁRIO" || p === "EVENTO TEMPORARIO") return "#F062B0";
   if (temObservacao) return "#FF6B6B";
   if (p === "PEDIDO CEL" || p === "PEDIDO DO CEL" || p === "CORONEL") return "#F4B183";
   if (p === "ATRASADA") return "#FF6B6B";
