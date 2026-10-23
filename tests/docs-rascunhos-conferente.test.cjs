@@ -45,3 +45,15 @@ test('prioridade permanece ao adicionar outro SIAPI e encerra o rascunho normalm
  assert.equal(f.sheets.RASCUNHO_ROTEIRO.cells[1][20],'LANÇADO');assert.equal(f.sheets.ROTEIRO_VISTORIAS.cells[1][12],'EVENTO TEMPORÁRIO');
  const late=c.atualizarPreferenciasRascunhosRoteiro([{protocolo:'P1',dataRoteiro:'2026-10-22',prioridade:'ATRASADA',observacao:'atrasada'}],'token');assert.equal(late.atualizados,0);assert.equal(f.sheets.RASCUNHO_ROTEIRO.cells[1][13],'EVENTO TEMPORÁRIO');assert.equal(c.obterRascunhosRoteiro('2026-10-22','token').itens.some(x=>x.protocolo==='P1'),false);
 });
+test('oficial do despacho é distinto do usuário que registra e fica visível em abertos e concluídos',()=>{
+ const f=docs(),c=f.context;c.exigirPerfil_=()=>({rg:'9',nome:'OPERADOR FICTÍCIO',perfil:'GESTOR'});
+ c.cadastrarDocDespacho({tipoDocumento:'ANEXO F',protocolo:'900001/26',dataDocumento:'2026-10-22',razaoSocial:'EMPRESA FICTÍCIA',oficialDespacho:'TEN EXEMPLO',eventoTemporario:true},'token');
+ let r=c.listarDocsDespacho({status:'TODOS'},'token').registros[0];assert.match(f.sheets.HISTORICO_DOCS_DESPACHO.cells.at(-1)[7],/Oficial que despachou: TEN EXEMPLO/);assert.equal(r.oficialDespacho,'TEN EXEMPLO');assert.equal(r.preenchidoPor,'OPERADOR FICTÍCIO');
+ c.atualizarDocDespachoGestao({id:r.id,andamento:'CONCLUÍDO',oficialDespacho:'CAP EXEMPLO',respostaOficiais:'Despachado'},'token');
+ r=c.listarDocsDespacho({status:'CONCLUIDOS'},'token').registros[0];assert.equal(r.oficialDespacho,'CAP EXEMPLO');assert.equal(r.responsavelGestao,'OPERADOR FICTÍCIO');assert.equal(r.eventoTemporario,true);assert.match(f.sheets.HISTORICO_DOCS_DESPACHO.cells.at(-1)[7],/Oficial que despachou: CAP EXEMPLO/);assert.match(f.sheets.HISTORICO_DOCS_DESPACHO.cells.at(-1)[7],/Oficial anterior: TEN EXEMPLO/);
+ c.atualizarDocDespachoGestao({id:r.id,andamento:'AGUARDANDO RESPOSTA',justificativa:'Atualizar andamento sem substituir o oficial'},'token');assert.equal(c.listarDocsDespacho({status:'ABERTOS'},'token').registros[0].oficialDespacho,'CAP EXEMPLO');
+});
+test('DOCs antigos não recebem oficial presumido e edição cadastral preserva oficial preenchido',()=>{
+ const f=docs(),c=f.context;c.cadastrarDocDespacho({tipoDocumento:'ANEXO F',protocolo:'900001/26',dataDocumento:'2026-10-22',razaoSocial:'EMPRESA FICTÍCIA'},'token');let r=c.listarDocsDespacho({status:'TODOS'},'token').registros[0];assert.equal(r.oficialDespacho,'');
+ c.atualizarDocDespachoGestao({id:r.id,andamento:'EM ANÁLISE',oficialDespacho:'CAP EXEMPLO'},'token');c.editarDadosDocDespachoGestao({id:r.id,tipoDocumento:r.tipoDocumento,protocolo:r.protocolo,dataDocumento:'2026-10-22',razaoSocial:r.razaoSocial,eventoTemporario:true},'token');r=c.listarDocsDespacho({status:'TODOS'},'token').registros[0];assert.equal(r.oficialDespacho,'CAP EXEMPLO');assert.equal(r.eventoTemporario,true);assert.equal(f.sheets.DOCS_DESPACHO.cells[0][24],'OFICIAL_DESPACHO');
+});

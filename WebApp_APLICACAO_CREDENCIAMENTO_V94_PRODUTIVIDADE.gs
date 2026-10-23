@@ -1392,7 +1392,7 @@ function garantirEstruturaDocsDespacho_() {
     "ID","ORIGEM","STATUS","TIPO_DOCUMENTO","PROTOCOLO","VISTORIADOR_RG","VISTORIADOR",
     "DATA_DOCUMENTO","PREENCHIDO_POR_RG","PREENCHIDO_POR","RAZAO_SOCIAL","OBSERVACAO_ORIGEM",
     "RESPOSTA_OFICIAIS","ANDAMENTO","JUSTIFICATIVA_GESTAO","RESPONSAVEL_GESTAO_RG","RESPONSAVEL_GESTAO",
-    "DECISAO_ISENCAO","JUSTIFICATIVA_ISENCAO","CADASTRADO_EM","ATUALIZADO_EM","CHAVE_IMPORTACAO","FONTE","EVENTO_TEMPORARIO"
+    "DECISAO_ISENCAO","JUSTIFICATIVA_ISENCAO","CADASTRADO_EM","ATUALIZADO_EM","CHAVE_IMPORTACAO","FONTE","EVENTO_TEMPORARIO","OFICIAL_DESPACHO"
   ];
   if (!aba) aba = ss.insertSheet("DOCS_DESPACHO");
   prepararCabecalhoLeve_(aba,cab,{cor:"#355a8a",texto:"#fff"});
@@ -1581,9 +1581,11 @@ function cadastrarDocDespacho(dados, token) {
   aba.appendRow([
     id,origem,"PENDENTE",tipo,String(protocolo),String(dados.vistoriadorRg||"").trim(),String(dados.vistoriador||"").trim(),
     dataTxt,String(sessao.rg||"").trim(),String(sessao.nome||"").trim(),razao,String(dados.observacao||"").trim(),
-    "","AGUARDANDO ANÁLISE","","","","","",agora,agora,"","SISTEMA",dados.eventoTemporario===true?"SIM":"NÃO"
+    "","AGUARDANDO ANÁLISE","","","","","",agora,agora,"","SISTEMA",dados.eventoTemporario===true?"SIM":"NÃO",String(dados.oficialDespacho||"").trim()
   ]);
-  garantirHistoricoDocsDespacho_().appendRow([Utilities.getUuid(),id,agora,"CADASTRADO","","PENDENTE","AGUARDANDO ANÁLISE",String(dados.observacao||"").trim(),sessao.rg,sessao.nome]);
+  var detalheCadastro=String(dados.observacao||"").trim();
+  if(String(dados.oficialDespacho||"").trim())detalheCadastro+=(detalheCadastro?" | ":"")+"Oficial que despachou: "+String(dados.oficialDespacho).trim();
+  garantirHistoricoDocsDespacho_().appendRow([Utilities.getUuid(),id,agora,"CADASTRADO","","PENDENTE","AGUARDANDO ANÁLISE",detalheCadastro,sessao.rg,sessao.nome]);
   return {sucesso:true,mensagem:"DOC para despacho cadastrado com sucesso."};
 }
 
@@ -1596,7 +1598,7 @@ function listarDocsDespacho(filtros, token) {
   var resumo={abertos:0,aguardandoResposta:0,concluidos:0,total:0};
   if(aba.getLastRow()<2)return{sucesso:true,registros:[],resumo:resumo};
 
-  var vals=aba.getRange(2,1,aba.getLastRow()-1,24).getDisplayValues();
+  var vals=aba.getRange(2,1,aba.getLastRow()-1,25).getDisplayValues();
 
   // Segurança adicional: nunca exibe duas linhas históricas idênticas.
   // Quando existem duplicados, mantém na visualização o registro mais recentemente
@@ -1671,7 +1673,7 @@ function listarDocsDespacho(filtros, token) {
     registros.push({
       id:r[0],origem:r[1],status:r[2],tipoDocumento:tipo,protocolo:r[4],vistoriadorRg:r[5],vistoriador:r[6],dataDocumento:r[7],preenchidoPor:r[9],razaoSocial:r[10],
       observacao:r[11],respostaOficiais:r[12],andamento:r[13],justificativa:r[14],responsavelGestao:r[16],decisaoIsencao:r[17],justificativaIsencao:r[18],
-      eventoTemporario:String(r[23]||'').trim().toUpperCase()==='SIM',cadastradoEm:r[19],atualizadoEm:r[20],diasDocumento:dias,faixaPrazo:finalizado?"FINALIZADO":faixaPrazoDoc_(dias)
+      oficialDespacho:r[24]||'',eventoTemporario:String(r[23]||'').trim().toUpperCase()==='SIM',cadastradoEm:r[19],atualizadoEm:r[20],diasDocumento:dias,faixaPrazo:finalizado?"FINALIZADO":faixaPrazoDoc_(dias)
     });
   });
 
@@ -1804,7 +1806,7 @@ function editarDadosDocDespachoGestao(dados, token) {
 function atualizarDocDespachoGestao(dados, token) {
   var sessao=exigirPerfil_(token,["GESTOR"]); dados=dados||{};
   var id=String(dados.id||"").trim(); if(!id)throw new Error("Documento não informado.");
-  var aba=garantirEstruturaDocsDespacho_(), vals=aba.getLastRow()>=2?aba.getRange(2,1,aba.getLastRow()-1,23).getDisplayValues():[], linha=-1, anterior="";
+  var aba=garantirEstruturaDocsDespacho_(), vals=aba.getLastRow()>=2?aba.getRange(2,1,aba.getLastRow()-1,25).getDisplayValues():[], linha=-1, anterior="";
   for(var i=0;i<vals.length;i++){
     if(String(vals[i][0]||"").trim()===id){linha=i+2;anterior=String(vals[i][2]||"").trim();break;}
   }
@@ -1818,10 +1820,15 @@ function atualizarDocDespachoGestao(dados, token) {
   aba.getRange(linha,13,1,5).setValues([[
     String(dados.respostaOficiais||"").trim(),andamento,String(dados.justificativa||"").trim(),sessao.rg,sessao.nome
   ]]);
+  var oficialAnterior=String(vals[linha-2][24]||'').trim();
+  var oficial=dados.oficialDespacho===undefined?oficialAnterior:String(dados.oficialDespacho||'').trim();
+  if(dados.oficialDespacho!==undefined)aba.getRange(linha,25).setValue(oficial);
   aba.getRange(linha,21).setValue(dataHoraSaoPauloTexto_());
   var detalheHistorico=[];
   var justificativaHistorico=String(dados.justificativa||"").trim();
   var respostaHistorico=String(dados.respostaOficiais||"").trim();
+  if(oficial)detalheHistorico.push('Oficial que despachou: '+oficial);
+  if(oficialAnterior && oficial!==oficialAnterior)detalheHistorico.push('Oficial anterior: '+oficialAnterior);
   if(justificativaHistorico) detalheHistorico.push("Justificativa: "+justificativaHistorico);
   if(respostaHistorico) detalheHistorico.push("Resposta dos Oficiais: "+respostaHistorico);
   garantirHistoricoDocsDespacho_().appendRow([

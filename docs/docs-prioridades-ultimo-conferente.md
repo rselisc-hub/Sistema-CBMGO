@@ -27,3 +27,11 @@ A pesquisa do histórico usa a coluna de eventos e lê os detalhes das conclusõ
 114 testes Node passaram. Foram repetidos os 17 cenários anteriores de navegador e acrescentados seis cenários de DOCs/prioridades/filtro, totalizando 23 cenários no Chromium. O teste de rascunho cobre selecionar as três cores, acrescentar outro SIAPI, recarregar e distribuir. Também verifica que a gravação atrasada não altera LANÇADO. Testes usam dados fictícios e serviços Google simulados; não houve implantação ou alteração de planilhas reais.
 
 Atualização: substituir WebApp.gs e Index.html, salvar e publicar uma nova versão. O número do commit identifica o pacote completo, que também conserva o Credenciamento SIAPI/SEI.
+
+## Oficial que despachou
+
+O cadastro de DOC e a atualização pelo Gestor oferecem o campo manual Oficial que despachou. A lista passa a exibi-lo em coluna própria, tanto em documentos abertos quanto concluídos. Campo opcional, com posto e nome digitados pelo operador; não presume que o oficial seja a pessoa conectada ao sistema.
+
+A informação é armazenada na coluna 25 OFICIAL_DESPACHO de DOCS_DESPACHO, sem deslocar as colunas anteriores. Documentos antigos sem preenchimento mostram Não informado. Atualizações que não enviam esse campo preservam o valor anterior; a edição cadastral também o preserva. O histórico registra o oficial no cadastro e na atualização, incluindo o nome anterior quando alterado. Usuário que registrou e responsável pela gestão continuam separados.
+
+Nesta atualização, passaram 116 testes locais e 25 cenários no Chromium com os serviços Google simulados. Incluem preenchimento no cadastro, correção na Gestão, consulta após conclusão e preservação do evento temporário. Nenhuma implantação ou planilha real foi alterada neste ambiente.
