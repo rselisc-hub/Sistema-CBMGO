@@ -1608,6 +1608,25 @@ function objetoDocDespachoLeve_(r) {
   return {id:r[0],origem:r[1],status:r[2],tipoDocumento:normalizarTipoDoc_(r[3]),protocolo:r[4],vistoriadorRg:r[5],vistoriador:r[6],dataDocumento:r[7],preenchidoPor:r[9],razaoSocial:r[10],observacao:r[11],respostaOficiais:r[12],andamento:r[13],justificativa:r[14],responsavelGestao:r[16],decisaoIsencao:r[17],justificativaIsencao:r[18],oficialDespacho:r[24]||'',eventoTemporario:String(r[23]||'').trim().toUpperCase()==='SIM',cadastradoEm:r[19],atualizadoEm:r[20],diasDocumento:dias,faixaPrazo:fim?'FINALIZADO':faixaPrazoDoc_(dias)};
 }
 
+// Exclusão lógica mantém identidade e auditoria; não apaga outros DOCs do protocolo.
+function excluirDocDespachoGestao(id,motivo,token){
+  var sessao=exigirPerfil_(token,['GESTOR']);id=String(id||'').trim();motivo=String(motivo||'').trim();
+  if(!id||!motivo)throw new Error('Informe o documento e o motivo da exclusão.');
+  var lock=LockService.getScriptLock();if(!lock.tryLock(3000))throw new Error('Aguarde outro processamento e tente novamente.');
+  try{
+    var aba=garantirEstruturaDocsDespacho_(),achados=aba.getLastRow()>1?aba.getRange(2,1,aba.getLastRow()-1,1).createTextFinder(id).matchEntireCell(true).findAll():[];
+    if(achados.length!==1)throw new Error('Documento não encontrado ou identificador ambíguo.');
+    var linha=achados[0].getRow(),r=aba.getRange(linha,1,1,26).getDisplayValues()[0],hist=garantirHistoricoDocsDespacho_(),evento='EXC-'+id;
+    if(!((hist.getLastRow()>1)&&hist.getRange(2,1,hist.getLastRow()-1,1).createTextFinder(evento).matchEntireCell(true).findAll().length))hist.appendRow([evento,id,dataHoraSaoPauloTexto_(),'EXCLUÍDO',r[2],'EXCLUÍDO','EXCLUÍDO',motivo,sessao.rg,sessao.nome]);
+    aba.getRange(linha,3).setValue('EXCLUÍDO');aba.getRange(linha,21).setValue(dataHoraSaoPauloTexto_());SpreadsheetApp.flush();
+    return {sucesso:true,id:id,mensagem:'DOC excluído das consultas. Histórico preservado.'};
+  }finally{lock.releaseLock();}
+}
+function cadastrarProtocoloManualConferencia(dados,token){
+  exigirAtribuicaoConferencia_(token);
+  return salvarCapturasConferencia(validarCapturasConferencia_([dados]),token);
+}
+
 function listarDocsDespacho(filtros, token) {
   var sessao=exigirPerfil_(token,["GESTOR","CONFERENCIA","ATENDIMENTO"]); filtros=filtros||{};
   // Não executa limpeza física ao abrir a tela. Em bases grandes, apagar linhas
@@ -1623,6 +1642,7 @@ function listarDocsDespacho(filtros, token) {
   // Quando existem duplicados, mantém na visualização o registro mais recentemente
   // atualizado. Isso permite que uma correção/linha manual substitua visualmente
   // uma importação antiga, sem precisar apagar o histórico da planilha.
+  vals=vals.filter(function(r){return String(r[2]||'').trim().toUpperCase()!=='EXCLUÍDO';});
   var naoHistoricos=[], gruposHistoricos=Object.create(null),cacheDatas=Object.create(null);
   vals.forEach(function(r,idx){
     if(!linhaEhHistoricaDoc_(r)){
@@ -1780,6 +1800,7 @@ function editarDadosDocDespachoGestao(dados, token) {
     if(String(vals[i][0]||"").trim()===id){ linha=i+2; antigo=vals[i]; break; }
   }
   if(linha<0) throw new Error("Documento não encontrado.");
+  if(String(antigo[2]).toUpperCase()==='EXCLUÍDO')throw new Error('Documento excluído. Atualize a consulta.');
 
   var dataTxt=formatarDataTexto(data);
   var chaveNova=chaveDuplicidadeDoc_(tipo,protocolo,dataTxt,razao);
@@ -1815,6 +1836,7 @@ function atualizarDocDespachoGestao(dados, token) {
     if(String(vals[i][0]||"").trim()===id){linha=i+2;anterior=String(vals[i][2]||"").trim();break;}
   }
   if(linha<0)throw new Error("Documento não encontrado.");
+  if(anterior==='EXCLUÍDO')throw new Error('Documento excluído. Atualize a consulta.');
 
   var andamento=String(dados.andamento||"").trim().toUpperCase();
   if(andamentosDocsDespacho_().indexOf(andamento)===-1) throw new Error("Selecione um andamento válido.");
