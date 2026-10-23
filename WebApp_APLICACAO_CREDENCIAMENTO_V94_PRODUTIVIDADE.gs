@@ -1636,7 +1636,21 @@ function listarDocsDespacho(filtros, token) {
   var resumo={abertos:0,aguardandoResposta:0,concluidos:0,total:0};
   if(aba.getLastRow()<2)return{sucesso:true,registros:[],resumo:resumo};
 
-  var vals=aba.getRange(2,1,aba.getLastRow()-1,25).getDisplayValues();
+  var situacaoLeitura=String(filtros.situacao||filtros.status||'ABERTOS').trim().toUpperCase();
+  var totalLinhas=aba.getLastRow()-1,vals;
+  if(totalLinhas>=100&&situacaoLeitura!=='TODOS'){
+    // Índice estreito: origem, status e tipo; a fonte identifica históricos
+    // cuja consolidação precisa considerar inclusive as versões fora do filtro.
+    var indice=aba.getRange(2,2,totalLinhas,3).getDisplayValues(),fontes=aba.getRange(2,23,totalLinhas,1).getDisplayValues(),linhas=[];
+    var leves=indice.map(function(x,i){var r=[];r[1]=x[0];r[2]=x[1];r[3]=x[2];r[22]=fontes[i][0];return r;});
+    leves.forEach(function(r,i){
+      var st=String(r[2]||'').trim().toUpperCase(),fim=st==='CONCLUÍDO'||st==='ARQUIVADO';
+      var atende=situacaoLeitura==='ABERTOS'?!fim:situacaoLeitura==='CONCLUIDOS'?fim:st===situacaoLeitura;
+      if(st!=='EXCLUÍDO'&&(linhaEhHistoricaDoc_(r)||atende))linhas.push(i+2);
+    });
+    if(linhas.length>totalLinhas*0.7)vals=aba.getRange(2,1,totalLinhas,25).getDisplayValues();
+    else {var detalhes=lerLinhasProtocolosRoteiro_(aba,{docs:linhas},25);vals=leves.map(function(r,i){return detalhes[i+2]||r;});}
+  }else vals=aba.getRange(2,1,totalLinhas,25).getDisplayValues();
 
   // Segurança adicional: nunca exibe duas linhas históricas idênticas.
   // Quando existem duplicados, mantém na visualização o registro mais recentemente
