@@ -351,7 +351,6 @@
     }
     .cred-table td { vertical-align:middle; }
     .cred-row-aprovado { background:#d9ead3 !important; }
-    .cred-row-exigencia { background:#fff2cc !important; }
     .cred-protocolo-link {
       border:0;
       background:transparent;
@@ -1079,11 +1078,12 @@
                 <th>RAZÃO SOCIAL</th>
                 <th>CONFERENTE</th>
                 <th>DATA DA ÚLTIMA MOVIMENTAÇÃO</th>
+                <th>ÚLTIMA ATUALIZAÇÃO ↓</th>
                 <th>MÊS</th>
               </tr>
             </thead>
             <tbody id="cred-cons-tbody">
-              <tr><td colspan="9" class="text-center text-muted py-4">Nenhum dado carregado.</td></tr>
+              <tr><td colspan="10" class="text-center text-muted py-4">Nenhum dado carregado.</td></tr>
             </tbody>
           </table>
         </div>
@@ -6007,7 +6007,7 @@
     function carregarConsultaCredenciamento() {
       var despacho = document.getElementById('cred-cons-despacho').value || '';
       var tbody = document.getElementById('cred-cons-tbody');
-      tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4"><div class="spinner-border spinner-border-sm"></div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4"><div class="spinner-border spinner-border-sm"></div></td></tr>';
 
       google.script.run
         .withSuccessHandler(function(r) {
@@ -6032,13 +6032,13 @@
     function renderizarConsultaCredenciamento(itens) {
       var tbody = document.getElementById('cred-cons-tbody');
       if (!itens.length) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">Nenhum protocolo encontrado.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">Nenhum protocolo encontrado.</td></tr>';
         return;
       }
 
       tbody.innerHTML = itens.map(function(x) {
         var desp = String(x.despacho || '').toUpperCase();
-        var cls = desp === 'APROVADO' ? 'cred-row-aprovado' : (desp === 'EXIGÊNCIA' ? 'cred-row-exigencia' : '');
+        var cls = desp === 'APROVADO' ? 'cred-row-aprovado' : '';
         var temAviso = !!String(x.aviso || '').trim();
         var protHtml = temAviso
           ? '<button class="cred-protocolo-link" onclick="abrirAvisoCredenciamento(' + JSON.stringify(x.protocolo) + ',' + JSON.stringify(x.aviso) + ')">' + escaparHtmlRoteiro(x.protocolo) + ' <i class="bi bi-info-circle-fill text-warning"></i></button>'
@@ -6053,6 +6053,7 @@
           '<td>' + escaparHtmlRoteiro(x.razaoSocial || '-') + '</td>' +
           '<td>' + escaparHtmlRoteiro(x.conferente || '-') + '</td>' +
           '<td class="text-nowrap">' + escaparHtmlRoteiro(x.dataUltimaMovimentacao || '-') + '</td>' +
+          '<td class="text-nowrap">' + escaparHtmlRoteiro(x.atualizadoEm || x.dataUltimaMovimentacao || x.ultimaImportacao || x.primeiraImportacao || '-') + '</td>' +
           '<td class="text-center">' + escaparHtmlRoteiro(x.mes || '-') + '</td>' +
         '</tr>';
       }).join('');

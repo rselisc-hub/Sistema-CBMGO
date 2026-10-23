@@ -2613,14 +2613,16 @@ function consultarCredenciamento(filtros, token) {
     });
   }
 
-  itens.sort(function(a,b) {
-    var da = dataCredenciamento_(a.dataUltimaMovimentacao);
-    var db = dataCredenciamento_(b.dataUltimaMovimentacao);
-    var ta = da ? da.getTime() : 0;
-    var tb = db ? db.getTime() : 0;
-    if (ta !== tb) return tb - ta;
-    return String(a.protocolo || "").localeCompare(String(b.protocolo || ""), "pt-BR");
-  });
+  // Calcula as chaves uma vez por item, preservando dia, hora e minuto.
+  itens=itens.map(function(item){
+    return {item:item,atualizacao:timestampAtualizacaoCredenciamento_(item.atualizadoEm) ||
+      timestampAtualizacaoCredenciamento_(item.dataUltimaMovimentacao) ||
+      timestampAtualizacaoCredenciamento_(item.ultimaImportacao) ||
+      timestampAtualizacaoCredenciamento_(item.primeiraImportacao)};
+  }).sort(function(a,b){
+    if(a.atualizacao!==b.atualizacao)return b.atualizacao-a.atualizacao;
+    return String(a.item.protocolo||'').localeCompare(String(b.item.protocolo||''),'pt-BR',{numeric:true});
+  }).map(function(registro){return registro.item;});
 
   return {sucesso:true, itens:itens};
 }
@@ -12619,4 +12621,18 @@ function gerenciarArquivoRascunhosGestor(acao,token) {
   else if(acao==='executar') resultado=executarArquivamentoRascunhos_();
   else throw new Error('Ação inválida.');
   return {resultado:resultado,controle:inicializarControleDadosGestor(token)};
+}
+
+// Datas exibidas pelo Sheets: interpretação explícita evita confundir dia e mês.
+function timestampAtualizacaoCredenciamento_(valor) {
+  if(valor instanceof Date)return isNaN(valor.getTime())?0:valor.getTime();
+  var texto=String(valor||'').trim();
+  var br=texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  var iso=texto.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  var m=br||iso;if(!m)return 0;
+  var ano=Number(br?m[3]:m[1]),mes=Number(m[2])-1,dia=Number(br?m[1]:m[3]);
+  var hora=Number(m[4]||0),minuto=Number(m[5]||0),segundo=Number(m[6]||0);
+  var d=new Date(ano,mes,dia,hora,minuto,segundo);
+  return d.getFullYear()===ano && d.getMonth()===mes && d.getDate()===dia &&
+    d.getHours()===hora && d.getMinutes()===minuto && d.getSeconds()===segundo?d.getTime():0;
 }
