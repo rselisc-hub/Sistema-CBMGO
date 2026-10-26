@@ -6522,6 +6522,12 @@ function atualizarStatusOrigemRoteiroRapido_(itens) {
 function localizarDistribuicoesExistentesRapido_(roteiro,itens){
   var alvos=Object.create(null),existentes={};(itens||[]).forEach(function(item){var d=criarDataSegura(item.dataRoteiro),p=normalizarProtocoloRoteiro_(item.protocolo);if(d&&p)alvos[formatarDataTexto(d)+'|'+p]=true;});
   var fim=roteiro.getLastRow();if(fim<2)return existentes;
+  var datas=Object.create(null);(itens||[]).forEach(function(item){var d=criarDataSegura(item.dataRoteiro);if(d)datas[formatarDataTexto(d)]=true;});
+  if(Object.keys(datas).length<=3){
+    var linhas=[];Object.keys(datas).forEach(function(d){roteiro.getRange(2,1,fim-1,1).createTextFinder(d).matchEntireCell(true).findAll().forEach(function(c){linhas.push(c.getRow());});});
+    var valores=lerLinhasProtocolosRoteiro_(roteiro,{datas:linhas},11);
+    Object.keys(valores).forEach(function(l){var r=valores[l],chave=String(r[0]||'').trim()+'|'+normalizarProtocoloRoteiro_(r[1]);if(alvos[chave]&&String(r[10]||'').trim().toUpperCase()!=='CANCELADO')existentes[chave]=true;});return existentes;
+  }
   var dados=roteiro.getRange(2,1,fim-1,2).getDisplayValues(),candidatas=[];
   dados.forEach(function(r,i){var chave=String(r[0]||'').trim()+'|'+normalizarProtocoloRoteiro_(r[1]);if(alvos[chave])candidatas.push({i:i,chave:chave});});
   if(candidatas.length){var status=roteiro.getRange(2,11,fim-1,1).getDisplayValues();candidatas.forEach(function(c){if(String(status[c.i][0]||'').trim().toUpperCase()!=='CANCELADO')existentes[c.chave]=true;});}
@@ -9896,7 +9902,7 @@ function salvarConfiguracaoFinanceira_(cotaUnidadeStr, supDicStr, supDapStr, sup
 
 
 
-function salvarOSeiRaiParaDataEspecifica_(dataRef, turnoRef, os, sei, rai) {
+function salvarOSeiRaiParaDataEspecifica_Conteudo_(dataRef, turnoRef, os, sei, rai) {
   // Retrocompatibilidade com a chamada antiga:
   // salvarOSeiRaiParaDataEspecifica_(dataRef, os, sei, rai)
   if (arguments.length === 4) {
@@ -9919,8 +9925,8 @@ function salvarOSeiRaiParaDataEspecifica_(dataRef, turnoRef, os, sei, rai) {
   var dataRefNorm = formatarDataTexto(dObj);
   var turnoBusca = String(turnoRef || "Todos").trim().toLowerCase();
 
-  var dados = abaControle.getRange(2, 1, abaControle.getLastRow() - 1, 13).getValues();
-  var atualizados = 0;
+  var dados = abaControle.getRange(2, 1, abaControle.getLastRow() - 1, 7).getValues();
+  var atualizados = 0,enderecos=[];
 
   var obsNova =
     "OS: " + (os || "N/A") +
@@ -9942,11 +9948,12 @@ function salvarOSeiRaiParaDataEspecifica_(dataRef, turnoRef, os, sei, rai) {
       status === "ESCALADO" &&
       mesmoTurno
     ) {
-      abaControle.getRange(i + 2, 12).setValue(obsNova);
+      enderecos.push('L'+(i+2));
       atualizados++;
     }
   }
 
+  if(enderecos.length)abaControle.getRangeList(enderecos).setValue(obsNova);
   salvarUltimosOSEI_(os, sei, rai);
   sincronizarEscalaPSE();
 
@@ -10015,7 +10022,7 @@ function obterDiasDoPeriodoAtivo_() {
 
 
 
-function recalcularRankingGeral(tipoOrdenacao, mesFiltro) {
+function recalcularRankingGeral(tipoOrdenacao, mesFiltro, somenteConsulta, militaresJaLidos) {
 
   tipoOrdenacao = tipoOrdenacao || "TOTAL";
 
@@ -10027,7 +10034,7 @@ function recalcularRankingGeral(tipoOrdenacao, mesFiltro) {
 
 
 
-  if (!abaRanking) { abaRanking = ss.insertSheet("RANKING"); }
+  if (!abaRanking && !somenteConsulta) { abaRanking = ss.insertSheet("RANKING"); }
 
 
 
@@ -10049,7 +10056,7 @@ function recalcularRankingGeral(tipoOrdenacao, mesFiltro) {
 
 
 
-  var militares = obterListaMilitares_();
+  var militares = militaresJaLidos || obterListaMilitares_();
 
   var mapaContagem = {};
 
@@ -10191,7 +10198,7 @@ function recalcularRankingGeral(tipoOrdenacao, mesFiltro) {
 
 
 
-  if (abaRanking) {
+  if (abaRanking && !somenteConsulta) {
 
     abaRanking.clear();
 
@@ -10207,43 +10214,14 @@ function recalcularRankingGeral(tipoOrdenacao, mesFiltro) {
 
 
 
-function obterMapaRanking(mesFiltro) {
-
-  recalcularRankingGeral("TOTAL", mesFiltro);
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  var abaRanking = ss.getSheetByName("RANKING");
-
-  var mapa = {};
-
-  if (!abaRanking || abaRanking.getLastRow() < 2) return mapa;
-
-
-
-  var dados = abaRanking.getRange(2, 1, abaRanking.getLastRow() - 1, 8).getDisplayValues();
-
-  dados.forEach(function(r) {
-
-    var rg = normalizarRgCadastro_(r[1]);
-
-    var nome = String(r[2] || "").trim();
-
-    var chaveRk = (rg && rg !== "S/RG") ? rg : nome;
-
-    if (chaveRk) mapa[chaveRk] = { posicao: r[0], azul: parseInt(r[3],10)||0, vermelho: parseInt(r[4],10)||0, total: parseInt(r[5],10)||0, nome: nome };
-
-  });
-
-  return mapa;
-
+function obterMapaRanking(mesFiltro,militaresJaLidos) {
+  var matriz=recalcularRankingGeral('TOTAL',mesFiltro,true,militaresJaLidos),mapa={};
+  matriz.slice(1).forEach(function(r){var rg=normalizarRgCadastro_(r[1]),nome=String(r[2]||'').trim(),chave=(rg&&rg!=='S/RG')?rg:nome;if(chave)mapa[chave]={posicao:String(r[0]).replace(/º$/,''),azul:parseInt(r[3],10)||0,vermelho:parseInt(r[4],10)||0,total:parseInt(r[5],10)||0,nome:nome};});return mapa;
 }
-
-
 
 function obterDadosRanking_(tipoOrdenacao, mesFiltro) {
 
-  return { matriz: recalcularRankingGeral(tipoOrdenacao || "TOTAL", mesFiltro || "") };
+  return { matriz: recalcularRankingGeral(tipoOrdenacao || "TOTAL", mesFiltro || "",true) };
 
 }
 
@@ -10281,7 +10259,7 @@ function verificarMilitarJaEscalado(dataServicoStr, rg, nome, turno) {
 
 
 
-  var dados = abaControle.getRange(2, 1, abaControle.getLastRow() - 1, 13).getDisplayValues();
+  var dados = abaControle.getRange(2, 1, abaControle.getLastRow() - 1, 7).getDisplayValues();
 
   for (var i = 0; i < dados.length; i++) {
 
@@ -10342,7 +10320,7 @@ function lancarVoluntariosSelecionadosWeb_(listaSelecionados) {
 
     if (abaControle.getLastRow() >= 2) {
       var existentes = abaControle
-        .getRange(2, 1, abaControle.getLastRow() - 1, 13)
+        .getRange(2, 1, abaControle.getLastRow() - 1, 7)
         .getDisplayValues();
 
       existentes.forEach(function(r) {
@@ -10521,7 +10499,7 @@ function lancarVoluntariosSelecionadosWeb_(listaSelecionados) {
 
 
 
-function lancarOrdemServicoWeb_(dadosOS) {
+function lancarOrdemServicoWeb_Conteudo_(dadosOS) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var abaControle = ss.getSheetByName("CONTROLE_ESCALAS");
   if (!abaControle) return "Aba 'CONTROLE_ESCALAS' não encontrada.";
@@ -10614,43 +10592,17 @@ function calcularHorasEValoresAC4(dataStr, horaIniStr, horaFimStr, config) {
 
 
 
-  for (var m = 0; m < totalMinutos; m++) {
-
-    var dtMinuto = new Date(minutoAtualEmDt);
-
-    var diaSemana = dtMinuto.getDay();
-
-    var horaDoDia = dtMinuto.getHours();
-
-
-
-    var ehVermelho = (diaSemana === 0 || diaSemana === 5 || diaSemana === 6);
-
-    var ehNoturno = (horaDoDia >= 22 || horaDoDia < 5);
-
-
-
-    if (ehVermelho) {
-
-      if (ehNoturno) minutosNoturnosVermelho++;
-
-      else minutosDiurnosVermelho++;
-
-    } else {
-
-      if (ehNoturno) minutosNoturnosAzul++;
-
-      else minutosDiurnosAzul++;
-
-    }
-
-
-
-    minutoAtualEmDt += 60000;
-
+  var restantes=totalMinutos;
+  while(restantes>0){
+    var dtMinuto=new Date(minutoAtualEmDt),diaSemana=dtMinuto.getDay(),horaDoDia=dtMinuto.getHours();
+    var ehVermelho=diaSemana===0||diaSemana===5||diaSemana===6,ehNoturno=horaDoDia>=22||horaDoDia<5;
+    var limite=new Date(minutoAtualEmDt);
+    if(horaDoDia<5)limite.setHours(5,0,0,0);else if(horaDoDia<22)limite.setHours(22,0,0,0);else {limite.setDate(limite.getDate()+1);limite.setHours(0,0,0,0);}
+    var passo=Math.min(restantes,Math.max(1,Math.round((limite.getTime()-minutoAtualEmDt)/60000)));
+    if(ehVermelho){if(ehNoturno)minutosNoturnosVermelho+=passo;else minutosDiurnosVermelho+=passo;}
+    else {if(ehNoturno)minutosNoturnosAzul+=passo;else minutosDiurnosAzul+=passo;}
+    minutoAtualEmDt+=passo*60000;restantes-=passo;
   }
-
-
 
   var vDiurnoAzul = (config && !isNaN(config.vDiurnoAzul)) ? config.vDiurnoAzul : 30.00;
 
@@ -11362,9 +11314,9 @@ function obterInscricoesVoluntarios_(dataFiltro, turnoFiltro) {
 
   var mesFiltroRk = dFiltroObj ? (dFiltroObj.getFullYear() + "-" + (dFiltroObj.getMonth() + 1 < 10 ? "0" + (dFiltroObj.getMonth() + 1) : dFiltroObj.getMonth() + 1)) : "";
 
-  var mapaRanking = obterMapaRanking(mesFiltroRk);
+  var mapaRanking = obterMapaRanking(mesFiltroRk,militares);
 
-  var dados = abaInsc.getRange(2, 1, abaInsc.getLastRow() - 1, Math.max(abaInsc.getLastColumn(), 1)).getDisplayValues();
+  var dados = abaInsc.getRange(2, 1, abaInsc.getLastRow() - 1, 8).getDisplayValues();
 
   var resultado = [], dataFiltroNorm = dFiltroObj ? formatarDataTexto(dFiltroObj) : "";
 
@@ -11566,10 +11518,10 @@ function obterMapaMilitaresPorRg_() {
 
 
 
-function removerMilitarDaEscala_(dataStr, rg, turno, nome) {
+function removerMilitarDaEscala_Conteudo_(dataStr, rg, turno, nome) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var abaControle = ss.getSheetByName("CONTROLE_ESCALAS");
-  var removidos = 0;
+  var removidos = 0,enderecos=[];
 
   var dObj = criarDataSegura(dataStr);
   if (!dObj) return "Data inválida para remoção.";
@@ -11587,7 +11539,7 @@ function removerMilitarDaEscala_(dataStr, rg, turno, nome) {
 
   if (abaControle && abaControle.getLastRow() >= 2) {
     var dadosC = abaControle
-      .getRange(2, 1, abaControle.getLastRow() - 1, 13)
+      .getRange(2, 1, abaControle.getLastRow() - 1, 7)
       .getDisplayValues();
 
     for (var i = 0; i < dadosC.length; i++) {
@@ -11632,15 +11584,14 @@ function removerMilitarDaEscala_(dataStr, rg, turno, nome) {
         mesmoTurno &&
         (mesmoRg || mesmoNome)
       ) {
-        abaControle
-          .getRange(i + 2, 7)
-          .setValue("CANCELADO");
+        enderecos.push('G'+(i+2));
 
         removidos++;
       }
     }
   }
 
+  if(enderecos.length)abaControle.getRangeList(enderecos).setValue('CANCELADO');
   // A Escala PSE é reconstruída a partir dos registros que continuam ESCALADOS.
   sincronizarEscalaPSE();
 
@@ -11831,28 +11782,8 @@ function localizarVoluntarioPSE_(mapas, data, turno, rgControle, nomeControle) {
 // A Nº | B Data | C Graduação | D RG | E Nome | F Função
 // G Horário | H Turno | I OS / SEI / RAI
 // ----------------------------------------------------------
-function sincronizarEscalaPSE() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var abaControle = ss.getSheetByName("CONTROLE_ESCALAS");
-  var abaEscala = ss.getSheetByName("Escala PSE");
-
-  if (!abaEscala) {
-    abaEscala = ss.insertSheet("Escala PSE");
-  }
-
-  // Desfaz mesclagens anteriores antes de reconstruir a tabela.
-  try {
-    abaEscala
-      .getRange(1, 1, Math.max(abaEscala.getMaxRows(), 1), 9)
-      .breakApart();
-  } catch (e) {}
-
-  // Remove filtro anterior para permitir a reconstrução.
-  var filtroAnterior = abaEscala.getFilter();
-  if (filtroAnterior) {
-    filtroAnterior.remove();
-  }
-
+function montarDadosEscalaPSE_(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet(),abaControle=ss.getSheetByName('CONTROLE_ESCALAS');
   var cabecalho = [[
     "Nº",
     "DATA",
@@ -12032,6 +11963,33 @@ function sincronizarEscalaPSE() {
     grupos.push(grupoAtual);
   }
 
+  return {cabecalho:cabecalho,linhas:linhas,grupos:grupos,registros:registros};
+}
+
+function sincronizarEscalaPSE() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var abaControle = ss.getSheetByName("CONTROLE_ESCALAS");
+  var abaEscala = ss.getSheetByName("Escala PSE");
+
+  if (!abaEscala) {
+    abaEscala = ss.insertSheet("Escala PSE");
+  }
+
+  // Desfaz mesclagens anteriores antes de reconstruir a tabela.
+  try {
+    abaEscala
+      .getRange(1, 1, Math.max(abaEscala.getMaxRows(), 1), 9)
+      .breakApart();
+  } catch (e) {}
+
+  // Remove filtro anterior para permitir a reconstrução.
+  var filtroAnterior = abaEscala.getFilter();
+  if (filtroAnterior) {
+    filtroAnterior.remove();
+  }
+
+  var dadosPreparados=montarDadosEscalaPSE_(),cabecalho=dadosPreparados.cabecalho,linhas=dadosPreparados.linhas,grupos=dadosPreparados.grupos,registros=dadosPreparados.registros;
+
   // Limpa conteúdo e formatação anteriores.
   abaEscala.clear();
 
@@ -12098,16 +12056,10 @@ function sincronizarEscalaPSE() {
     var mapaCorDia = {};
     var indiceCor = 0;
 
-    registros.forEach(function(r, idx) {
-      if (!mapaCorDia[r.data]) {
-        mapaCorDia[r.data] = coresPorDia[indiceCor % coresPorDia.length];
-        indiceCor++;
-      }
-
-      abaEscala
-        .getRange(idx + 2, 1, 1, 9)
-        .setBackground(mapaCorDia[r.data]);
-    });
+    var cores=registros.map(function(r){if(!mapaCorDia[r.data]){mapaCorDia[r.data]=coresPorDia[indiceCor%coresPorDia.length];indiceCor++;}return Array(9).fill(mapaCorDia[r.data]);});
+    faixaDados.setBackgrounds(cores);
+    // Observações já foram gravadas em linhas: formato comum aplicado uma vez.
+    abaEscala.getRange(2,9,linhas.length,1).setFontWeight('bold');
 
     // -----------------------------
     // COLUNA I - AGRUPADA POR DIA + TURNO
@@ -12125,14 +12077,6 @@ function sincronizarEscalaPSE() {
 
         rangeObs.mergeVertically();
       }
-
-      abaEscala
-        .getRange(g.inicio, 9)
-        .setValue(g.obs)
-        .setHorizontalAlignment("center")
-        .setVerticalAlignment("middle")
-        .setWrap(true)
-        .setFontWeight("bold");
 
       // Separação visual mais forte entre MATUTINO / VESPERTINO / NOTURNO.
       abaEscala
@@ -12217,11 +12161,10 @@ function formatarObsPSE_(obs) {
 }
 
 function obterDadosEscala_(dataInicio, dataFim) {
-  sincronizarEscalaPSE();
-  var aba = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Escala PSE");
-  if (!aba) return { erro: "Aba 'Escala PSE' não encontrada." };
-  if (aba.getLastRow() === 0) return { matriz: [] };
-  return { matriz: aba.getDataRange().getDisplayValues() };
+  var inicio=dataInicio?criarDataSegura(dataInicio):null,fim=dataFim?criarDataSegura(dataFim):null;
+  if((dataInicio&&!inicio)||(dataFim&&!fim)||(inicio&&fim&&inicio.getTime()>fim.getTime()))return {erro:'Informe um período válido para a escala.'};
+  var dados=montarDadosEscalaPSE_(),linhas=dados.linhas.filter(function(r){var d=criarDataSegura(r[1]);return d&&(!inicio||d.getTime()>=inicio.getTime())&&(!fim||d.getTime()<=fim.getTime());});
+  return {matriz:dados.cabecalho.concat(linhas).map(function(r){return r.map(function(v){return String(v===null||v===undefined?'':v);});})};
 }
 
 
@@ -12241,7 +12184,7 @@ function obterDadosEscala_(dataInicio, dataFim) {
 // CONSULTA DA ESCALA PSE NO MÓDULO VISTORIAS
 // ----------------------------------------------------------
 function obterEscalaPSEVistorias(dataFiltro, token) {
-  exigirPerfil_(token, ["CONFERENCIA"]);
+  exigirPerfil_(token, ["GESTOR","CONFERENCIA"]);
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var aba = ss.getSheetByName("Escala PSE");
@@ -13608,3 +13551,9 @@ function obterIndicadoresOperacionaisGestor(filtros,token){
   var saida={};Object.keys(grupos).forEach(function(k){saida[k]=Object.keys(grupos[k]).sort(function(a,b){return a.localeCompare(b,'pt-BR',{numeric:true});}).map(function(x){return grupos[k][x];});});
   return {sucesso:true,area:area,inicio:inicio,fim:fim,atualizadoEm:dataHoraSaoPauloTexto_(),totais:totais,grupos:saida,avisos:avisos};
 }
+
+function lancarOrdemServicoWeb_(){var lock=LockService.getScriptLock();lock.waitLock(15000);try{return lancarOrdemServicoWeb_Conteudo_.apply(null,arguments);}finally{lock.releaseLock();}}
+
+function removerMilitarDaEscala_(){var lock=LockService.getScriptLock();lock.waitLock(15000);try{return removerMilitarDaEscala_Conteudo_.apply(null,arguments);}finally{lock.releaseLock();}}
+
+function salvarOSeiRaiParaDataEspecifica_(){var lock=LockService.getScriptLock();lock.waitLock(15000);try{return salvarOSeiRaiParaDataEspecifica_Conteudo_.apply(null,arguments);}finally{lock.releaseLock();}}

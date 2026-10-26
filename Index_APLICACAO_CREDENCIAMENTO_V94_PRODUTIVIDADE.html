@@ -2811,7 +2811,7 @@
 
                   <div class="col-md-2"><button class="btn btn-outline-secondary btn-sm w-100" onclick="limparFiltroEBuscarTodos()"><i class="bi bi-list-stars me-1"></i> Todos</button></div>
 
-                  <div class="col-md-2"><button class="btn btn-success btn-sm w-100" onclick="lancarVoluntariosSelecionados()"><i class="bi bi-rocket-takeoff me-1"></i> Escalar</button></div>
+                  <div class="col-md-2"><button id="btn-escalar-voluntarios" class="btn btn-success btn-sm w-100" onclick="lancarVoluntariosSelecionados()"><i class="bi bi-rocket-takeoff me-1"></i> Escalar</button></div>
 
                 </div>
 
@@ -2923,7 +2923,7 @@
 
                   <div class="col-md-2"><label class="form-label fw-bold small">Nº RAI</label><input type="text" class="form-control form-control-sm" id="global-rai" placeholder="123456"></div>
 
-                  <div class="col-md-2"><button class="btn btn-success btn-sm w-100" onclick="salvarOSeiRaiParaData()"><i class="bi bi-save2-fill me-1"></i> Atualizar Turno</button></div>
+                  <div class="col-md-2"><button id="btn-atualizar-rai" class="btn btn-success btn-sm w-100" onclick="salvarOSeiRaiParaData()"><i class="bi bi-save2-fill me-1"></i> Atualizar Turno</button></div>
 
                 </div>
 
@@ -3031,7 +3031,7 @@
 
                   <div class="col-md-2"><label class="form-label fw-bold small">Nº RAI</label><input type="text" class="form-control" id="extra-rai"></div>
 
-                  <div class="col-12 mt-3"><button class="btn btn-danger px-5 py-2" onclick="gravarOrdemServicoExtra()"><i class="bi bi-check-circle-fill me-1"></i> Gravar Escala Extra</button></div>
+                  <div class="col-12 mt-3"><button id="btn-gravar-extra" class="btn btn-danger px-5 py-2" onclick="gravarOrdemServicoExtra()"><i class="bi bi-check-circle-fill me-1"></i> Gravar Escala Extra</button></div>
 
                 </div>
 
@@ -7405,7 +7405,7 @@
     var conferenciaConclusaoEmAndamento = false;
     var conferenciaConclusaoNaoConfirmada = null;
     window.addEventListener('beforeunload',function(event){
-      if(Object.keys(atendimentoEnvios||{}).length || docsCadastroEnviando || docsTentativaCadastro || conferenciaConclusaoEmAndamento || conferenciaConclusaoNaoConfirmada || Object.keys(preferenciasRascunhoPendentes||{}).length){event.preventDefault();event.returnValue='';}
+      if(escalaGestorEnviando || voluntariosLancando || Object.keys(atendimentoEnvios||{}).length || docsCadastroEnviando || docsTentativaCadastro || conferenciaConclusaoEmAndamento || conferenciaConclusaoNaoConfirmada || Object.keys(preferenciasRascunhoPendentes||{}).length){event.preventDefault();event.returnValue='';}
     });
     function informarGravacaoConferencia(texto,erro) {
       var el=document.getElementById('conf-gravacao-status');
@@ -9739,6 +9739,7 @@
 
 
     function sairDoSistema() {
+      if(escalaGestorEnviando||voluntariosLancando){alert('Aguarde a confirmação da escala antes de sair.');return;}
       if(Object.keys(atendimentoEnvios).some(function(k){return atendimentoEnvios[k].enviando;})){alert("Aguarde a confirmação do Atendimento antes de sair.");return;}
       if(Object.keys(atendimentoEnvios).length&&!confirm("Há um envio de Atendimento sem confirmação. Ele pode já estar salvo. Sair descarta a identificação desta tentativa; consulte a base antes de recadastrar. Deseja sair?"))return;
       atendimentoResumoPronto=false;atendimentoResumoSeq++;atdRoteiroSeq++;atdRoteiroCarregando=null;roteiroVistoriadoresAtendimentoJaCarregado=false;
@@ -9887,7 +9888,16 @@
 
 
 
+    var escalaGestorEnviando=false;
+    function iniciarEnvioEscalaGestor_(botao,prefixo){
+      if(escalaGestorEnviando||voluntariosLancando)return null;escalaGestorEnviando=true;
+      var btn=document.getElementById(botao),texto=btn.innerHTML,campos=Array.from(document.querySelectorAll('input[id^="'+prefixo+'"],select[id^="'+prefixo+'"]')).map(function(el){var x={el:el,disabled:el.disabled};el.disabled=true;return x;});btn.disabled=true;btn.textContent='Gravando…';
+      var status=document.getElementById(botao+'-status');if(!status){status=document.createElement('div');status.id=botao+'-status';status.className='small mt-2';status.setAttribute('role','status');btn.parentNode.appendChild(status);}status.textContent='Aguardando confirmação da gravação.';
+      return function(mensagem){escalaGestorEnviando=false;btn.disabled=false;btn.innerHTML=texto;campos.forEach(function(x){x.el.disabled=x.disabled;});status.textContent=String(mensagem||'Resposta não confirmada. Confira a escala.');};
+    }
+
     function salvarOSeiRaiParaData() {
+      if(escalaGestorEnviando||voluntariosLancando)return;
 
       var dataRef = document.getElementById('global-data-ref').value;
 
@@ -9918,11 +9928,13 @@
       }
 
 
+      var finalizar=iniciarEnvioEscalaGestor_('btn-atualizar-rai','global-');if(!finalizar)return;
       google.script.run
 
         .withSuccessHandler(function(resp) {
 
-          alert(resp);
+          finalizar(resp);
+          if(!/atualizados com sucesso/i.test(String(resp)))return;
 
           document.getElementById('extra-data').value = dataRef;
 
@@ -9934,11 +9946,11 @@
 
           document.getElementById('extra-rai').value = rai;
 
-          carregarEscala();
+          escalaPSEGestorJaCarregada=false;var tabela=document.getElementById('conteudo-escala');if(tabela&&tabela.offsetParent!==null)carregarEscala();
 
         })
 
-        .withFailureHandler(capturarErroServidor)
+        .withFailureHandler(function(e){finalizar('Não foi possível confirmar. Os campos foram mantidos. '+String(e&&e.message||e||''));})
 
         .salvarOSeiRaiParaDataEspecifica(dataRef, turnoRef, os, sei, rai, sessaoToken);
 
@@ -9960,9 +9972,11 @@
 
 
 
+    var consultasGestorSeq={};
     function visualizarEscalaSEI() {
+      var consultaSeq=(consultasGestorSeq['visualizarEscalaSEI']||0)+1;consultasGestorSeq['visualizarEscalaSEI']=consultaSeq;var consultaToken=sessaoToken;
       google.script.run
-        .withSuccessHandler(function(res) {
+        .withSuccessHandler(function(res) {if(consultaSeq!==consultasGestorSeq['visualizarEscalaSEI']||consultaToken!==sessaoToken)return;
           if (res.erro) { alert(res.erro); return; }
 
           var html = '<p><strong>Período:</strong> ' + res.periodo + ' | <strong>Total de Militares Escalados:</strong> ' + res.total + '</p>';
@@ -10011,7 +10025,7 @@
           document.getElementById('corpo-modal-sei').innerHTML = html;
           new bootstrap.Modal(document.getElementById('modalSEI')).show();
         })
-        .withFailureHandler(capturarErroServidor)
+        .withFailureHandler(function(err){if(consultaSeq!==consultasGestorSeq['visualizarEscalaSEI']||consultaToken!==sessaoToken)return;capturarErroServidor(err);})
         .obterVisualizacaoEscalaSEI(document.getElementById('escala-data-inicio').value, document.getElementById('escala-data-fim').value, sessaoToken);
     }
 
@@ -10079,6 +10093,7 @@
 
 
     function carregarEscalaPSEGestor(completa) {
+      var consultaSeq=(consultasGestorSeq['carregarEscalaPSEGestor']||0)+1;consultasGestorSeq['carregarEscalaPSEGestor']=consultaSeq;var consultaToken=sessaoToken;
       var campo = document.getElementById('gestor-pse-data');
       var data = completa ? '' : (campo ? campo.value : '');
       var status = document.getElementById('gestor-pse-status');
@@ -10092,7 +10107,7 @@
       tbody.innerHTML = '<tr><td colspan="11" class="text-center py-5"><div class="spinner-border text-success"></div></td></tr>';
 
       google.script.run
-        .withSuccessHandler(function(r) {
+        .withSuccessHandler(function(r) {if(consultaSeq!==consultasGestorSeq['carregarEscalaPSEGestor']||consultaToken!==sessaoToken)return;
           r = r || {};
           var itens = r.itens || [];
           escalaPSEGestorJaCarregada = true;
@@ -10109,7 +10124,7 @@
           status.textContent = data ? 'Escala de ' + (r.dataExibicao || data) + ' carregada.' : 'Escala PSE completa carregada.';
           renderizarEscalaPSEGestor(itens);
         })
-        .withFailureHandler(capturarErroServidor)
+        .withFailureHandler(function(err){if(consultaSeq!==consultasGestorSeq['carregarEscalaPSEGestor']||consultaToken!==sessaoToken)return;capturarErroServidor(err);})
         .obterEscalaPSEVistorias(data, sessaoToken);
     }
 
@@ -10212,6 +10227,7 @@
 
 
     function carregarResumoEscalaExtraMensal() {
+      var consultaSeq=(consultasGestorSeq['carregarResumoEscalaExtraMensal']||0)+1;consultasGestorSeq['carregarResumoEscalaExtraMensal']=consultaSeq;var consultaToken=sessaoToken;
       var campo = document.getElementById('extra-mes-resumo');
       if (!campo) return;
 
@@ -10221,25 +10237,26 @@
       }
 
       google.script.run
-        .withSuccessHandler(function(r) {
+        .withSuccessHandler(function(r) {if(consultaSeq!==consultasGestorSeq['carregarResumoEscalaExtraMensal']||consultaToken!==sessaoToken)return;
           r = r || {};
           document.getElementById('extra-total-mensal').textContent = r.totalEscalas || 0;
           document.getElementById('extra-militares-mensal').textContent = r.totalMilitares || 0;
           document.getElementById('extra-valor-mensal').textContent = r.valorTotal || 'R$ 0,00';
         })
-        .withFailureHandler(capturarErroServidor)
+        .withFailureHandler(function(err){if(consultaSeq!==consultasGestorSeq['carregarResumoEscalaExtraMensal']||consultaToken!==sessaoToken)return;capturarErroServidor(err);})
         .obterResumoEscalaExtraMensal(campo.value, sessaoToken);
     }
 
 
     function carregarControleMensalPagamentosPSE() {
+      var consultaSeq=(consultasGestorSeq['carregarControleMensalPagamentosPSE']||0)+1;consultasGestorSeq['carregarControleMensalPagamentosPSE']=consultaSeq;var consultaToken=sessaoToken;
       var corpo = document.getElementById('corpo-controle-mensal-pse');
       if (!corpo) return;
 
       corpo.innerHTML = '<tr><td colspan="8" class="py-3 text-muted">Carregando controle mensal...</td></tr>';
 
       google.script.run
-        .withSuccessHandler(function(r) {
+        .withSuccessHandler(function(r) {if(consultaSeq!==consultasGestorSeq['carregarControleMensalPagamentosPSE']||consultaToken!==sessaoToken)return;
           var meses = (r && r.meses) ? r.meses : [];
           if (!meses.length) {
             corpo.innerHTML = '<tr><td colspan="8" class="py-3 text-muted">Nenhum pagamento PSE encontrado.</td></tr>';
@@ -10259,7 +10276,7 @@
             '</tr>';
           }).join('');
         })
-        .withFailureHandler(capturarErroServidor)
+        .withFailureHandler(function(err){if(consultaSeq!==consultasGestorSeq['carregarControleMensalPagamentosPSE']||consultaToken!==sessaoToken)return;capturarErroServidor(err);})
         .obterControleMensalPagamentosPSE(sessaoToken);
     }
 
@@ -10300,13 +10317,17 @@
 
 
 
+    var voluntariosConsultaSeq=0;
     function carregarInscricoesVoluntarios() {
+      if(voluntariosLancando)return;
+      var seq=++voluntariosConsultaSeq,token=sessaoToken;
 
       document.getElementById('tabela-voluntarios-inscritos').innerHTML = '<tr><td colspan="11" class="text-center py-4"><div class="spinner-border text-primary spinner-border-sm me-2"></div>Buscando inscrições e calculando ranking...</td></tr>';
 
       google.script.run
 
         .withSuccessHandler(function(lista) {
+          if(seq!==voluntariosConsultaSeq||token!==sessaoToken)return;
 
           inscritosCache = lista;
 
@@ -10364,11 +10385,13 @@
 
     function limparFiltroEBuscarTodos() { document.getElementById('filtro-inscritos-data').value = ''; document.getElementById('filtro-inscritos-turno').value = 'Todos'; carregarInscricoesVoluntarios(); }
 
-    function alternarTodosVoluntarios(master) { document.querySelectorAll('.check-voluntario').forEach(function(c) { c.checked = master.checked; }); }
+    function alternarTodosVoluntarios(master) { if(voluntariosLancando)return;document.querySelectorAll('.check-voluntario').forEach(function(c) { c.checked = master.checked; }); }
 
 
 
+    var voluntariosLancando=false;
     function lancarVoluntariosSelecionados() {
+      if(voluntariosLancando||escalaGestorEnviando)return;
 
       var osVal = document.getElementById('global-os').value;
 
@@ -10443,11 +10466,15 @@
         return;
       }
 
+      voluntariosLancando=true;
+      var btn=document.getElementById('btn-escalar-voluntarios'),texto=btn.innerHTML,campos=Array.from(document.querySelectorAll('.check-voluntario,select[id^="servico-vol-"],select[id^="turno-escalar-"],input[id^="hora-ini-"],input[id^="hora-fim-"]')).map(function(el){var x={el:el,disabled:el.disabled};el.disabled=true;return x;});btn.disabled=true;btn.textContent='Gravando escala…';
+      var status=document.getElementById('voluntarios-lancamento-status');if(!status){status=document.createElement('div');status.id='voluntarios-lancamento-status';status.className='small mt-2';status.setAttribute('role','status');btn.parentNode.appendChild(status);}status.textContent='Aguardando confirmação da gravação.';
+      function liberar(){voluntariosLancando=false;btn.disabled=false;btn.innerHTML=texto;campos.forEach(function(x){x.el.disabled=x.disabled;});}
       google.script.run
 
-        .withSuccessHandler(function(resp) { alert(resp); carregarInscricoesVoluntarios(); carregarRanking(); })
+        .withSuccessHandler(function(resp) {liberar();status.textContent=String(resp||'Resposta não confirmada. Confira a escala.');if(/^Sucesso:/i.test(String(resp||''))){carregarInscricoesVoluntarios();var ranking=document.getElementById('conteudo-ranking');if(ranking&&ranking.offsetParent!==null)carregarRanking();escalaPSEGestorJaCarregada=false;} })
 
-        .withFailureHandler(capturarErroServidor)
+        .withFailureHandler(function(e){liberar();status.textContent='Não foi possível confirmar. Os campos foram mantidos; confira a escala antes de repetir. '+String(e&&e.message||e||'');})
 
         .lancarVoluntariosSelecionadosWeb(selecionados, sessaoToken);
 
@@ -10463,6 +10490,7 @@
 
 
     function gravarOrdemServicoExtra() {
+      if(escalaGestorEnviando||voluntariosLancando)return;
 
       var data = document.getElementById('extra-data').value, turno = document.getElementById('extra-turno').value, hIni = document.getElementById('extra-hora-ini').value || "07:00", hFim = document.getElementById('extra-hora-fim').value || "13:00";
 
@@ -10470,11 +10498,12 @@
 
       if (!data || !rg || !nome) { alert('Preencha pelo menos a Data, o RG e o Nome.'); return; }
 
+      var finalizar=iniciarEnvioEscalaGestor_('btn-gravar-extra','extra-');if(!finalizar)return;
       google.script.run
 
-        .withSuccessHandler(function(resp) { alert(resp); document.getElementById('extra-rg').value = ''; document.getElementById('extra-nome').value = ''; document.getElementById('extra-militar-select').value = ''; carregarRanking(); carregarUltimosOSEI(); })
+        .withSuccessHandler(function(resp) {finalizar(resp);if(!/lançada com sucesso/i.test(String(resp)))return;escalaPSEGestorJaCarregada=false; document.getElementById('extra-rg').value = ''; document.getElementById('extra-nome').value = ''; document.getElementById('extra-militar-select').value = ''; var ranking=document.getElementById('conteudo-ranking');if(ranking&&ranking.offsetParent!==null)carregarRanking(); carregarUltimosOSEI(); })
 
-        .withFailureHandler(capturarErroServidor)
+        .withFailureHandler(function(e){finalizar('Não foi possível confirmar. Os campos foram mantidos; confira a escala antes de repetir. '+String(e&&e.message||e||''));})
 
         .lancarOrdemServicoWeb({ data: data, turno: turno, horaIni: hIni, horaFim: hFim, rg: rg, nome: nome, os: os, sei: sei, rai: rai }, sessaoToken);
 
@@ -10483,12 +10512,13 @@
 
 
     function carregarMilitaresEscaladosParaRemocao() {
+      var consultaSeq=(consultasGestorSeq['carregarMilitaresEscaladosParaRemocao']||0)+1;consultasGestorSeq['carregarMilitaresEscaladosParaRemocao']=consultaSeq;var consultaToken=sessaoToken;
 
       document.getElementById('tabela-escalados-remocao').innerHTML = '<tr><td colspan="6" class="py-3 text-muted">Buscando militares escalados...</td></tr>';
 
       google.script.run
 
-        .withSuccessHandler(function(res) {
+        .withSuccessHandler(function(res) {if(consultaSeq!==consultasGestorSeq['carregarMilitaresEscaladosParaRemocao']||consultaToken!==sessaoToken)return;
 
           if (!res || !res.registros || res.registros.length === 0) { document.getElementById('tabela-escalados-remocao').innerHTML = '<tr><td colspan="6" class="py-3 text-muted">Nenhum militar escalado no momento.</td></tr>'; return; }
 
@@ -10500,7 +10530,7 @@
 
         })
 
-        .withFailureHandler(capturarErroServidor)
+        .withFailureHandler(function(err){if(consultaSeq!==consultasGestorSeq['carregarMilitaresEscaladosParaRemocao']||consultaToken!==sessaoToken)return;capturarErroServidor(err);})
 
         .obterVisualizacaoEscalaSEI("", "", sessaoToken);
 
@@ -10548,12 +10578,13 @@
 
 
     function carregarRelatorioFinanceiroAC4() {
+      var consultaSeq=(consultasGestorSeq['carregarRelatorioFinanceiroAC4']||0)+1;consultasGestorSeq['carregarRelatorioFinanceiroAC4']=consultaSeq;var consultaToken=sessaoToken;
 
       document.getElementById('corpo-tabela-ac4').innerHTML = '<tr><td colspan="13" class="py-4 text-center"><div class="spinner-border text-success spinner-border-sm me-2"></div>Calculando execução financeira da cota AC-4...</td></tr>';
 
       google.script.run
 
-        .withSuccessHandler(function(res) {
+        .withSuccessHandler(function(res) {if(consultaSeq!==consultasGestorSeq['carregarRelatorioFinanceiroAC4']||consultaToken!==sessaoToken)return;
 
           document.getElementById('fin-cota-total').innerText = res.cotaTotal; document.getElementById('fin-detalhe-cota').innerText = 'Cota Inicial: ' + res.cotaInicial + ' | Suplementações: ' + res.totalSuplementacao;
 
@@ -10583,7 +10614,7 @@
 
         })
 
-        .withFailureHandler(capturarErroServidor)
+        .withFailureHandler(function(err){if(consultaSeq!==consultasGestorSeq['carregarRelatorioFinanceiroAC4']||consultaToken!==sessaoToken)return;capturarErroServidor(err);})
 
         .obterDadosRelatorioAC4(
           document.getElementById('filtro-mes-pagamento-pse') ? document.getElementById('filtro-mes-pagamento-pse').value : '',
@@ -10634,14 +10665,15 @@
 
 
     function carregarRanking() {
+      var consultaSeq=(consultasGestorSeq['carregarRanking']||0)+1;consultasGestorSeq['carregarRanking']=consultaSeq;var consultaToken=sessaoToken;
 
       document.getElementById('conteudo-ranking').innerHTML = '<div class="text-center py-4"><div class="spinner-border text-warning spinner-border-sm me-2"></div>Calculando ranking...</div>';
 
       google.script.run
 
-        .withSuccessHandler(function(res) { renderizarTabela('conteudo-ranking', res.matriz, res.erro); })
+        .withSuccessHandler(function(res) {if(consultaSeq!==consultasGestorSeq['carregarRanking']||consultaToken!==sessaoToken)return; renderizarTabela('conteudo-ranking', res.matriz, res.erro); })
 
-        .withFailureHandler(capturarErroServidor)
+        .withFailureHandler(function(err){if(consultaSeq!==consultasGestorSeq['carregarRanking']||consultaToken!==sessaoToken)return;capturarErroServidor(err);})
 
         .obterDadosRanking(document.getElementById('filtro-ordem-ranking') ? document.getElementById('filtro-ordem-ranking').value : "TOTAL", document.getElementById('filtro-mes-ranking') ? document.getElementById('filtro-mes-ranking').value : "", sessaoToken);
 
@@ -10650,14 +10682,15 @@
 
 
     function carregarEscala() {
+      var consultaSeq=(consultasGestorSeq['carregarEscala']||0)+1;consultasGestorSeq['carregarEscala']=consultaSeq;var consultaToken=sessaoToken;
 
-      document.getElementById('conteudo-escala').innerHTML = 'Carregando Escala PSE...';
+      var escalaAnterior=document.getElementById('conteudo-escala');if(!escalaAnterior.querySelector('table'))escalaAnterior.textContent='Carregando Escala PSE…';
 
       google.script.run
 
-        .withSuccessHandler(function(res) { renderizarTabela('conteudo-escala', res.matriz, res.erro); })
+        .withSuccessHandler(function(res) {if(consultaSeq!==consultasGestorSeq['carregarEscala']||consultaToken!==sessaoToken)return; renderizarTabela('conteudo-escala', res.matriz, res.erro); })
 
-        .withFailureHandler(capturarErroServidor)
+        .withFailureHandler(function(err){if(consultaSeq!==consultasGestorSeq['carregarEscala']||consultaToken!==sessaoToken)return;capturarErroServidor(err);})
 
         .obterDadosEscala(document.getElementById('escala-data-inicio') ? document.getElementById('escala-data-inicio').value : "", document.getElementById('escala-data-fim') ? document.getElementById('escala-data-fim').value : "", sessaoToken);
 
