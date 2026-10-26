@@ -1758,6 +1758,10 @@
   </div>
 
   <!-- Modal de histórico da Conferência -->
+  <div class="modal fade" id="modal-conferencia-reabrir" tabindex="-1" aria-labelledby="conf-reabrir-titulo" aria-hidden="true">
+    <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="conf-reabrir-titulo">Reabrir para Conferência</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div><div class="modal-body"><div class="fw-bold mb-2" id="conf-reabrir-identificacao"></div><p class="small">Use somente para corrigir uma conclusão indevida. O protocolo voltará à fila comum, sem conferente responsável. O histórico e o último status informado do SIAPI serão mantidos.</p><label for="conf-reabrir-motivo" class="form-label">Motivo da reabertura *</label><textarea class="form-control" id="conf-reabrir-motivo" rows="4" maxlength="1000" required></textarea><div id="conf-reabrir-status" class="small mt-2" role="status" aria-live="polite"></div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-warning" id="btn-conf-reabrir" onclick="confirmarReaberturaConferencia()">Reabrir e disponibilizar</button></div></div></div>
+  </div>
+
   <div class="modal fade" id="modal-conferencia-historico" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
       <div class="modal-content">
@@ -7405,7 +7409,7 @@
     var conferenciaConclusaoEmAndamento = false;
     var conferenciaConclusaoNaoConfirmada = null;
     window.addEventListener('beforeunload',function(event){
-      if(escalaGestorEnviando || voluntariosLancando || Object.keys(atendimentoEnvios||{}).length || docsCadastroEnviando || docsTentativaCadastro || conferenciaConclusaoEmAndamento || conferenciaConclusaoNaoConfirmada || Object.keys(preferenciasRascunhoPendentes||{}).length){event.preventDefault();event.returnValue='';}
+      if(conferenciaReabrindo || escalaGestorEnviando || voluntariosLancando || Object.keys(atendimentoEnvios||{}).length || docsCadastroEnviando || docsTentativaCadastro || conferenciaConclusaoEmAndamento || conferenciaConclusaoNaoConfirmada || Object.keys(preferenciasRascunhoPendentes||{}).length){event.preventDefault();event.returnValue='';}
     });
     function informarGravacaoConferencia(texto,erro) {
       var el=document.getElementById('conf-gravacao-status');
@@ -7584,6 +7588,30 @@
     }
 
 
+    var conferenciaConsultaCache=[],conferenciaReaberturaAtual=null,conferenciaReabrindo=false;
+    function podeReabrirConferenciaTela_(){return !!(usuarioLogado&&(String(usuarioLogado.perfil||'').toUpperCase()==='GESTOR'||(usuarioLogado.permissoes&&usuarioLogado.permissoes.conferenciaAtribuir)));}
+    function abrirReaberturaConferencia(indice){
+      if(!podeReabrirConferenciaTela_()||conferenciaReabrindo)return;
+      var x=conferenciaConsultaCache[indice];if(!x||x.estadoInterno!=='CONCLUÍDO')return;
+      conferenciaReaberturaAtual={protocolo:x.protocolo,ciclo:x.ciclo,atualizadoEm:x.atualizadoEm||'',concluidoEm:x.concluidoEm||''};
+      document.getElementById('conf-reabrir-identificacao').textContent=x.protocolo+' — '+(x.razaoSocial||'');document.getElementById('conf-reabrir-motivo').value='';document.getElementById('conf-reabrir-status').textContent='';bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-conferencia-reabrir')).show();
+    }
+    function confirmarReaberturaConferencia(){
+      if(conferenciaReabrindo||!conferenciaReaberturaAtual||!podeReabrirConferenciaTela_())return;
+      var alvo=Object.assign({},conferenciaReaberturaAtual),motivo=document.getElementById('conf-reabrir-motivo').value.trim(),status=document.getElementById('conf-reabrir-status');
+      if(!motivo){status.textContent='Informe o motivo da reabertura.';return;}
+      conferenciaReabrindo=true;var token=sessaoToken,controles=Array.from(document.querySelectorAll('#modal-conferencia-reabrir textarea,#modal-conferencia-reabrir button')).map(function(el){var x={el:el,disabled:el.disabled};el.disabled=true;return x;});status.textContent='Registrando a reabertura…';
+      function liberar(){conferenciaReabrindo=false;controles.forEach(function(x){x.el.disabled=x.disabled;});}
+      google.script.run.withSuccessHandler(function(r){
+        liberar();if(token!==sessaoToken)return;
+        if(!r||!r.sucesso){status.textContent='Não foi possível confirmar. Atualize a consulta antes de repetir.';return;}
+        conferenciaReaberturaAtual=null;conferenciaConsultaSequencia++;conferenciaFilaUltimaAplicada=++conferenciaFilaSequencia;
+        conferenciaFilaCache=(conferenciaFilaCache||[]).filter(function(x){return x.protocolo!==alvo.protocolo;});
+        var el=document.getElementById('modal-conferencia-reabrir'),modal=bootstrap.Modal.getInstance(el);if(modal){modal.hide();if(el.classList.contains('show'))el.addEventListener('shown.bs.modal',function(){modal.hide();},{once:true});}
+        var aviso=document.getElementById('conf-cons-reabertura-aviso');if(!aviso){aviso=document.createElement('div');aviso.id='conf-cons-reabertura-aviso';aviso.className='alert alert-success';aviso.setAttribute('role','status');document.getElementById('conf-pane-consulta').prepend(aviso);}aviso.textContent=r.mensagem||'Protocolo disponível novamente na fila.';
+        carregarConsultaConferencia();
+      }).withFailureHandler(function(err){liberar();if(token!==sessaoToken)return;status.textContent='Não foi possível confirmar. O motivo foi mantido; atualize a consulta para conferir a situação antes de repetir. '+String(err&&err.message||err||'');}).reabrirProtocoloConferencia(alvo.protocolo,motivo,{ciclo:alvo.ciclo,atualizadoEm:alvo.atualizadoEm,concluidoEm:alvo.concluidoEm},token);
+    }
     var conferenciaConsultaSequencia=0;
     function carregarConsultaConferencia() {
       var sequencia=++conferenciaConsultaSequencia;
@@ -7607,6 +7635,7 @@
         .withSuccessHandler(function(r) {
           if(sequencia!==conferenciaConsultaSequencia)return;
           var itens = (r && r.itens) ? r.itens : [];
+          conferenciaConsultaCache=itens;
           document.getElementById('conf-cons-conferentes').innerHTML=((r&&r.conferentes)||[]).map(function(n){return '<option value="'+escaparHtmlRoteiro(n)+'"></option>';}).join('');
 
           if (!itens.length) {
@@ -7614,7 +7643,7 @@
             return;
           }
 
-          tb.innerHTML = itens.map(function(x) {
+          tb.innerHTML = itens.map(function(x,idx) {
             return '<tr>' +
               '<td class="fw-bold">' + escaparHtmlRoteiro(x.protocolo || '') + '</td>' +
               '<td>' + escaparHtmlRoteiro(x.razaoSocial || '-') + '</td>' +
@@ -7624,8 +7653,9 @@
               '<td>' + escaparHtmlRoteiro(x.ultimoConferente || '-') + '</td>' +
               '<td>' + escaparHtmlRoteiro(x.concluidoEm || '-') + '</td>' +
               '<td>' + escaparHtmlRoteiro(x.atualizadoEm || '-') + '</td>' +
+              '<td>'+escaparHtmlRoteiro(x.observacao||'-')+'</td>'+
               '<td><button class="btn btn-sm btn-outline-secondary" onclick="abrirHistoricoConferencia(\'' +
-                escaparJsConferencia(x.protocolo) + '\')"><i class="bi bi-clock-history me-1"></i>Ver</button></td>' +
+                escaparJsConferencia(x.protocolo) + '\')"><i class="bi bi-clock-history me-1"></i>Ver</button>'+((podeReabrirConferenciaTela_()&&x.estadoInterno==='CONCLUÍDO')?'<button type="button" class="btn btn-sm btn-outline-warning ms-1 conf-btn-reabrir" onclick="abrirReaberturaConferencia('+idx+')">Reabrir</button>':'')+'</td>' +
             '</tr>';
           }).join('');
         })
@@ -9729,6 +9759,7 @@
 
 
     function limparSessaoLocal() {
+      conferenciaConsultaCache=[];conferenciaReaberturaAtual=null;conferenciaConsultaSequencia++;
       indOperacional.seq++;indOperacional.cache={};indOperacional.dados=null;indOperacional.emCurso=null;indOperacional.token=null;
       textosPadraoEstado.sequencia++;textosPadraoEstado.token=null;textosPadraoEstado.modelos=null;textosPadraoEstado.ajustes={};textosPadraoEstado.selecionado=null;textosPadraoEstado.enviando=false;
       sessaoToken = '';
@@ -9739,6 +9770,7 @@
 
 
     function sairDoSistema() {
+      if(conferenciaReabrindo){alert('Aguarde a confirmação da reabertura antes de sair.');return;}
       if(escalaGestorEnviando||voluntariosLancando){alert('Aguarde a confirmação da escala antes de sair.');return;}
       if(Object.keys(atendimentoEnvios).some(function(k){return atendimentoEnvios[k].enviando;})){alert("Aguarde a confirmação do Atendimento antes de sair.");return;}
       if(Object.keys(atendimentoEnvios).length&&!confirm("Há um envio de Atendimento sem confirmação. Ele pode já estar salvo. Sair descarta a identificação desta tentativa; consulte a base antes de recadastrar. Deseja sair?"))return;

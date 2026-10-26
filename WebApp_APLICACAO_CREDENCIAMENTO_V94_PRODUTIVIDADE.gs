@@ -13557,3 +13557,31 @@ function lancarOrdemServicoWeb_(){var lock=LockService.getScriptLock();lock.wait
 function removerMilitarDaEscala_(){var lock=LockService.getScriptLock();lock.waitLock(15000);try{return removerMilitarDaEscala_Conteudo_.apply(null,arguments);}finally{lock.releaseLock();}}
 
 function salvarOSeiRaiParaDataEspecifica_(){var lock=LockService.getScriptLock();lock.waitLock(15000);try{return salvarOSeiRaiParaDataEspecifica_Conteudo_.apply(null,arguments);}finally{lock.releaseLock();}}
+
+// Correção administrativa de conclusão indevida. Permissão é revalidada na base.
+function reabrirProtocoloConferencia(protocolo,motivo,referencia,token){
+  var sessao=exigirAtribuicaoConferencia_(token);
+  protocolo=normalizarTextoConferencia_(protocolo).replace(/\u00a0/g,' ').trim();motivo=String(motivo||'').trim();
+  if(!protocolo)throw new Error('Informe o protocolo.');
+  if(!motivo||motivo.length>1000)throw new Error('Informe o motivo da reabertura, com até 1000 caracteres.');
+  if(!referencia||!Number.isSafeInteger(referencia.ciclo)||referencia.ciclo<0||typeof referencia.atualizadoEm!=='string'||typeof referencia.concluidoEm!=='string')throw new Error('Atualize a consulta antes de reabrir o protocolo.');
+  var lock=LockService.getScriptLock();lock.waitLock(10000);
+  try{
+    sessao=exigirAtribuicaoConferencia_(token);
+    var loc=localizarConferenciaPorProtocoloRapido_(protocolo);if(!loc.achado)throw new Error('Protocolo não encontrado.');
+    var antigo=loc.achado.r,anterior=objetoConferenciaDaLinha_(antigo);
+    if(anterior.estadoInterno!=='CONCLUÍDO')throw new Error('Somente protocolos concluídos podem ser reabertos. Atualize a consulta para conferir a situação atual.');
+    if(anterior.ciclo!==referencia.ciclo||anterior.atualizadoEm!==referencia.atualizadoEm||anterior.concluidoEm!==referencia.concluidoEm)throw new Error('O protocolo foi alterado após esta consulta. Atualize a lista antes de reabrir.');
+    var agora=dataHoraSaoPauloTexto_(),linha=antigo.slice(),nome=sessao.nomeGuerra||sessao.nome||('RG '+sessao.rg);
+    linha[9]='DISPONÍVEL';linha[10]='';linha[11]='';linha[12]=sessao.rg;linha[13]=nome;linha[14]=agora;linha[15]='';linha[16]='';linha[17]=agora;linha[19]=anterior.ciclo+1;linha[24]='NÃO';
+    var novo=objetoConferenciaDaLinha_(linha),hist=garantirEstruturaHistoricoConferencia_(),linhaHist=hist.getLastRow()+1;
+    var detalhe='Reabertura por conclusão indevida. Motivo: '+motivo+' | Última conclusão: '+(anterior.concluidoEm||'não informada')+' | Último conferente: '+(anterior.conferente||anterior.rgConferente||'não informado');
+    // Registra a tentativa antes da alteração. Se houver interrupção, continua
+    // existindo evidência do responsável/motivo, sem inventar uma conclusão.
+    var evento=[agora,protocolo,novo.ciclo,'REABERTURA SOLICITADA',sessao.rg,nome,anterior.estadoInterno,anterior.estadoInterno,anterior.statusSiapi,anterior.statusSiapi,detalhe,snapshotConferencia_(anterior)];
+    hist.getRange(linhaHist,1,1,12).setValues([evento]);SpreadsheetApp.flush();
+    loc.aba.getRange(loc.achado.linha,10,1,16).setValues([linha.slice(9,25)]);SpreadsheetApp.flush();
+    evento[3]='REABERTO PARA CONFERÊNCIA';evento[7]=novo.estadoInterno;evento[11]=snapshotConferencia_(novo);hist.getRange(linhaHist,1,1,12).setValues([evento]);SpreadsheetApp.flush();
+    return {sucesso:true,item:novo,mensagem:'Protocolo '+protocolo+' disponível novamente na fila de Conferência. Histórico e último status SIAPI preservados.'};
+  }finally{lock.releaseLock();}
+}
