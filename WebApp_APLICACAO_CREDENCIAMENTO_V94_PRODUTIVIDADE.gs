@@ -1731,9 +1731,21 @@ function listarDocsDespacho(filtros, token) {
     var d=criarDataSegura(s); return d?d.getTime():0;
   }
 
+  // Recupera a finalização em uma leitura, sem confundir edição posterior com despacho.
+  var finaisDocs={};
+  registros.forEach(function(x){if(x.status==='CONCLUÍDO'||x.status==='ARQUIVADO'){finaisDocs[String(x.id)]=x;}});
+  var histDocs=Object.keys(finaisDocs).length?SpreadsheetApp.getActiveSpreadsheet().getSheetByName('HISTORICO_DOCS_DESPACHO'):null;
+  if(histDocs&&histDocs.getLastRow()>1){
+    histDocs.getRange(2,2,histDocs.getLastRow()-1,9).getDisplayValues().forEach(function(r){
+      var x=finaisDocs[String(r[0])],anterior=String(r[3]||'').trim().toUpperCase(),novo=String(r[4]||'').trim().toUpperCase();
+      if(!x||['CONCLUÍDO','ARQUIVADO'].indexOf(novo)<0||['CONCLUÍDO','ARQUIVADO'].indexOf(anterior)>=0)return;
+      if(dataHoraDocMs_(r[1])>dataHoraDocMs_(x.dataDespacho)){x.dataDespacho=String(r[1]||'');x.despachadoPor=String(r[8]||'').trim();}
+    });
+  }
+
   registros=registros.map(function(item){
     var d=criarDataSegura(item.dataDocumento);
-    return {item:item,finalizado:String(item.status||'').toUpperCase()==='CONCLUÍDO'||String(item.status||'').toUpperCase()==='ARQUIVADO',atualizacao:dataHoraDocMs_(item.atualizadoEm),data:d?d.getTime():null};
+    return {item:item,finalizado:String(item.status||'').toUpperCase()==='CONCLUÍDO'||String(item.status||'').toUpperCase()==='ARQUIVADO',atualizacao:dataHoraDocMs_(item.dataDespacho||item.atualizadoEm),data:d?d.getTime():null};
   }).sort(function(a,b){
     if(situacao==='TODOS'){
       if(a.finalizado!==b.finalizado)return a.finalizado?-1:1;
@@ -1861,8 +1873,9 @@ function atualizarDocDespachoGestao(dados, token) {
     String(dados.respostaOficiais||"").trim(),andamento,String(dados.justificativa||"").trim(),sessao.rg,sessao.nome
   ]]);
   var oficialAnterior=String(vals[linha-2][24]||'').trim();
-  var oficial=dados.oficialDespacho===undefined?oficialAnterior:String(dados.oficialDespacho||'').trim();
-  if(dados.oficialDespacho!==undefined)aba.getRange(linha,25).setValue(oficial);
+  var finalizando=status==='CONCLUÍDO'||status==='ARQUIVADO';
+  var oficial=finalizando?String(sessao.nome||'').trim():oficialAnterior;
+  if(finalizando)aba.getRange(linha,25).setValue(oficial);
   aba.getRange(linha,21).setValue(dataHoraSaoPauloTexto_());
   var detalheHistorico=[];
   var justificativaHistorico=String(dados.justificativa||"").trim();

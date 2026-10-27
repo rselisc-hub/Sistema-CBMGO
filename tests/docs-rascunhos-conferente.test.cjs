@@ -50,10 +50,19 @@ test('oficial do despacho é distinto do usuário que registra e fica visível e
  c.cadastrarDocDespacho({tipoDocumento:'ANEXO F',protocolo:'900001/26',dataDocumento:'2026-10-22',razaoSocial:'EMPRESA FICTÍCIA',oficialDespacho:'TEN EXEMPLO',eventoTemporario:true},'token');
  let r=c.listarDocsDespacho({status:'TODOS'},'token').registros[0];assert.match(f.sheets.HISTORICO_DOCS_DESPACHO.cells.at(-1)[7],/Oficial que despachou: TEN EXEMPLO/);assert.equal(r.oficialDespacho,'TEN EXEMPLO');assert.equal(r.preenchidoPor,'OPERADOR FICTÍCIO');
  c.atualizarDocDespachoGestao({id:r.id,andamento:'CONCLUÍDO',oficialDespacho:'CAP EXEMPLO',respostaOficiais:'Despachado'},'token');
- r=c.listarDocsDespacho({status:'CONCLUIDOS'},'token').registros[0];assert.equal(r.oficialDespacho,'CAP EXEMPLO');assert.equal(r.responsavelGestao,'OPERADOR FICTÍCIO');assert.equal(r.eventoTemporario,true);assert.match(f.sheets.HISTORICO_DOCS_DESPACHO.cells.at(-1)[7],/Oficial que despachou: CAP EXEMPLO/);assert.match(f.sheets.HISTORICO_DOCS_DESPACHO.cells.at(-1)[7],/Oficial anterior: TEN EXEMPLO/);
- c.atualizarDocDespachoGestao({id:r.id,andamento:'AGUARDANDO RESPOSTA',justificativa:'Atualizar andamento sem substituir o oficial'},'token');assert.equal(c.listarDocsDespacho({status:'ABERTOS'},'token').registros[0].oficialDespacho,'CAP EXEMPLO');
+ r=c.listarDocsDespacho({status:'CONCLUIDOS'},'token').registros[0];assert.equal(r.oficialDespacho,'OPERADOR FICTÍCIO');assert.equal(r.responsavelGestao,'OPERADOR FICTÍCIO');assert.equal(r.eventoTemporario,true);assert.match(f.sheets.HISTORICO_DOCS_DESPACHO.cells.at(-1)[7],/Oficial que despachou: OPERADOR FICTÍCIO/);assert.match(f.sheets.HISTORICO_DOCS_DESPACHO.cells.at(-1)[7],/Oficial anterior: TEN EXEMPLO/);
+ c.atualizarDocDespachoGestao({id:r.id,andamento:'AGUARDANDO RESPOSTA',justificativa:'Atualizar andamento sem substituir o oficial'},'token');assert.equal(c.listarDocsDespacho({status:'ABERTOS'},'token').registros[0].oficialDespacho,'OPERADOR FICTÍCIO');
 });
 test('DOCs antigos não recebem oficial presumido e edição cadastral preserva oficial preenchido',()=>{
  const f=docs(),c=f.context;c.cadastrarDocDespacho({tipoDocumento:'ANEXO F',protocolo:'900001/26',dataDocumento:'2026-10-22',razaoSocial:'EMPRESA FICTÍCIA'},'token');let r=c.listarDocsDespacho({status:'TODOS'},'token').registros[0];assert.equal(r.oficialDespacho,'');
- c.atualizarDocDespachoGestao({id:r.id,andamento:'EM ANÁLISE',oficialDespacho:'CAP EXEMPLO'},'token');c.editarDadosDocDespachoGestao({id:r.id,tipoDocumento:r.tipoDocumento,protocolo:r.protocolo,dataDocumento:'2026-10-22',razaoSocial:r.razaoSocial,eventoTemporario:true},'token');r=c.listarDocsDespacho({status:'TODOS'},'token').registros[0];assert.equal(r.oficialDespacho,'CAP EXEMPLO');assert.equal(r.eventoTemporario,true);assert.equal(f.sheets.DOCS_DESPACHO.cells[0][24],'OFICIAL_DESPACHO');
+ c.atualizarDocDespachoGestao({id:r.id,andamento:'EM ANÁLISE',oficialDespacho:'CAP EXEMPLO'},'token');c.editarDadosDocDespachoGestao({id:r.id,tipoDocumento:r.tipoDocumento,protocolo:r.protocolo,dataDocumento:'2026-10-22',razaoSocial:r.razaoSocial,eventoTemporario:true},'token');r=c.listarDocsDespacho({status:'TODOS'},'token').registros[0];assert.equal(r.oficialDespacho,'');assert.equal(r.eventoTemporario,true);assert.equal(f.sheets.DOCS_DESPACHO.cells[0][24],'OFICIAL_DESPACHO');
+});
+
+test('data do despacho usa finalização auditada e ordena sem usar edição posterior',()=>{
+ const f=docs(),c=f.context;
+ for(const n of [1,2])c.cadastrarDocDespacho({tipoDocumento:'ANEXO F',protocolo:'90000'+n+'/26',dataDocumento:'2026-10-22',razaoSocial:'FICTÍCIA'},'token');
+ const a=f.sheets.DOCS_DESPACHO.cells[1],b=f.sheets.DOCS_DESPACHO.cells[2];
+ a[2]=b[2]='CONCLUÍDO';a[20]='27/10/2026 15:00:00';b[20]='26/10/2026 11:00:00';
+ f.sheets.HISTORICO_DOCS_DESPACHO.cells.push(row(10,{1:a[0],2:'25/10/2026 10:00:00',4:'PENDENTE',5:'CONCLUÍDO',9:'ANA TESTE'}),row(10,{1:b[0],2:'26/10/2026 11:00:00',4:'PENDENTE',5:'CONCLUÍDO'}),row(10,{1:a[0],2:'27/10/2026 15:00:00',4:'CONCLUÍDO',5:'CONCLUÍDO'}));
+ for(const situacao of ['CONCLUIDOS','TODOS']){const r=c.listarDocsDespacho({situacao},'token').registros;assert.equal(r[0].id,b[0]);assert.equal(r[1].dataDespacho,'25/10/2026 10:00:00');assert.equal(r[1].despachadoPor,'ANA TESTE');}
 });
