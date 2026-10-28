@@ -3921,7 +3921,7 @@
     }
 
     var indOperacional={area:'atendimento',cache:{},token:null,seq:0,dados:null,pagina:0,emCurso:null};
-    var indRotulos={dia:'Dia',mes:'Mês',tipo:'Tipo de atendimento',motivo:'Motivo',atendente:'Atendente',protocolo:'Protocolo',divisao:'Divisão da edificação',resultado:'Resultado',conferente:'Conferente',setor:'Setor / Região',bairro:'Bairro',equipe:'Equipe',servico:'Serviço',militar:'Militar',funcao:'Função',turno:'Turno',pagamento:'Pagamento'};
+    var indRotulos={dia:'Dia',mes:'Mês',tipo:'Tipo de atendimento',motivo:'Motivo',atendente:'Atendente',protocolo:'Protocolo',divisao:'Divisão da edificação',resultado:'Resultado',conferente:'Conferente',setor:'Setor / Região',bairro:'Bairro',equipe:'Equipe / dupla (sem ordem)',composicao:'Individual ou dupla',servico:'Serviço',militar:'Militar — análise individual',funcao:'Função',turno:'Turno',pagamento:'Pagamento'};
     function iniciarIndicadoresOperacionais(){indOperacional.cache={};indOperacional.dados=null;indOperacional.emCurso=null;indOperacional.seq++;if(!document.getElementById('ind-op-inicio').value)definirPeriodoIndicadores(false);carregarIndicadoresOperacionais(false);}
     function definirPeriodoIndicadores(consultar){var hoje=dataHojeInput_(),p=document.getElementById('ind-op-periodo').value;if(p!=='personalizado'){document.getElementById('ind-op-inicio').value=p==='mes'?hoje.slice(0,7)+'-01':p==='ano'?hoje.slice(0,4)+'-01-01':hoje;document.getElementById('ind-op-fim').value=hoje;}if(consultar!==false)carregarIndicadoresOperacionais(false);}
     function selecionarAreaIndicadores(area){indOperacional.area=area;carregarIndicadoresOperacionais(false);}
