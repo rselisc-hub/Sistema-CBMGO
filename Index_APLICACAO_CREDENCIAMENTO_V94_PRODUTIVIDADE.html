@@ -639,6 +639,7 @@
       <button class="btn btn-outline-info" onclick="abrirRoteiroVistoriadoresAtendimento()">
         <i class="bi bi-people me-1"></i>Roteiro dos Vistoriadores
       </button>
+      <button class="btn btn-outline-success" onclick="abrirEscalaPSEAtendimento()"><i class="bi bi-calendar2-check me-1"></i>Escala PSE — Consulta</button>
       <button class="btn btn-outline-danger" onclick="abrirPendenciasVistoriasAtendimento()"><i class="bi bi-list-check me-1"></i>Pendências de Vistorias</button>
       <button class="btn btn-outline-dark" onclick="abrirDocsDespacho('atendimento')">
         <i class="bi bi-file-earmark-text me-1"></i>DOCs para Despacho
@@ -1871,13 +1872,13 @@
           <h4 class="fw-bold mb-1"><i class="bi bi-calendar2-check-fill text-success me-2"></i>Escala PSE</h4>
           <div class="text-muted">Consulta operacional da mesma Escala PSE utilizada na planilha.</div>
         </div>
-        <button class="btn btn-outline-secondary" onclick="abrirModuloVistorias()">
+        <button class="btn btn-outline-secondary" onclick="voltarConsultaEscalaPSE()">
           <i class="bi bi-arrow-left me-1"></i>Voltar
         </button>
       </div>
     </div>
 
-    <div class="d-flex flex-wrap gap-2 mb-4 vistorias-nav">
+    <div id="pse-consulta-nav-vistorias" class="d-flex flex-wrap gap-2 mb-4 vistorias-nav">
       <button class="btn btn-outline-primary" onclick="abrirRoteiroVistorias()">
         <i class="bi bi-signpost-split me-1"></i>Roteiro de Vistorias
       </button>
@@ -3531,6 +3532,8 @@
         return;
       }
 
+      if(ultimaTela==='atendimento-pse'&&usuarioLogado.permissoes&&usuarioLogado.permissoes.atendimento){abrirEscalaPSEAtendimento(true);return;}
+
       if(ultimaTela==='atendimento-pendencias'&&usuarioLogado.permissoes&&usuarioLogado.permissoes.atendimento){abrirPendenciasVistoriasAtendimento(true);return;}
 
       if (ultimaTela === 'atendimento-roteiro-vistoriadores' && usuarioLogado.permissoes && usuarioLogado.permissoes.atendimento) {
@@ -4424,15 +4427,20 @@
 
     var escalaPSEVistoriasJaCarregada = false;
 
-    function abrirEscalaPSEVistorias(restaurando) {
-      if (!usuarioLogado || !usuarioLogado.permissoes || !usuarioLogado.permissoes.vistorias) {
+    var escalaPSEConsultaOrigem='vistorias',escalaPSEConsultaSeq=0;
+    function abrirEscalaPSEAtendimento(restaurando){abrirEscalaPSEVistorias(restaurando,'atendimento');}
+    function voltarConsultaEscalaPSE(){if(escalaPSEConsultaOrigem==='atendimento')abrirModuloAtendimento();else abrirModuloVistorias();}
+    function abrirEscalaPSEVistorias(restaurando,origem) {
+      origem=origem==='atendimento'?'atendimento':'vistorias';
+      if (!usuarioLogado || !usuarioLogado.permissoes || !usuarioLogado.permissoes[origem==='atendimento'?'atendimento':'vistorias']) {
         alert('Você não possui permissão para acessar a Escala PSE.');
         return;
       }
 
       esconderTelasPrincipais();
       document.getElementById('vistorias-escala-pse-screen').style.display = 'block';
-      registrarTelaAtual('vistorias-escala-pse');
+      escalaPSEConsultaOrigem=origem;document.getElementById('pse-consulta-nav-vistorias').classList.toggle('d-none',origem==='atendimento');
+      registrarTelaAtual(origem==='atendimento'?'atendimento-pse':'vistorias-escala-pse');
 
       var campo = document.getElementById('pse-vist-data');
       if (campo && !campo.value) campo.value = dataHojeInput_();
@@ -4440,12 +4448,13 @@
       // Depois que a escala já foi carregada uma vez, navegar entre as abas
       // não dispara nova consulta. Ela só muda ao clicar em Consultar dia
       // ou Ver escala completa.
-      if (!escalaPSEVistoriasJaCarregada) {
+      if (origem==='atendimento'||!escalaPSEVistoriasJaCarregada) {
         carregarEscalaPSEVistorias(false);
       }
     }
 
     function carregarEscalaPSEVistorias(completa) {
+      var seq=++escalaPSEConsultaSeq,token=sessaoToken;
       var campo = document.getElementById('pse-vist-data');
       var data = completa ? '' : (campo ? campo.value : '');
 
@@ -4459,6 +4468,7 @@
 
       google.script.run
         .withSuccessHandler(function(r) {
+          if(seq!==escalaPSEConsultaSeq||token!==sessaoToken)return;
           r = r || {};
           var itens = r.itens || [];
           escalaPSEVistoriasJaCarregada = true;
@@ -4481,12 +4491,13 @@
           renderizarEscalaPSEVistorias(itens);
         })
         .withFailureHandler(function(err) {
+          if(seq!==escalaPSEConsultaSeq||token!==sessaoToken)return;
           total.textContent = '0 militar(es)';
           status.className = 'alert alert-danger mb-3';
           status.textContent = (err && err.message) ? err.message : 'Erro ao carregar a Escala PSE.';
           tbody.innerHTML = '<tr><td colspan="11" class="text-center text-danger py-5">Não foi possível carregar a escala.</td></tr>';
         })
-        .obterEscalaPSEVistorias(data, sessaoToken);
+        .obterEscalaPSEVistorias(data, token);
     }
 
     function renderizarEscalaPSEVistorias(itens) {
@@ -9881,6 +9892,7 @@
 
 
     function limparSessaoLocal() {
+      escalaPSEConsultaSeq++;escalaPSEVistoriasJaCarregada=false;escalaPSEConsultaOrigem='vistorias';document.getElementById('pse-vist-tbody').textContent='';document.getElementById('pse-vist-total').textContent='0 militar(es)';
       atendimentoPendencias.seq++;atendimentoPendencias.itens=[];atendimentoPendencias.visiveis=[];atendimentoPendencias.carregando=false;atendimentoPendencias.pagina=0;document.getElementById('atd-pend-tbody').textContent='';document.getElementById('atd-pend-modal-corpo').textContent='';document.getElementById('atd-pend-modal-titulo').textContent='Informações da pendência';document.getElementById('atd-pend-busca').value='';document.getElementById('atd-pend-origem').value='';document.getElementById('atd-pend-status').textContent='';document.getElementById('atd-pend-total').textContent='';document.getElementById('atd-pend-atualizar').disabled=false;
       conferenciaConsultaCache=[];conferenciaReaberturaAtual=null;conferenciaConsultaSequencia++;
       indOperacional.seq++;indOperacional.cache={};indOperacional.dados=null;indOperacional.emCurso=null;indOperacional.token=null;

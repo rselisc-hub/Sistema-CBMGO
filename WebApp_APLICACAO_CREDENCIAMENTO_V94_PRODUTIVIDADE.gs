@@ -12216,7 +12216,7 @@ function obterDadosEscala_(dataInicio, dataFim) {
 // CONSULTA DA ESCALA PSE NO MÓDULO VISTORIAS
 // ----------------------------------------------------------
 function obterEscalaPSEVistorias(dataFiltro, token) {
-  exigirPerfil_(token, ["GESTOR","CONFERENCIA"]);
+  var sessao=exigirPerfil_(token, ["GESTOR","CONFERENCIA","ATENDIMENTO"]);
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var aba = ss.getSheetByName("Escala PSE");
@@ -12225,7 +12225,7 @@ function obterEscalaPSEVistorias(dataFiltro, token) {
   // Não reconstruímos a planilha em toda consulta do WebApp,
   // pois isso deixava a navegação lenta. Só cria/sincroniza
   // se a aba ainda não existir.
-  if (!aba) {
+  if (!aba && String(sessao.perfil||'').toUpperCase()!=='ATENDIMENTO') {
     sincronizarEscalaPSE();
     aba = ss.getSheetByName("Escala PSE");
   }
