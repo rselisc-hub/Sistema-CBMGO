@@ -1624,6 +1624,10 @@ function excluirDocDespachoGestao(id,motivo,token){
 }
 function cadastrarProtocoloManualConferencia(dados,token){
   exigirAtribuicaoConferencia_(token);
+  if(dados&&dados.usarHorarioCadastro===true){
+    dados=Object.assign({},dados,{movimentacao:dataHoraSaoPauloTexto_()});
+    return salvarCapturasConferencia(validarCapturasConferencia_([dados]),token,true);
+  }
   return salvarCapturasConferencia(validarCapturasConferencia_([dados]),token);
 }
 
@@ -3147,7 +3151,7 @@ function validarCapturasConferencia_(registros) {
   });
 }
 
-function salvarCapturasConferencia(registros, token) {
+function salvarCapturasConferencia(registros, token, cadastroManual) {
   var sessao = exigirAtribuicaoConferencia_(token);
   registros = Array.isArray(registros) ? registros : [];
   if (!registros.length) throw new Error("Nenhum protocolo foi informado.");
@@ -3163,12 +3167,16 @@ function salvarCapturasConferencia(registros, token) {
     var hist = garantirEstruturaHistoricoConferencia_();
 
     var agora = dataHoraSaoPauloTexto_();
+    if(cadastroManual===true)registros.forEach(function(x){x.movimentacao=agora;});
     var hoje = dataHojeConferencia_();
     var totalColunas = 27;
 
     // Uma leitura da base para montar o índice por protocolo.
     var existentes = [];
-    if (aba.getLastRow() >= 2) {
+    if(cadastroManual===true&&registros.length===1){
+      var localizado=localizarConferenciaPorProtocoloRapido_(registros[0].protocolo);
+      if(localizado.achado)return {sucesso:true,novos:0,atualizados:0,semAlteracao:1,duplicados:0,totalProcessados:1,registro:objetoConferenciaDaLinha_(localizado.achado.r),mensagem:'Protocolo já cadastrado. Dados e atribuição existentes foram preservados.'};
+    } else if (aba.getLastRow() >= 2) {
       existentes = aba.getRange(
         2,1,aba.getLastRow()-1,totalColunas
       ).getDisplayValues();
@@ -3265,7 +3273,7 @@ function salvarCapturasConferencia(registros, token) {
           "",
           "",
           mesmaData === "SIM"
-            ? "Primeira captura do SIAPI. Movimentação na mesma data da importação."
+            ? (cadastroManual ? "Cadastro manual. Horário de Brasília registrado no servidor." : "Primeira captura do SIAPI. Movimentação na mesma data da importação.")
             : "Primeira captura do SIAPI.",
           snapshotConferencia_(novoObj)
         ]);
@@ -3415,7 +3423,7 @@ function salvarCapturasConferencia(registros, token) {
     // Um recibo por lote, incluindo capturas idênticas, nas mesmas colunas do histórico.
     var resumoImportacao = {recebidos:registros.length,novos:novos,atualizados:atualizados,
       semAlteracao:semAlteracao,duplicados:duplicados};
-    historicos.push([agora,'',0,'IMPORTAÇÃO SIAPI',sessao.rg,
+    historicos.push([agora,'',0,cadastroManual?'CADASTRO MANUAL':'IMPORTAÇÃO SIAPI',sessao.rg,
       sessao.nomeGuerra || sessao.nome || ('RG ' + sessao.rg),'','','','',
       'Resumo da importação: ' + novos + ' novo(s), ' + atualizados +
       ' alterado(s), ' + semAlteracao + ' sem alteração, ' + duplicados + ' duplicado(s).',
@@ -3433,7 +3441,7 @@ function salvarCapturasConferencia(registros, token) {
 
     SpreadsheetApp.flush();
 
-    return {
+    var respostaCaptura={
       sucesso:true,
       novos:novos,
       atualizados:atualizados,
@@ -3441,6 +3449,8 @@ function salvarCapturasConferencia(registros, token) {
       duplicados:duplicados,
       totalProcessados:novos + atualizados + semAlteracao
     };
+    if(cadastroManual&&novasLinhas.length)respostaCaptura.registro=objetoConferenciaDaLinha_(novasLinhas[0]);
+    return respostaCaptura;
   } finally {
     try { lock.releaseLock(); } catch (e) {}
   }
