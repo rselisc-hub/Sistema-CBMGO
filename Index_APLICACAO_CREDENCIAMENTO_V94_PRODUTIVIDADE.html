@@ -629,7 +629,7 @@
         <span class="badge text-bg-success" id="atendimento-atendente"></span>
       </div>
     </div>
-    <div class="d-flex flex-wrap gap-2 mb-4">
+    <div class="d-flex flex-wrap gap-2 mb-4 atendimento-menu">
       <button class="btn btn-success" onclick="abrirModuloAtendimento()">
         <i class="bi bi-headset me-1"></i>Atendimentos
       </button>
@@ -695,11 +695,11 @@
 
   <!-- ====================================================== -->
   <!-- ATENDIMENTO - SOLICITAÇÕES DE VISTORIA -->
-  <div id="atendimento-pendencias-screen" class="container-fluid px-3 px-lg-4 my-4" style="display:none;">
+  <div id="atendimento-pendencias-screen" class="container my-4" style="display:none;">
     <div class="card card-custom p-4 mb-3"><div class="d-flex justify-content-between align-items-center gap-2 flex-wrap"><div><h4 class="fw-bold mb-1">Pendências de Vistorias</h4><div class="text-muted">Consulta das pendências e solicitações que aguardam distribuição. Clique no protocolo para ver as informações.</div></div><button class="btn btn-outline-secondary" onclick="abrirModuloAtendimento()">Voltar ao Atendimento</button></div></div>
-    <div class="card card-custom p-4"><div class="row g-2 mb-3"><div class="col-md-6"><label for="atd-pend-busca" class="form-label">Pesquisar protocolo, razão social ou região</label><input id="atd-pend-busca" type="search" class="form-control" oninput="atendimentoPendencias.pagina=0;renderizarPendenciasAtendimento()"></div><div class="col-md-4"><label for="atd-pend-origem" class="form-label">Origem</label><select id="atd-pend-origem" class="form-select" onchange="atendimentoPendencias.pagina=0;renderizarPendenciasAtendimento()"><option value="">Todas</option><option value="naoRealizadas">Pendências de Vistorias</option><option value="atendimento">Solicitações do Atendimento</option></select></div><div class="col-md-2 d-flex align-items-end"><button id="atd-pend-atualizar" class="btn btn-outline-primary w-100" onclick="carregarPendenciasAtendimento()">Atualizar</button></div></div><div id="atd-pend-status" class="small mb-3" role="status"></div><div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Protocolo</th><th>Razão social</th><th>Região</th><th>Origem</th><th>Motivo</th></tr></thead><tbody id="atd-pend-tbody"></tbody></table></div><div class="d-flex gap-2 align-items-center flex-wrap"><button id="atd-pend-anterior" class="btn btn-sm btn-outline-secondary" onclick="atendimentoPendencias.pagina--;renderizarPendenciasAtendimento()">Anterior</button><span id="atd-pend-total" class="small"></span><button id="atd-pend-proxima" class="btn btn-sm btn-outline-secondary" onclick="atendimentoPendencias.pagina++;renderizarPendenciasAtendimento()">Próxima</button></div></div>
+    <div class="card card-custom p-4"><div class="row g-2 mb-3"><div class="col-md-6"><label for="atd-pend-busca" class="form-label">Pesquisar protocolo, razão social ou região</label><input id="atd-pend-busca" type="search" class="form-control" oninput="renderizarPendenciasAtendimento()"></div><div class="col-md-4"><label for="atd-pend-origem" class="form-label">Origem</label><select id="atd-pend-origem" class="form-select" onchange="renderizarPendenciasAtendimento()"><option value="">Todas</option><option value="naoRealizadas">Pendências de Vistorias</option><option value="atendimento">Solicitações do Atendimento</option></select></div><div class="col-md-2 d-flex align-items-end"><button id="atd-pend-atualizar" class="btn btn-outline-primary w-100" onclick="carregarPendenciasAtendimento()">Atualizar</button></div></div><div id="atd-pend-status" class="small mb-3" role="status"></div><h5 class="fw-bold mb-1">Pendências disponíveis para novos roteiros</h5><div class="text-muted small mb-3">Vermelho = vistoria não realizada. Azul = solicitação registrada pelo Atendimento.</div><div class="d-flex flex-wrap gap-3 small mb-3"><span><span class="pend-legenda-cor pend-legenda-vermelha"></span> Não realizada / cadastro manual</span><span><span class="pend-legenda-cor pend-legenda-azul"></span> Solicitação do Atendimento</span><span class="text-muted">Clique no protocolo para abrir os detalhes.</span></div><div class="pendencias-grade-wrap border rounded"><table class="table table-bordered table-sm mb-0 pendencias-grade"><thead id="atd-pend-cabecalho"></thead><tbody id="atd-pend-tbody"></tbody></table></div><div id="atd-pend-sem-regiao-box" class="mt-4" style="display:none;"><h6 class="fw-bold text-secondary mb-2">Sem região identificada</h6><div id="atd-pend-sem-regiao" class="d-flex flex-wrap gap-2"></div></div><span id="atd-pend-total" class="small"></span></div>
   </div>
-  <div class="modal fade" id="modal-atd-pendencia" tabindex="-1" aria-labelledby="atd-pend-modal-titulo" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 id="atd-pend-modal-titulo" class="modal-title">Informações da pendência</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div><div id="atd-pend-modal-corpo" class="modal-body"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button></div></div></div></div>
+  <div class="modal fade" id="modal-atd-pendencia" tabindex="-1" aria-labelledby="atd-pend-modal-titulo" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 id="atd-pend-modal-titulo" class="modal-title">Informações da pendência</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div><div id="atd-pend-modal-corpo" class="modal-body"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button></div></div></div></div>
 
 
   <!-- ====================================================== -->
@@ -714,7 +714,7 @@
       </div>
     </div>
 
-    <div class="d-flex flex-wrap gap-2 mb-4">
+    <div class="d-flex flex-wrap gap-2 mb-4 atendimento-menu">
       <button class="btn btn-outline-success" onclick="abrirModuloAtendimento()">
         <i class="bi bi-headset me-1"></i>Atendimentos
       </button>
@@ -795,7 +795,7 @@
       </div>
     </div>
 
-    <div class="d-flex flex-wrap gap-2 mb-4">
+    <div class="d-flex flex-wrap gap-2 mb-4 atendimento-menu">
       <button class="btn btn-outline-success" onclick="abrirModuloAtendimento()">
         <i class="bi bi-headset me-1"></i>Atendimentos
       </button>
@@ -3685,6 +3685,7 @@
       var av=document.getElementById('docs-aviso-visualizacao'); if(av)av.textContent=gestor?'':'A lista abaixo é geral. Você pode consultar os protocolos em aberto e os concluídos; a atualização da tramitação é exclusiva da Gestão.';
       var s=document.getElementById('docs-tipo');if(s)s.innerHTML='<option value="">Selecione...</option>'+TIPOS_DOCS.map(function(x){return '<option>'+x+'</option>';}).join('');
       var filtro=document.getElementById('docs-filtro-status');if(filtro)filtro.value='ABERTOS';var pesquisa=document.getElementById('docs-pesquisa-protocolo');if(pesquisa)pesquisa.value='';
+      var menuAtd=document.querySelector('#docs-despacho-screen .atendimento-menu');if(docsOrigemTela==='atendimento')montarMenuAtendimento_('docs-despacho-screen','docs');else if(menuAtd)menuAtd.classList.add('d-none');
       registrarTelaAtual('docs-'+docsOrigemTela);carregarVistoriadoresDocs();carregarDocsDespacho();
     }
     function voltarDocsDespacho(){if(docsOrigemTela==='atendimento'){abrirModuloAtendimento();return;}if(docsOrigemTela==='conferencia'){abrirModuloConferencia();return;}if(docsOrigemTela==='gestor'){abrirModuloGestor();return;}voltarInicio();}
@@ -4025,11 +4026,17 @@
     }
 
 
-    var atendimentoPendencias={itens:[],visiveis:[],pagina:0,seq:0,carregando:false};
+    function montarMenuAtendimento_(screen,ativo){
+      var tela=document.getElementById(screen),nav=tela.querySelector('.atendimento-menu');
+      if(!nav){nav=document.createElement('div');nav.className='d-flex flex-wrap gap-2 mb-4 atendimento-menu';tela.insertBefore(nav,tela.children[1]||null);}
+      var itens=[['atendimento','Atendimentos','abrirModuloAtendimento()','success','headset'],['solicitacoes','Solicitações de Vistoria','abrirSolicitacoesVistoriaAtendimento()','primary','clipboard-plus'],['roteiro','Roteiro dos Vistoriadores','abrirRoteiroVistoriadoresAtendimento()','info','people'],['pse','Escala PSE — Consulta','abrirEscalaPSEAtendimento()','success','calendar2-check'],['pendencias','Pendências de Vistorias','abrirPendenciasVistoriasAtendimento()','danger','exclamation-triangle'],['docs','DOCs para Despacho',"abrirDocsDespacho('atendimento')",'dark','file-earmark-text']];
+      nav.innerHTML=itens.map(function(x){return '<button type="button" class="btn btn-'+(x[0]===ativo?'':'outline-')+x[3]+'" onclick="'+x[2]+'"'+(x[0]===ativo?' aria-current="page"':'')+'><i class="bi bi-'+x[4]+' me-1"></i>'+x[1]+'</button>';}).join('');nav.classList.remove('d-none');return nav;
+    }
+    var atendimentoPendencias={itens:[],visiveis:[],seq:0,carregando:false};
     function podeConsultarPendenciasAtendimento_(){return !!(usuarioLogado&&usuarioLogado.permissoes&&usuarioLogado.permissoes.atendimento);}
     function abrirPendenciasVistoriasAtendimento(){
       if(!podeConsultarPendenciasAtendimento_())return;
-      esconderTelasPrincipais();document.getElementById('atendimento-pendencias-screen').style.display='block';registrarTelaAtual('atendimento-pendencias');carregarPendenciasAtendimento();
+      esconderTelasPrincipais();document.getElementById('atendimento-pendencias-screen').style.display='block';montarMenuAtendimento_('atendimento-pendencias-screen','pendencias');registrarTelaAtual('atendimento-pendencias');carregarPendenciasAtendimento();
     }
     function carregarPendenciasAtendimento(){
       if(!podeConsultarPendenciasAtendimento_()||atendimentoPendencias.carregando)return;
@@ -4040,15 +4047,19 @@
         if(!atual())return;if(!r||!r.sucesso){falhou('Resposta não confirmada.');return;}
         e.carregando=false;b.disabled=false;e.itens=[];
         ['naoRealizadas','atendimento'].forEach(function(tipo){(r[tipo]||[]).forEach(function(x){e.itens.push({tipo:tipo,dados:x});});});
-        e.pagina=0;renderizarPendenciasAtendimento();st.textContent='Consulta atualizada. '+e.itens.length+' pendência(s).';
+        renderizarPendenciasAtendimento();st.textContent='Consulta atualizada. '+e.itens.length+' pendência(s).';
       }).withFailureHandler(falhou).consultarPendenciasVistoriasAtendimento(token);
     }
     function renderizarPendenciasAtendimento(){
       var e=atendimentoPendencias,busca=normalizarBuscaTextoPadrao_(document.getElementById('atd-pend-busca').value),origem=document.getElementById('atd-pend-origem').value;
       e.visiveis=e.itens.filter(function(item){var x=item.dados;return (!origem||item.tipo===origem)&&(!busca||normalizarBuscaTextoPadrao_([x.protocolo,x.razaoSocial,x.regiao,x.motivo,x.origem].join(' ')).indexOf(busca)!==-1);});
-      var paginas=Math.max(1,Math.ceil(e.visiveis.length/50));e.pagina=Math.max(0,Math.min(e.pagina,paginas-1));
-      document.getElementById('atd-pend-tbody').innerHTML=e.visiveis.slice(e.pagina*50,e.pagina*50+50).map(function(item,i){var x=item.dados;return '<tr><td><button type="button" class="btn btn-link p-0" onclick="abrirDetalhePendenciaAtendimento('+(e.pagina*50+i)+')">'+escaparHtmlRoteiro(x.protocolo||'—')+'</button></td><td>'+escaparHtmlRoteiro(x.razaoSocial||'—')+'</td><td>'+escaparHtmlRoteiro(x.regiao||'—')+'</td><td><span class="badge '+(item.tipo==='atendimento'?'bg-primary':'bg-danger')+'">'+escaparHtmlRoteiro(x.origem||'NÃO REALIZADA')+'</span></td><td>'+escaparHtmlRoteiro(x.motivo||'—')+'</td></tr>';}).join('')||'<tr><td colspan="5">Nenhuma pendência encontrada.</td></tr>';
-      document.getElementById('atd-pend-total').textContent=e.visiveis.length+' de '+e.itens.length+' pendência(s) · Página '+(e.pagina+1)+' de '+paginas;document.getElementById('atd-pend-anterior').disabled=e.pagina===0;document.getElementById('atd-pend-proxima').disabled=e.pagina>=paginas-1;
+      e.grade={naoRealizadas:[],atendimento:[]};e.visiveis.forEach(function(item){e.grade[item.tipo].push(item.dados);});
+      renderizarGradePendencias_(e.grade,{cabecalho:document.getElementById('atd-pend-cabecalho'),corpo:document.getElementById('atd-pend-tbody'),semBox:document.getElementById('atd-pend-sem-regiao-box'),semConteudo:document.getElementById('atd-pend-sem-regiao')},'abrirDetalhePendenciaAtendimentoPorTipo');
+      document.getElementById('atd-pend-total').textContent=e.visiveis.length+' de '+e.itens.length+' pendência(s)';
+    }
+    function abrirDetalhePendenciaAtendimentoPorTipo(tipo,idx){
+      var x=((atendimentoPendencias.grade||{})[tipo]||[])[idx];if(!x)return;
+      var i=atendimentoPendencias.visiveis.findIndex(function(item){return item.tipo===tipo&&item.dados===x;});if(i>=0)abrirDetalhePendenciaAtendimento(i);
     }
     function abrirDetalhePendenciaAtendimento(indice){
       if(!podeConsultarPendenciasAtendimento_())return;
@@ -4062,6 +4073,7 @@
       if (!usuarioLogado || !usuarioLogado.permissoes || !usuarioLogado.permissoes.atendimento) { alert('Você não possui permissão para acessar o módulo Atendimento.'); return; }
       esconderTelasPrincipais();
       document.getElementById('atendimento-screen').style.display = 'block';
+      montarMenuAtendimento_('atendimento-screen','atendimento');
       registrarTelaAtual('atendimento');
       document.getElementById('atendimento-atendente').textContent = usuarioLogado.nome || ('RG ' + usuarioLogado.rg);
       carregarResumoAtendimentoHoje();
@@ -4116,6 +4128,7 @@
 
       esconderTelasPrincipais();
       document.getElementById('atendimento-solicitacoes-screen').style.display = 'block';
+      montarMenuAtendimento_('atendimento-solicitacoes-screen','solicitacoes');
       registrarTelaAtual('atendimento-solicitacoes');
       document.getElementById('sol-atendente').textContent = usuarioLogado.nome || ('RG ' + usuarioLogado.rg);
 
@@ -4158,6 +4171,7 @@
         'atendimento-roteiro-vistoriadores-screen'
       ).style.display = 'block';
 
+      montarMenuAtendimento_('atendimento-roteiro-vistoriadores-screen','roteiro');
       registrarTelaAtual('atendimento-roteiro-vistoriadores');
 
       var campo = document.getElementById('atd-rv-data');
@@ -4439,6 +4453,7 @@
 
       esconderTelasPrincipais();
       document.getElementById('vistorias-escala-pse-screen').style.display = 'block';
+      var menuAtd=document.querySelector('#vistorias-escala-pse-screen .atendimento-menu');if(origem==='atendimento')montarMenuAtendimento_('vistorias-escala-pse-screen','pse');else if(menuAtd)menuAtd.classList.add('d-none');
       escalaPSEConsultaOrigem=origem;document.getElementById('pse-consulta-nav-vistorias').classList.toggle('d-none',origem==='atendimento');
       registrarTelaAtual(origem==='atendimento'?'atendimento-pse':'vistorias-escala-pse');
 
@@ -8102,9 +8117,13 @@
     }
 
 
-    function renderizarPendenciasRoteiro() {
-      var nr = pendenciasRoteiroCache.naoRealizadas || [];
-      var atd = pendenciasRoteiroCache.atendimento || [];
+    function renderizarPendenciasRoteiro(){
+      renderizarGradePendencias_(pendenciasRoteiroCache,{cabecalho:document.getElementById('pendencias-grade-cabecalho'),corpo:document.getElementById('pendencias-grade-corpo'),semBox:document.getElementById('pendencias-sem-regiao-box'),semConteudo:document.getElementById('pendencias-sem-regiao')},'abrirDetalhePendencia');
+    }
+
+    function renderizarGradePendencias_(cache,elementos,callback) {
+      var nr = cache.naoRealizadas || [];
+      var atd = cache.atendimento || [];
 
       var colunas = [
         {chave:'BUENO', rotulo:'BUENO', classe:'pend-cab-magenta'},
@@ -8155,8 +8174,8 @@
       });
 
       var total = nr.length + atd.length;
-      var cab = document.getElementById('pendencias-grade-cabecalho');
-      var corpo = document.getElementById('pendencias-grade-corpo');
+      var cab = elementos.cabecalho;
+      var corpo = elementos.corpo;
 
       var cabHtml =
         '<tr><th colspan="' + colunas.length + '" class="pend-titulo-geral">VISTORIAS PENDENTES</th></tr><tr>';
@@ -8192,7 +8211,7 @@
           var classe = item.tipo === 'atendimento' ? 'pend-atd' : 'pend-nr';
 
           corpoHtml += '<td><button type="button" class="pend-protocolo-planilha ' + classe + '"' +
-            ' onclick="abrirDetalhePendencia(\'' + item.tipo + '\',' + item.idx + ')"' +
+            ' onclick="' + callback + '(\'' + item.tipo + '\',' + item.idx + ')"' +
             ' title="' + escaparHtmlRoteiro(item.origem) + '">' +
             escaparHtmlRoteiro(item.protocolo) +
             '</button></td>';
@@ -8208,15 +8227,15 @@
 
       corpo.innerHTML = corpoHtml;
 
-      var semBox = document.getElementById('pendencias-sem-regiao-box');
-      var semConteudo = document.getElementById('pendencias-sem-regiao');
+      var semBox = elementos.semBox;
+      var semConteudo = elementos.semConteudo;
 
       if (semRegiao.length) {
         semBox.style.display = 'block';
         semConteudo.innerHTML = semRegiao.map(function(item) {
           var classe = item.tipo === 'atendimento' ? 'pendencia-azul' : 'pendencia-vermelha';
           return '<button class="pendencia-protocolo-card ' + classe + '"' +
-            ' onclick="abrirDetalhePendencia(\'' + item.tipo + '\',' + item.idx + ')"' +
+            ' onclick="' + callback + '(\'' + item.tipo + '\',' + item.idx + ')">' +
             escaparHtmlRoteiro(item.protocolo) + '</button>';
         }).join('');
       } else {
@@ -9893,7 +9912,7 @@
 
     function limparSessaoLocal() {
       escalaPSEConsultaSeq++;escalaPSEVistoriasJaCarregada=false;escalaPSEConsultaOrigem='vistorias';document.getElementById('pse-vist-tbody').textContent='';document.getElementById('pse-vist-total').textContent='0 militar(es)';
-      atendimentoPendencias.seq++;atendimentoPendencias.itens=[];atendimentoPendencias.visiveis=[];atendimentoPendencias.carregando=false;atendimentoPendencias.pagina=0;document.getElementById('atd-pend-tbody').textContent='';document.getElementById('atd-pend-modal-corpo').textContent='';document.getElementById('atd-pend-modal-titulo').textContent='Informações da pendência';document.getElementById('atd-pend-busca').value='';document.getElementById('atd-pend-origem').value='';document.getElementById('atd-pend-status').textContent='';document.getElementById('atd-pend-total').textContent='';document.getElementById('atd-pend-atualizar').disabled=false;
+      atendimentoPendencias.seq++;atendimentoPendencias.grade=null;document.getElementById('atd-pend-sem-regiao').textContent='';document.getElementById('atd-pend-sem-regiao-box').style.display='none';atendimentoPendencias.itens=[];atendimentoPendencias.visiveis=[];atendimentoPendencias.carregando=false;document.getElementById('atd-pend-tbody').textContent='';document.getElementById('atd-pend-modal-corpo').textContent='';document.getElementById('atd-pend-modal-titulo').textContent='Informações da pendência';document.getElementById('atd-pend-busca').value='';document.getElementById('atd-pend-origem').value='';document.getElementById('atd-pend-status').textContent='';document.getElementById('atd-pend-total').textContent='';document.getElementById('atd-pend-atualizar').disabled=false;
       conferenciaConsultaCache=[];conferenciaReaberturaAtual=null;conferenciaConsultaSequencia++;
       indOperacional.seq++;indOperacional.cache={};indOperacional.dados=null;indOperacional.emCurso=null;indOperacional.token=null;
       textosPadraoEstado.sequencia++;textosPadraoEstado.token=null;textosPadraoEstado.modelos=null;textosPadraoEstado.ajustes={};textosPadraoEstado.selecionado=null;textosPadraoEstado.enviando=false;
