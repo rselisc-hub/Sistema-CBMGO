@@ -7154,8 +7154,17 @@ function registrarVistoriaNaoRealizada(protocolo, token) {
 
 function obterPendenciasRoteiro(token) {
   exigirPerfil_(token, ["CONFERENCIA"]);
+  return lerPendenciasRoteiro_(garantirEstruturaPendenciasRoteiro_());
+}
 
-  var est = garantirEstruturaPendenciasRoteiro_();
+function consultarPendenciasVistoriasAtendimento(token) {
+  exigirPerfil_(token, ["ATENDIMENTO","CONFERENCIA"]);
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  // Consulta pura: não cria abas, não prepara cabeçalhos e não altera status.
+  return lerPendenciasRoteiro_({pendencias:ss.getSheetByName('PENDENCIAS_VISTORIAS'),solicitacoes:ss.getSheetByName('SOLICITACOES_VISTORIA')});
+}
+
+function lerPendenciasRoteiro_(est) {
   var vermelhas = [];
   var azuis = [];
 
@@ -7200,7 +7209,7 @@ function obterPendenciasRoteiro(token) {
     });
   }
 
-  if (est.pendencias.getLastRow() >= 2) {
+  if (est.pendencias && est.pendencias.getLastRow() >= 2) {
     var pd = est.pendencias.getRange(
       2,
       1,
@@ -7239,7 +7248,7 @@ function obterPendenciasRoteiro(token) {
     });
   }
 
-  if (est.solicitacoes.getLastRow() >= 2) {
+  if (est.solicitacoes && est.solicitacoes.getLastRow() >= 2) {
     var sd = est.solicitacoes.getRange(
       2,
       1,
