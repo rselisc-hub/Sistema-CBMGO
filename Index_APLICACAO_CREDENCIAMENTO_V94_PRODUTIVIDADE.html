@@ -22,6 +22,10 @@
     .simbolo-cbmgo { width:62px; height:46px; object-fit:contain; background:#fff; padding:3px; border-radius:4px; vertical-align:middle; margin-right:10px; }
     @media (max-width:576px) { .simbolo-cbmgo { width:48px; height:36px; margin-right:8px; } }
 
+    .somente-vistoriador { display:none; }
+    body.perfil-vistoriador .somente-vistoriador { display:block; }
+    body.perfil-vistoriador .vistoria-operacional { display:none!important; }
+
     .card-custom { border: none; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); background-color: #ffffff; }
 
     .badge-user { background-color: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; }
@@ -1814,7 +1818,7 @@
       </div>
     </div>
 
-    <div class="row g-4">
+    <div class="row g-4"><div class="col-md-6 col-xl-4 somente-vistoriador"><button class="card home-card w-100 h-100 text-start p-4 bg-white" onclick="abrirMinhasVistorias()"><h5 class="fw-bold">Minhas Vistorias</h5><p class="text-muted mb-0">Consultar as visitas da sua equipe e informar as não realizadas.</p></button></div>
       <div class="col-md-6 col-xl-4">
         <button class="card home-card w-100 h-100 text-start p-4 bg-white" onclick="abrirRoteiroVistorias()">
           <div class="home-icon text-primary mb-3"><i class="bi bi-signpost-split-fill"></i></div>
@@ -1869,6 +1873,7 @@
   <!-- ====================================================== -->
   <!-- VISTORIAS - CONSULTA ESCALA PSE -->
   <!-- ====================================================== -->
+  <div id="minhas-vistorias-screen" class="container my-4" style="display:none;"><div class="card card-custom p-4 mb-3"><div class="d-flex justify-content-between align-items-center flex-wrap gap-2"><div><h4>Minhas Vistorias</h4><p class="text-muted mb-0">Visitas atribuídas a você como primeiro ou segundo vistoriador. Marque somente as não realizadas. As demais não são confirmadas automaticamente como realizadas.</p></div><button class="btn btn-outline-secondary" onclick="abrirModuloVistorias()">Voltar</button></div></div><div class="card card-custom p-4"><div class="d-flex gap-2 mb-3"><input aria-label="Data das minhas vistorias" id="mv-data" type="date" class="form-control" style="max-width:220px;"><button id="mv-consultar" class="btn btn-primary" onclick="carregarMinhasVistorias()">Consultar</button></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th></th><th>Protocolo</th><th>Razão social / Bairro</th><th>Equipe / Período</th><th>Situação</th></tr></thead><tbody id="mv-tbody"></tbody></table></div><div class="row g-2"><div class="col-md-6"><label class="form-label" for="mv-motivo">Motivo das não realizadas selecionadas</label><select class="form-select" id="mv-motivo"><option value="">Selecione...</option><option>ESTABELECIMENTO FECHADO</option><option>RESPONSÁVEL AUSENTE</option><option>ENDEREÇO NÃO LOCALIZADO</option><option>IMPEDIMENTO OPERACIONAL</option><option>OUTRO</option></select></div><div class="col-md-6"><label class="form-label" for="mv-observacao">Observação (obrigatória em Outro)</label><textarea id="mv-observacao" class="form-control" maxlength="1000" rows="2"></textarea></div></div><button class="btn btn-danger mt-3" id="mv-salvar" onclick="salvarNaoRealizadasMinhasVistorias()">Registrar selecionadas como não realizadas</button><div id="mv-status" class="mt-3" role="status"></div></div></div>
   <div id="vistorias-escala-pse-screen" class="container-fluid px-3 px-lg-4 my-4" style="display:none;">
     <div class="card card-custom p-4 mb-4">
       <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
@@ -3264,7 +3269,7 @@
         pararAtualizacaoAutomaticaConferencia();
       }
 
-      ['startup-loading-screen', 'login-screen', 'home-screen', 'atendimento-screen', 'atendimento-solicitacoes-screen', 'atendimento-pendencias-screen', 'atendimento-roteiro-vistoriadores-screen', 'credenciamento-screen', 'docs-despacho-screen', 'isencoes-screen', 'tacs-screen', 'pessoal-screen', 'pessoal-funcoes-screen', 'pessoal-afastamentos-screen', 'vistorias-screen', 'vistorias-escala-pse-screen', 'vistorias-roteiro-vistoriadores-screen', 'vistorias-dia-screen', 'conferencia-screen', 'roteiro-screen', 'roteiro-pendencias-screen', 'sistema-screen'].forEach(function(id) {
+      ['startup-loading-screen', 'login-screen', 'home-screen', 'atendimento-screen', 'atendimento-solicitacoes-screen', 'atendimento-pendencias-screen', 'atendimento-roteiro-vistoriadores-screen', 'credenciamento-screen', 'docs-despacho-screen', 'isencoes-screen', 'tacs-screen', 'pessoal-screen', 'pessoal-funcoes-screen', 'pessoal-afastamentos-screen', 'vistorias-screen', 'minhas-vistorias-screen', 'vistorias-escala-pse-screen', 'vistorias-roteiro-vistoriadores-screen', 'vistorias-dia-screen', 'conferencia-screen', 'roteiro-screen', 'roteiro-pendencias-screen', 'sistema-screen'].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.style.display = 'none';
       });
@@ -3442,6 +3447,7 @@
 
 
     function aplicarUsuarioLogado() {
+      aplicarRestricoesVistoriador_();
       if (!usuarioLogado) {
         mostrarLogin();
         return;
@@ -3544,6 +3550,10 @@
         abrirRoteiroVistoriadoresAtendimento(true);
         return;
       }
+
+      if(ultimaTela==='minhas-vistorias'&&perfilVistoriadorLeitura_()){abrirMinhasVistorias();return;}
+
+      if(perfilVistoriadorLeitura_()&&['roteiro','roteiro-pendencias','afastamentos-vistorias'].indexOf(ultimaTela)>=0){abrirModuloVistorias(true);return;}
 
       if (ultimaTela === 'vistorias' && usuarioLogado.permissoes && usuarioLogado.permissoes.vistorias) {
         abrirModuloVistorias(true);
@@ -4423,6 +4433,27 @@
 
 
 
+    function perfilVistoriadorLeitura_(){return !!(usuarioLogado&&['VISTORIADOR','CONSULTA'].indexOf(String(usuarioLogado.perfil||'').toUpperCase())>=0);}
+    function aplicarRestricoesVistoriador_(){
+      document.body.classList.toggle('perfil-vistoriador',perfilVistoriadorLeitura_());
+      ['abrirRoteiroVistorias()','abrirPendenciasRoteiro()',"abrirAfastamentos('vistorias')"].forEach(function(fn){document.querySelectorAll('button[onclick]').forEach(function(b){if(b.getAttribute('onclick')!==fn)return;var card=b.closest('#vistorias-screen .col-md-6');(card||b).classList.add('vistoria-operacional');});});
+      document.querySelectorAll('.vistorias-nav').forEach(function(nav){if(!nav.querySelector('[data-minhas-vistorias]')){var b=document.createElement('button');b.className='btn btn-outline-primary somente-vistoriador';b.dataset.minhasVistorias='1';b.textContent='Minhas Vistorias';b.onclick=abrirMinhasVistorias;nav.appendChild(b);}});
+      var bulk=document.getElementById('btn-vd-alterar-vistoriadores-lote');if(bulk)bulk.closest('.card').classList.add('vistoria-operacional');
+      document.querySelectorAll('.vd-table tr').forEach(function(tr){if(tr.children.length>1){tr.firstElementChild.classList.add('vistoria-operacional');tr.lastElementChild.classList.add('vistoria-operacional');}});
+    }
+    var minhasVistorias={itens:[],seq:0,enviando:false,tentativa:null};
+    function abrirMinhasVistorias(){if(!perfilVistoriadorLeitura_())return;esconderTelasPrincipais();document.getElementById('minhas-vistorias-screen').style.display='block';registrarTelaAtual('minhas-vistorias');var d=document.getElementById('mv-data');if(!d.value)d.value=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());carregarMinhasVistorias();}
+    function carregarMinhasVistorias(){if(!perfilVistoriadorLeitura_()||minhasVistorias.enviando)return;var e=minhasVistorias,seq=++e.seq,token=sessaoToken,st=document.getElementById('mv-status');st.textContent='Consultando suas visitas…';google.script.run.withSuccessHandler(function(r){if(seq!==e.seq||token!==sessaoToken)return;if(!r||!r.sucesso){st.textContent='Consulta não confirmada.';return;}e.itens=r.itens||[];e.tentativa=null;document.getElementById('mv-motivo').disabled=false;document.getElementById('mv-observacao').disabled=false;renderizarMinhasVistorias_();st.textContent=e.itens.length+' visita(s) da sua equipe.';}).withFailureHandler(function(err){if(seq===e.seq&&token===sessaoToken)st.textContent='Não foi possível consultar. '+String(err.message||err);}).obterMinhasVistorias(document.getElementById('mv-data').value,token);}
+    function renderizarMinhasVistorias_(){document.getElementById('mv-tbody').innerHTML=minhasVistorias.itens.map(function(x,i){return '<tr><td><input type="checkbox" class="mv-check" data-idx="'+i+'" '+(!x.podeInformar?'disabled':'')+' aria-label="Selecionar '+escaparHtmlRoteiro(x.protocolo)+'"></td><td>'+escaparHtmlRoteiro(x.protocolo)+'</td><td>'+escaparHtmlRoteiro(x.razaoSocial)+'<div class="small text-muted">'+escaparHtmlRoteiro(x.bairro)+'</div></td><td>'+escaparHtmlRoteiro(x.equipe)+'<div class="small">'+escaparHtmlRoteiro(x.periodo)+'</div></td><td>'+escaparHtmlRoteiro(x.registroPendente?'Envio pendente de confirmação':x.naoRealizada?'NÃO REALIZADA — '+x.motivo:x.podeInformar?'Sem registro de não realizada':'Visita futura')+'</td></tr>';}).join('')||'<tr><td colspan="5">Nenhuma visita atribuída à sua equipe nesta data.</td></tr>';}
+    function salvarNaoRealizadasMinhasVistorias(){
+      var e=minhasVistorias;if(!perfilVistoriadorLeitura_()||e.enviando)return;var st=document.getElementById('mv-status');
+      if(!e.tentativa){var itens=Array.from(document.querySelectorAll('.mv-check:checked')).map(function(c){var x=e.itens[Number(c.dataset.idx)];return {linha:x.linha,data:x.data,protocolo:x.protocolo,assinatura:x.assinatura,idVisita:x.idVisita};}),motivo=document.getElementById('mv-motivo').value,obs=document.getElementById('mv-observacao').value.trim();if(!itens.length||itens.length>100||!motivo||(motivo==='OUTRO'&&!obs)){st.textContent='Selecione entre 1 e 100 visitas e informe o motivo. Descreva o ocorrido em Outro.';return;}e.tentativa={itens:itens,motivo:motivo,obs:obs};}
+      e.enviando=true;var token=sessaoToken,controles=Array.from(document.querySelectorAll('#minhas-vistorias-screen input,#minhas-vistorias-screen button,#minhas-vistorias-screen select,#minhas-vistorias-screen textarea')).map(function(el){var x={el:el,disabled:el.disabled};el.disabled=true;return x;});st.textContent='Registrando na planilha…';
+      function liberar(){e.enviando=false;controles.forEach(function(x){x.el.disabled=x.disabled;});}
+      function falhar(err){liberar();document.querySelectorAll('.mv-check,#mv-motivo,#mv-observacao').forEach(function(el){el.disabled=true;});if(token===sessaoToken)st.textContent='Não foi possível confirmar todo o envio. Os dados foram mantidos. Clique novamente para repetir o mesmo envio com segurança, ou consulte a situação. '+String(err&&err.message||err||'');}
+      var t=e.tentativa;google.script.run.withSuccessHandler(function(r){if(!r||!r.sucesso){falhar('Resposta incompleta.');return;}liberar();if(token!==sessaoToken)return;e.seq++;(r.itens||[]).forEach(function(x){var i=e.itens.findIndex(function(a){return a.linha===x.linha&&a.protocolo===x.protocolo;});if(i>=0)e.itens[i]=x;});e.tentativa=null;renderizarMinhasVistorias_();st.textContent=r.mensagem;}).withFailureHandler(falhar).registrarNaoRealizadasVistoriador(t.itens,t.motivo,t.obs,token);
+    }
+
     function abrirModuloVistorias(restaurando) {
       if (!usuarioLogado || !usuarioLogado.permissoes || !usuarioLogado.permissoes.vistorias) {
         alert('Você não possui permissão para acessar o módulo Vistorias.');
@@ -4431,6 +4462,7 @@
 
       esconderTelasPrincipais();
       document.getElementById('vistorias-screen').style.display = 'block';
+      aplicarRestricoesVistoriador_();
       registrarTelaAtual('vistorias');
     }
 
@@ -5279,6 +5311,7 @@
       });
 
       tbody.innerHTML = h;
+      aplicarRestricoesVistoriador_();
 
       var todos = document.getElementById('vd-check-todos');
       var totalItens = (itens || []).length;
@@ -7561,7 +7594,7 @@
     var conferenciaConclusaoEmAndamento = false;
     var conferenciaConclusaoNaoConfirmada = null;
     window.addEventListener('beforeunload',function(event){
-      if(conferenciaManualEnviando || conferenciaReabrindo || escalaGestorEnviando || voluntariosLancando || Object.keys(atendimentoEnvios||{}).length || docsCadastroEnviando || docsTentativaCadastro || conferenciaConclusaoEmAndamento || conferenciaConclusaoNaoConfirmada || Object.keys(preferenciasRascunhoPendentes||{}).length){event.preventDefault();event.returnValue='';}
+      if(minhasVistorias.enviando || minhasVistorias.tentativa || conferenciaManualEnviando || conferenciaReabrindo || escalaGestorEnviando || voluntariosLancando || Object.keys(atendimentoEnvios||{}).length || docsCadastroEnviando || docsTentativaCadastro || conferenciaConclusaoEmAndamento || conferenciaConclusaoNaoConfirmada || Object.keys(preferenciasRascunhoPendentes||{}).length){event.preventDefault();event.returnValue='';}
     });
     function informarGravacaoConferencia(texto,erro) {
       var el=document.getElementById('conf-gravacao-status');
@@ -7882,6 +7915,7 @@
     var timeoutBuscaPendencia = null;
 
     function abrirPendenciasRoteiro(restaurando) {
+      if(perfilVistoriadorLeitura_())return;
       if (!usuarioLogado || !usuarioLogado.permissoes || !usuarioLogado.permissoes.vistorias) {
         alert('Você não possui permissão para acessar as pendências do Roteiro.');
         return;
@@ -8491,6 +8525,7 @@
 
 
     function abrirRoteiroVistorias(restaurando) {
+      if(perfilVistoriadorLeitura_())return;
       if (!usuarioLogado || !usuarioLogado.permissoes || !usuarioLogado.permissoes.vistorias) {
         alert('Você não possui permissão para acessar o Roteiro de Vistorias.');
         return;
@@ -9675,6 +9710,7 @@
     var timerAtualizacaoPlanilhasRoteiro = null;
 
     function sincronizarRoteiroPendenteEmSegundoPlano_() {
+      if(perfilVistoriadorLeitura_())return;
       // Não bloqueia a ação atual nem mostra spinner.
       google.script.run
         .withFailureHandler(function(err) {
@@ -9915,6 +9951,7 @@
 
 
     function limparSessaoLocal() {
+      minhasVistorias.seq++;minhasVistorias.itens=[];minhasVistorias.tentativa=null;document.getElementById('mv-tbody').textContent='';document.body.classList.remove('perfil-vistoriador');
       escalaPSEConsultaSeq++;escalaPSEVistoriasJaCarregada=false;escalaPSEConsultaOrigem='vistorias';document.getElementById('pse-vist-tbody').textContent='';document.getElementById('pse-vist-total').textContent='0 militar(es)';
       atendimentoPendencias.seq++;atendimentoPendencias.grade=null;document.getElementById('atd-pend-sem-regiao').textContent='';document.getElementById('atd-pend-sem-regiao-box').style.display='none';atendimentoPendencias.itens=[];atendimentoPendencias.visiveis=[];atendimentoPendencias.carregando=false;document.getElementById('atd-pend-tbody').textContent='';document.getElementById('atd-pend-modal-corpo').textContent='';document.getElementById('atd-pend-modal-titulo').textContent='Informações da pendência';document.getElementById('atd-pend-busca').value='';document.getElementById('atd-pend-origem').value='';document.getElementById('atd-pend-status').textContent='';document.getElementById('atd-pend-total').textContent='';document.getElementById('atd-pend-atualizar').disabled=false;
       conferenciaConsultaCache=[];conferenciaReaberturaAtual=null;conferenciaConsultaSequencia++;
@@ -9928,6 +9965,7 @@
 
 
     function sairDoSistema() {
+      if(minhasVistorias.enviando){alert('Aguarde a confirmação das não realizadas antes de sair.');return;}
       if(conferenciaManualEnviando){alert('Aguarde a confirmação do cadastro manual antes de sair.');return;}
       if(conferenciaReabrindo){alert('Aguarde a confirmação da reabertura antes de sair.');return;}
       if(escalaGestorEnviando||voluntariosLancando){alert('Aguarde a confirmação da escala antes de sair.');return;}

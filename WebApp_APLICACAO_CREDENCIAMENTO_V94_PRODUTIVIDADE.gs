@@ -6564,7 +6564,7 @@ function marcarSincronizacaoRoteiroPendente_() {
 }
 
 function sincronizarRoteiroPendente(token) {
-  exigirPerfil_(token,['CONFERENCIA','ATENDIMENTO','VISTORIADOR','CONSULTA']);
+  exigirPerfil_(token,['CONFERENCIA','ATENDIMENTO']);
   return sincronizarRoteiroPendenteInterno_();
 }
 var roteiroGeracaoEmExecucao_=false;
@@ -8346,7 +8346,7 @@ function obterRoteiroVistoriadoresWeb(dataFiltro, token) {
 }
 
 function obterVistoriasDoDiaWeb(dataFiltro, razaoSocialFiltro, token) {
-  exigirPerfil_(token, ["CONFERENCIA"]);
+  exigirPerfil_(token, ["CONFERENCIA","VISTORIADOR","CONSULTA"]);
 
   var razaoBusca = normalizarChaveTextoRoteiro_(razaoSocialFiltro);
   var dataChave = chaveDataRoteiro_(dataFiltro);
@@ -12216,7 +12216,7 @@ function obterDadosEscala_(dataInicio, dataFim) {
 // CONSULTA DA ESCALA PSE NO MÓDULO VISTORIAS
 // ----------------------------------------------------------
 function obterEscalaPSEVistorias(dataFiltro, token) {
-  var sessao=exigirPerfil_(token, ["GESTOR","CONFERENCIA","ATENDIMENTO"]);
+  var sessao=exigirPerfil_(token, ["GESTOR","CONFERENCIA","ATENDIMENTO","VISTORIADOR","CONSULTA"]);
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var aba = ss.getSheetByName("Escala PSE");
@@ -12225,7 +12225,7 @@ function obterEscalaPSEVistorias(dataFiltro, token) {
   // Não reconstruímos a planilha em toda consulta do WebApp,
   // pois isso deixava a navegação lenta. Só cria/sincroniza
   // se a aba ainda não existir.
-  if (!aba && String(sessao.perfil||'').toUpperCase()!=='ATENDIMENTO') {
+  if (!aba && ['ATENDIMENTO','VISTORIADOR','CONSULTA'].indexOf(String(sessao.perfil||'').toUpperCase())<0) {
     sincronizarEscalaPSE();
     aba = ss.getSheetByName("Escala PSE");
   }
@@ -13655,5 +13655,69 @@ function reabrirProtocoloConferencia(protocolo,motivo,referencia,token){
     loc.aba.getRange(loc.achado.linha,10,1,16).setValues([linha.slice(9,25)]);SpreadsheetApp.flush();
     evento[3]='REABERTO PARA CONFERÊNCIA';evento[7]=novo.estadoInterno;evento[11]=snapshotConferencia_(novo);hist.getRange(linhaHist,1,1,12).setValues([evento]);SpreadsheetApp.flush();
     return {sucesso:true,item:novo,mensagem:'Protocolo '+protocolo+' disponível novamente na fila de Conferência. Histórico e último status SIAPI preservados.'};
+  }finally{lock.releaseLock();}
+}
+
+// Visitas do próprio militar: consulta estreita por data e registro explícito de não realizada.
+function rgVisitaPessoal_(v){var rg=String(v||'').trim().replace(/\.0$/,'').replace(/\D/g,'');return /^0+$/.test(rg)?'':rg;}
+function assinaturaVisitaPessoal_(r){return hashCadastroDoc_(JSON.stringify([chaveDataRoteiro_(r[0]),normalizarProtocoloRoteiro_(r[1]),rgVisitaPessoal_(r[2]),String(r[3]||'').trim(),rgVisitaPessoal_(r[4]),String(r[5]||'').trim()]));}
+function equipeVisitaPessoal_(r,a,b){return [rgVisitaPessoal_(r[a]),rgVisitaPessoal_(r[b])].filter(Boolean).sort().join('|');}
+function lerPendenciasVisitaPessoal_(ss){var a=ss.getSheetByName('PENDENCIAS_VISTORIAS');return !a||a.getLastRow()<2?[]:a.getRange(2,1,a.getLastRow()-1,15).getDisplayValues();}
+function pendenciaDaVisitaPessoal_(r,pendencias){
+  var id=String(r[26]||''),origem=String(r[21]||''),data=chaveDataRoteiro_(r[0]),p=normalizarProtocoloRoteiro_(r[1]),equipe=equipeVisitaPessoal_(r,2,4);
+  for(var i=pendencias.length-1;i>=0;i--){var x=pendencias[i];if(id&&String(x[0])==='NR-VIS-'+id)return x;
+    if(String(x[0])===origem)continue;
+    if(String(x[3]||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase()==='NAO REALIZADA'&&chaveDataRoteiro_(x[5])===data&&normalizarProtocoloRoteiro_(x[2])===p&&equipeVisitaPessoal_(x,6,8)===equipe)return x;
+  }return null;
+}
+function objetoVisitaPessoal_(r,linha,pendencias,hoje){var pend=pendenciaDaVisitaPessoal_(r,pendencias);return {linha:linha,data:chaveDataRoteiro_(r[0]),protocolo:r[1],assinatura:assinaturaVisitaPessoal_(r),idVisita:r[26]||'',razaoSocial:r[15]||'',bairro:r[14]||'',regiao:r[6]||'',equipe:[r[3],r[5]].filter(Boolean).join(' / '),periodo:r[7]||'',observacao:r[11]||'',naoRealizada:!!pend,motivo:pend?pend[11]||'':'',podeInformar:!pend&&chaveDataRoteiro_(r[0])<=hoje};}
+function obterMinhasVistorias(data,token){
+  var sessao=exigirPerfil_(token,['VISTORIADOR','CONSULTA']),rg=rgVisitaPessoal_(sessao.rg),d=chaveDataRoteiro_(data);if(!rg||!d)throw Error('Informe uma data válida e confira seu RG no cadastro.');
+  var ss=SpreadsheetApp.getActiveSpreadsheet(),a=ss.getSheetByName('ROTEIRO_VISTORIAS'),itens=[],hoje=Utilities.formatDate(new Date(),'America/Sao_Paulo','yyyy-MM-dd');if(!a||a.getLastRow()<2)return {sucesso:true,itens:[],hoje:hoje};
+  var datas=a.getRange(2,1,a.getLastRow()-1,1).getDisplayValues(),linhas=[];datas.forEach(function(r,i){if(chaveDataRoteiro_(r[0])===d)linhas.push(i+2);});
+  var mapa=lerLinhasProtocolosRoteiro_(a,{data:linhas},27),pendencias=null;
+  linhas.forEach(function(l){var r=mapa[l];if(!r||!normalizarProtocoloRoteiro_(r[1])||String(r[10]||'').trim().toUpperCase()==='CANCELADO'||[rgVisitaPessoal_(r[2]),rgVisitaPessoal_(r[4])].indexOf(rg)<0)return;if(!pendencias)pendencias=lerPendenciasVisitaPessoal_(ss);itens.push(objetoVisitaPessoal_(r,l,pendencias,hoje));});
+  if(itens.some(function(x){return x.idVisita&&x.naoRealizada;})){
+    var hist=ss.getSheetByName('HISTORICO_VISTORIAS'),confirmados={};if(hist&&hist.getLastRow()>1)hist.getRange(2,18,hist.getLastRow()-1,1).getDisplayValues().forEach(function(x){confirmados[x[0]]=true;});
+    itens.forEach(function(x){if(x.idVisita&&x.naoRealizada&&!confirmados['NR-VIS-'+x.idVisita]){x.registroPendente=true;x.podeInformar=x.data<=hoje;}});
+  }
+  return {sucesso:true,itens:itens,hoje:hoje};
+}
+function registrarNaoRealizadasVistoriador(itens,motivo,observacao,token){
+  exigirPerfil_(token,['VISTORIADOR','CONSULTA']);itens=Array.isArray(itens)?itens:[];motivo=String(motivo||'').trim();observacao=String(observacao||'').trim();
+  if(!itens.length||itens.length>100)throw Error('Selecione entre 1 e 100 visitas.');
+  if(['ESTABELECIMENTO FECHADO','RESPONSÁVEL AUSENTE','ENDEREÇO NÃO LOCALIZADO','IMPEDIMENTO OPERACIONAL','OUTRO'].indexOf(motivo)<0||observacao.length>1000||(motivo==='OUTRO'&&!observacao))throw Error('Informe um motivo válido; em Outro, descreva o ocorrido.');
+  var lock=LockService.getScriptLock();lock.waitLock(15000);
+  try{
+    var sessao=exigirPerfil_(token,['VISTORIADOR','CONSULTA']),rg=rgVisitaPessoal_(sessao.rg);if(!rg)throw Error('RG inválido na sessão.');
+    var ss=SpreadsheetApp.getActiveSpreadsheet(),a=ss.getSheetByName('ROTEIRO_VISTORIAS'),hoje=Utilities.formatDate(new Date(),'America/Sao_Paulo','yyyy-MM-dd'),alvos=[],vistos={};if(!a)throw Error('Roteiro não encontrado.');
+    // Valida o lote inteiro, inclusive vínculo de equipe, antes de qualquer escrita.
+    var linhasAlvo=itens.map(function(ref){var l=Number(ref&&ref.linha);if(!Number.isSafeInteger(l)||l<2||l>a.getLastRow())throw Error('Visita inválida. Atualize a consulta.');return l;}),dadosAlvo=lerLinhasProtocolosRoteiro_(a,{alvos:linhasAlvo},27);
+    itens.forEach(function(ref){var l=Number(ref&&ref.linha);if(!Number.isSafeInteger(l)||l<2||l>a.getLastRow()||vistos[l])throw Error('Visita inválida ou repetida. Atualize a consulta.');vistos[l]=true;var r=dadosAlvo[l];
+      if(!normalizarProtocoloRoteiro_(r[1])||!ref.assinatura||assinaturaVisitaPessoal_(r)!==ref.assinatura||chaveDataRoteiro_(r[0])!==ref.data||normalizarProtocoloRoteiro_(r[1])!==normalizarProtocoloRoteiro_(ref.protocolo)||String(r[10]||'').trim().toUpperCase()==='CANCELADO'||(ref.idVisita&&String(ref.idVisita)!==String(r[26]||'')))throw Error('Visita alterada ou cancelada. Atualize a consulta.');
+      if([rgVisitaPessoal_(r[2]),rgVisitaPessoal_(r[4])].indexOf(rg)<0)throw Error('Você só pode informar visitas atribuídas à sua equipe.');if(chaveDataRoteiro_(r[0])>hoje)throw Error('Não é possível registrar uma visita futura como não realizada.');alvos.push({r:r,linha:l});});
+    var cab=String(a.getRange(1,27).getDisplayValue()||'').trim();if(cab&&cab!=='ID_VISITA_CHECKLIST')throw Error('A coluna de identificação da visita já está em uso. Solicite verificação ao Gestor.');
+    if(!cab&&a.getLastRow()>1&&a.getRange(2,27,a.getLastRow()-1,1).getDisplayValues().some(function(x){return String(x[0]||'').trim();}))throw Error('A coluna de identificação da visita contém dados sem cabeçalho. Solicite verificação ao Gestor.');
+    var est=garantirEstruturaPendenciasRoteiro_(),pend=est.pendencias,hist=ss.getSheetByName('HISTORICO_VISTORIAS');if(!hist)throw Error('Histórico de vistorias não encontrado. Solicite verificação ao Gestor.');
+    var cabHist=String(hist.getRange(1,18).getDisplayValue()||'').trim();if(cabHist&&cabHist!=='ID_EVENTO_CHECKLIST')throw Error('A coluna de auditoria já está em uso. Solicite verificação ao Gestor.');
+    if(!cabHist&&hist.getLastRow()>1&&hist.getRange(2,18,hist.getLastRow()-1,1).getDisplayValues().some(function(x){return String(x[0]||'').trim();}))throw Error('A coluna de auditoria contém dados sem cabeçalho. Solicite verificação ao Gestor.');
+    if(!cab)a.getRange(1,27).setValue('ID_VISITA_CHECKLIST');if(!cabHist)hist.getRange(1,18).setValue('ID_EVENTO_CHECKLIST');
+    var pd=lerPendenciasVisitaPessoal_(ss),idsHist={};if(hist.getLastRow()>1)hist.getRange(2,18,hist.getLastRow()-1,1).getDisplayValues().forEach(function(x){if(x[0])idsHist[x[0]]=true;});var saida=[];
+    var idsNovos=[],novasPendencias=[],novosEventos=[];
+    alvos.forEach(function(alvo){var r=alvo.r,existente=pendenciaDaVisitaPessoal_(r,pd),id=String(r[26]||''),agora=dataHoraSaoPauloTexto_();
+      if(existente&&String(existente[0]).indexOf('NR-VIS-')!==0){saida.push(objetoVisitaPessoal_(r,alvo.linha,pd,hoje));return;}
+      if(!id){id=Utilities.getUuid();r[26]=id;idsNovos.push({linha:alvo.linha,id:id});}
+      var pendId='NR-VIS-'+id;
+      if(!existente){var linha=[pendId,agora,r[1],'NÃO REALIZADA','PENDENTE',r[0],r[2],r[3],r[4],r[5],r[6],motivo,[String(r[11]||'').trim(),observacao?'Relato do vistoriador: '+observacao:''].filter(Boolean).join('\n'),sessao.rg,sessao.nome,r[9],r[14],r[18],r[15],r[16],r[23],r[17]];novasPendencias.push(linha);pd.push(linha);existente=linha;}
+      if(!idsHist[pendId]){novosEventos.push([agora,r[0],r[1],r[9],r[12],r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[10],'NÃO REALIZADA',String(existente[11]||'')+(existente[12]?' — '+existente[12]:''),existente[13]||sessao.rg,existente[14]||sessao.nome,pendId]);idsHist[pendId]=true;}
+      saida.push(objetoVisitaPessoal_(r,alvo.linha,pd,hoje));
+    });
+    // IDs primeiro, pendências depois e histórico por último. Cada etapa é retomável.
+    idsNovos.sort(function(a,b){return a.linha-b.linha;});
+    for(var j=0;j<idsNovos.length;){var ini=j;while(j+1<idsNovos.length&&idsNovos[j+1].linha===idsNovos[j].linha+1)j++;var bloco=idsNovos.slice(ini,j+1);a.getRange(bloco[0].linha,27,bloco.length,1).setValues(bloco.map(function(x){return [x.id];}));j++;}
+    if(idsNovos.length)SpreadsheetApp.flush();
+    if(novasPendencias.length){pend.getRange(pend.getLastRow()+1,1,novasPendencias.length,22).setValues(novasPendencias);SpreadsheetApp.flush();}
+    if(novosEventos.length)hist.getRange(hist.getLastRow()+1,1,novosEventos.length,18).setValues(novosEventos);
+    SpreadsheetApp.flush();return {sucesso:true,itens:saida,mensagem:'Não realizadas registradas nas Pendências. As demais visitas não foram alteradas.'};
   }finally{lock.releaseLock();}
 }
