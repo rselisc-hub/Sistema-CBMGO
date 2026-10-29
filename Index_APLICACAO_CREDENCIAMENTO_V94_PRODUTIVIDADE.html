@@ -5,6 +5,7 @@
 <head>
 
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <title>Departamento de Inspeções e Credenciamento - DIC</title>
 
@@ -20,7 +21,6 @@
 
     /* Símbolo institucional: apenas apresentação do cabeçalho. */
     .simbolo-cbmgo { width:62px; height:46px; object-fit:contain; background:#fff; padding:3px; border-radius:4px; vertical-align:middle; margin-right:10px; }
-    @media (max-width:576px) { .simbolo-cbmgo { width:48px; height:36px; margin-right:8px; } }
 
     .somente-vistoriador { display:none; }
     body.perfil-vistoriador .somente-vistoriador { display:block; }
@@ -419,6 +419,51 @@
       border-radius:14px;
       box-shadow:0 4px 14px rgba(0,0,0,.07);
       padding:32px 24px;
+    }
+
+    /* Responsividade: o CSS permanece neste HTML para a publicação no Apps Script. */
+    .navbar-cbmgo > div, .card-custom { min-width:0; }
+    .table-responsive, .pendencias-grade-wrap { max-width:100%; overscroll-behavior-x:contain; }
+
+    /* Celulares: até 767 px. */
+    @media screen and (max-width:767.98px) {
+      .navbar-cbmgo { padding:12px; flex-wrap:wrap; gap:12px; }
+      .navbar-cbmgo > div { width:100%; }
+      .navbar-cbmgo > div:last-child { flex-wrap:wrap; gap:8px; }
+      .navbar-cbmgo h4 { font-size:1.05rem; line-height:1.4; }
+      .simbolo-cbmgo { width:48px; height:36px; margin-right:8px; }
+      .badge-user { max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+      .auth-shell, #startup-loading-screen { padding:20px 12px; }
+      .card-custom.p-4, .card-custom.p-lg-4 { padding:1rem !important; }
+      .vistorias-nav, .atendimento-menu { flex-wrap:wrap; gap:8px !important; }
+      .vistorias-nav .btn, .atendimento-menu .btn { flex:1 1 45%; white-space:normal; }
+      #minhas-vistorias-screen .d-flex, #sub-escala .d-flex { flex-wrap:wrap; gap:8px; }
+      .form-control, .form-select { font-size:1rem; min-width:0; max-width:100%; }
+      .btn { min-height:40px; }
+      .table-container { max-height:min(520px,60vh); }
+      .modal-dialog { margin:8px; }
+      .modal-body { padding:1rem; }
+    }
+
+    /* Tablets: de 768 a 1199 px, incluindo orientação horizontal. */
+    @media screen and (min-width:768px) and (max-width:1199.98px) {
+      .navbar-cbmgo { padding:14px 16px; flex-wrap:wrap; gap:12px; }
+      .navbar-cbmgo > div:last-child { flex-wrap:wrap; }
+      .navbar-cbmgo h4 { font-size:1.2rem; line-height:1.35; }
+      .simbolo-cbmgo { width:56px; height:42px; }
+      .card-custom.p-4, .card-custom.p-lg-4 { padding:1.25rem !important; }
+      .vistorias-nav, .atendimento-menu { flex-wrap:wrap; }
+      #sub-escala .d-flex { flex-wrap:wrap; gap:8px; }
+      .badge-user { max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+      .table-container { max-height:min(520px,65vh); }
+    }
+
+    /* Computadores: a partir de 1200 px. */
+    @media screen and (min-width:1200px) {
+      .navbar-cbmgo { padding:15px 20px; }
+      .simbolo-cbmgo { width:62px; height:46px; }
+      .card-custom.p-4, .card-custom.p-lg-4 { padding:1.5rem !important; }
+      .table-container { max-height:520px; }
     }
 
 </style>
