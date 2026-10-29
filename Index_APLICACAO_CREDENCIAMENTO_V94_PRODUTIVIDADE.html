@@ -2971,7 +2971,7 @@
 
                   <div class="col-md-4"><button class="btn btn-outline-dark btn-sm w-100" onclick="visualizarEscalaSEI()"><i class="bi bi-eye-fill me-1"></i> Visualizar Escala SEI</button></div>
 
-                  <div class="col-md-4"><button class="btn btn-outline-danger btn-sm w-100" onclick="gerarPdfEscalaSEI()"><i class="bi bi-file-earmark-pdf-fill me-1"></i> Gerar PDF</button></div>
+                  <div class="col-md-4"><button class="btn btn-outline-danger btn-sm w-100" id="btn-pdf-escala" onclick="gerarPdfEscalaSEI()"><i class="bi bi-file-earmark-pdf-fill me-1"></i> Gerar PDF</button><div id="pdf-escala-status" class="small mt-1" role="status" aria-live="polite"></div></div>
 
                   <div class="col-md-4"><button class="btn btn-success btn-sm w-100" onclick="executarLancamentoSEI()"><i class="bi bi-rocket-takeoff-fill me-1"></i> Lançar Escala SEI</button></div>
 
@@ -3077,7 +3077,7 @@
                       onchange="carregarRelatorioFinanceiroAC4()">
                   </div>
                   <div class="col-md-3">
-                    <button class="btn btn-success btn-sm w-100" onclick="carregarRelatorioFinanceiroAC4()"><i class="bi bi-search me-1"></i> Consultar mês</button>
+                    <button class="btn btn-success btn-sm w-100" id="btn-consultar-ac4" onclick="carregarRelatorioFinanceiroAC4()"><i class="bi bi-search me-1"></i> Consultar mês</button>
                   </div>
                   <div class="col-md-5">
                     <small class="text-muted">O relatório, o valor executado e o saldo abaixo serão calculados para o mês selecionado.</small>
@@ -3091,7 +3091,7 @@
 
                   <h6 class="fw-bold text-dark m-0"><i class="bi bi-cash-coin text-success me-1"></i> Controle da Cota Inicial e Suplementações do Mês</h6>
 
-                  <button class="btn btn-outline-primary btn-sm" id="btn-editar-fin" onclick="habilitarEdicaoFinanceira()"><i class="bi bi-pencil-square me-1"></i> Editar Cota e Suplementações</button>
+                  <button class="btn btn-outline-primary btn-sm" id="btn-editar-fin" disabled onclick="habilitarEdicaoFinanceira()"><i class="bi bi-pencil-square me-1"></i> Editar Cota e Suplementações</button>
 
                 </div>
 
@@ -3113,9 +3113,9 @@
 
                   <div class="col-12 mt-2 text-end" id="box-botoes-fin" style="display: none;">
 
-                    <button class="btn btn-secondary btn-sm me-2" onclick="cancelarEdicaoFinanceira()">Cancelar</button>
+                    <button class="btn btn-secondary btn-sm me-2" id="btn-cancelar-fin" onclick="cancelarEdicaoFinanceira()">Cancelar</button>
 
-                    <button class="btn btn-success btn-sm px-4" onclick="salvarFinanceiroGestor()"><i class="bi bi-save me-1"></i> Salvar</button>
+                    <button class="btn btn-success btn-sm px-4" id="btn-salvar-fin" onclick="salvarFinanceiroGestor()"><i class="bi bi-save me-1"></i> Salvar</button>
 
                   </div>
 
@@ -3125,6 +3125,7 @@
 
 
 
+              <div id="financeiro-status" class="small mb-2" role="status" aria-live="polite"></div>
               <!-- Cards -->
 
               <div class="row g-3 mb-3">
@@ -7594,7 +7595,7 @@
     var conferenciaConclusaoEmAndamento = false;
     var conferenciaConclusaoNaoConfirmada = null;
     window.addEventListener('beforeunload',function(event){
-      if(minhasVistorias.enviando || minhasVistorias.tentativa || conferenciaManualEnviando || conferenciaReabrindo || escalaGestorEnviando || voluntariosLancando || Object.keys(atendimentoEnvios||{}).length || docsCadastroEnviando || docsTentativaCadastro || conferenciaConclusaoEmAndamento || conferenciaConclusaoNaoConfirmada || Object.keys(preferenciasRascunhoPendentes||{}).length){event.preventDefault();event.returnValue='';}
+      if(financeiroGestor.salvando || financeiroGestor.editando || minhasVistorias.enviando || minhasVistorias.tentativa || conferenciaManualEnviando || conferenciaReabrindo || escalaGestorEnviando || voluntariosLancando || Object.keys(atendimentoEnvios||{}).length || docsCadastroEnviando || docsTentativaCadastro || conferenciaConclusaoEmAndamento || conferenciaConclusaoNaoConfirmada || Object.keys(preferenciasRascunhoPendentes||{}).length){event.preventDefault();event.returnValue='';}
     });
     function informarGravacaoConferencia(texto,erro) {
       var el=document.getElementById('conf-gravacao-status');
@@ -9951,6 +9952,7 @@
 
 
     function limparSessaoLocal() {
+      financeiroGestor.editando=false;financeiroGestor.mesCarregado='';financeiroGestor.mesEdicao='';controlesFinanceiroGestor_();
       minhasVistorias.seq++;minhasVistorias.itens=[];minhasVistorias.tentativa=null;document.getElementById('mv-tbody').textContent='';document.body.classList.remove('perfil-vistoriador');
       escalaPSEConsultaSeq++;escalaPSEVistoriasJaCarregada=false;escalaPSEConsultaOrigem='vistorias';document.getElementById('pse-vist-tbody').textContent='';document.getElementById('pse-vist-total').textContent='0 militar(es)';
       atendimentoPendencias.seq++;atendimentoPendencias.grade=null;document.getElementById('atd-pend-sem-regiao').textContent='';document.getElementById('atd-pend-sem-regiao-box').style.display='none';atendimentoPendencias.itens=[];atendimentoPendencias.visiveis=[];atendimentoPendencias.carregando=false;document.getElementById('atd-pend-tbody').textContent='';document.getElementById('atd-pend-modal-corpo').textContent='';document.getElementById('atd-pend-modal-titulo').textContent='Informações da pendência';document.getElementById('atd-pend-busca').value='';document.getElementById('atd-pend-origem').value='';document.getElementById('atd-pend-status').textContent='';document.getElementById('atd-pend-total').textContent='';document.getElementById('atd-pend-atualizar').disabled=false;
@@ -9965,6 +9967,8 @@
 
 
     function sairDoSistema() {
+      if(financeiroGestor.salvando){alert('Aguarde a confirmação dos valores do AC-4 antes de sair.');return;}
+      if(financeiroGestor.editando&&!confirm('Descartar as alterações ainda não salvas da cota AC-4?'))return;
       if(minhasVistorias.enviando){alert('Aguarde a confirmação das não realizadas antes de sair.');return;}
       if(conferenciaManualEnviando){alert('Aguarde a confirmação do cadastro manual antes de sair.');return;}
       if(conferenciaReabrindo){alert('Aguarde a confirmação da reabertura antes de sair.');return;}
@@ -10013,9 +10017,29 @@
 
 
 
-    function habilitarEdicaoFinanceira() { document.querySelectorAll('.mascara-moeda').forEach(function(inp) { inp.disabled = false; }); document.getElementById('box-botoes-fin').style.display = 'block'; document.getElementById('btn-editar-fin').style.display = 'none'; }
-
-    function cancelarEdicaoFinanceira() { document.querySelectorAll('.mascara-moeda').forEach(function(inp) { inp.disabled = true; }); document.getElementById('box-botoes-fin').style.display = 'none'; document.getElementById('btn-editar-fin').style.display = 'inline-block'; carregarRelatorioFinanceiroAC4(); }
+    var financeiroGestor={editando:false,salvando:false,mesCarregado:'',mesEdicao:''};
+    function controlesFinanceiroGestor_() {
+      var f=financeiroGestor;
+      document.querySelectorAll('.mascara-moeda').forEach(function(el){el.disabled=!f.editando||f.salvando;});
+      document.getElementById('filtro-mes-pagamento-pse').disabled=f.editando||f.salvando;
+      document.getElementById('btn-consultar-ac4').disabled=f.editando||f.salvando;
+      document.getElementById('btn-editar-fin').disabled=!f.mesCarregado||f.salvando;
+      document.getElementById('box-botoes-fin').style.display=f.editando?'block':'none';
+      document.getElementById('btn-editar-fin').style.display=f.editando?'none':'inline-block';
+      document.getElementById('btn-cancelar-fin').disabled=f.salvando;
+      document.getElementById('btn-salvar-fin').disabled=f.salvando;
+      document.getElementById('btn-salvar-fin').textContent=f.salvando?'Salvando…':'Salvar';
+    }
+    function habilitarEdicaoFinanceira() {
+      var f=financeiroGestor,mes=document.getElementById('filtro-mes-pagamento-pse').value;
+      if(f.salvando||!mes||f.mesCarregado!==mes)return;
+      f.editando=true;f.mesEdicao=mes;controlesFinanceiroGestor_();
+      document.getElementById('financeiro-status').textContent='Editando cota e suplementações de '+mes.split('-').reverse().join('/')+'.';
+    }
+    function cancelarEdicaoFinanceira() {
+      if(financeiroGestor.salvando)return;
+      financeiroGestor.editando=false;financeiroGestor.mesEdicao='';controlesFinanceiroGestor_();carregarRelatorioFinanceiroAC4();
+    }
 
     function carregarPeriodoInscricao() {
 
@@ -10037,19 +10061,7 @@
 
 
 
-          if (res.config.cota) document.getElementById('cfg-cota-unidade').value = 'R$ ' + res.config.cota.toLocaleString('pt-BR', {minimumFractionDigits: 2});
-
-          if (res.config.supDic) document.getElementById('cfg-sup-dic').value = 'R$ ' + res.config.supDic.toLocaleString('pt-BR', {minimumFractionDigits: 2});
-
-          if (res.config.supDap) document.getElementById('cfg-sup-dap').value = 'R$ ' + res.config.supDap.toLocaleString('pt-BR', {minimumFractionDigits: 2});
-
-          if (res.config.supGuarda) document.getElementById('cfg-sup-guarda').value = 'R$ ' + res.config.supGuarda.toLocaleString('pt-BR', {minimumFractionDigits: 2});
-
-          if (res.config.supDefau) document.getElementById('cfg-sup-defau').value = 'R$ ' + res.config.supDefau.toLocaleString('pt-BR', {minimumFractionDigits: 2});
-
-          if (res.config.supDnd) document.getElementById('cfg-sup-dnd').value = 'R$ ' + res.config.supDnd.toLocaleString('pt-BR', {minimumFractionDigits: 2});
-
-
+          // Valores financeiros são preenchidos somente pelo relatório do mês selecionado.
 
           var hojePeriodo = new Date();
           var primeiroDiaMes = hojePeriodo.getFullYear() + '-' + String(hojePeriodo.getMonth() + 1).padStart(2, '0') + '-01';
@@ -10420,40 +10432,31 @@
     }
 
 
+    var pdfEscalaGerando=false;
     function gerarPdfEscalaSEI() {
-      var ini = document.getElementById('escala-data-inicio').value;
-      var fim = document.getElementById('escala-data-fim').value;
-
-      if (!ini || !fim) {
-        alert('Informe a Data Início e a Data Término para gerar o PDF.');
-        return;
-      }
-
-      google.script.run
-        .withSuccessHandler(function(r) {
-          if (!r || !r.base64) {
-            alert('Não foi possível gerar o PDF.');
-            return;
-          }
-
-          var bytes = atob(r.base64);
-          var array = new Uint8Array(bytes.length);
-          for (var i = 0; i < bytes.length; i++) array[i] = bytes.charCodeAt(i);
-
-          var blob = new Blob([array], {type: r.mimeType || 'application/pdf'});
-          var url = URL.createObjectURL(blob);
-          var a = document.createElement('a');
-          a.href = url;
-          a.download = r.nomeArquivo || 'Escala_PSE_SEI.pdf';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
-        })
-        .withFailureHandler(capturarErroServidor)
-        .gerarPdfEscalaSEI(ini, fim, sessaoToken);
+      if(pdfEscalaGerando)return;
+      var ini=document.getElementById('escala-data-inicio').value,fim=document.getElementById('escala-data-fim').value;
+      var btn=document.getElementById('btn-pdf-escala'),status=document.getElementById('pdf-escala-status');
+      if(!ini||!fim||ini>fim){status.textContent='Informe um período válido para gerar o PDF.';return;}
+      var token=sessaoToken,texto=btn.innerHTML;
+      pdfEscalaGerando=true;btn.disabled=true;btn.textContent='Gerando PDF…';
+      status.textContent='Preparando o PDF da escala. Aguarde…';
+      function terminar(msg){pdfEscalaGerando=false;btn.disabled=false;btn.innerHTML=texto;if(token===sessaoToken)status.textContent=msg;}
+      google.script.run.withSuccessHandler(function(r){
+        if(token!==sessaoToken){terminar('');return;}
+        try {
+          if(!r||!r.sucesso||!r.base64)throw new Error('O servidor não retornou um PDF válido.');
+          var bytes=atob(r.base64),array=new Uint8Array(bytes.length);
+          for(var i=0;i<bytes.length;i++)array[i]=bytes.charCodeAt(i);
+          if(bytes.slice(0,5)!=='%PDF-')throw new Error('O arquivo recebido não é um PDF válido.');
+          var url=URL.createObjectURL(new Blob([array],{type:'application/pdf'})),a=document.createElement('a');
+          a.href=url;a.download=r.nomeArquivo||'Escala_PSE_SEI.pdf';document.body.appendChild(a);a.click();a.remove();
+          setTimeout(function(){URL.revokeObjectURL(url);},60000);
+          terminar('PDF gerado. Confira os downloads do navegador.');
+        } catch(e){terminar('Não foi possível baixar o PDF: '+e.message+' Tente novamente.');}
+      }).withFailureHandler(function(err){terminar('Não foi possível gerar o PDF: '+(err&&err.message||err)+'. Tente novamente.');})
+        .gerarPdfEscalaSEI(ini,fim,token);
     }
-
 
     function carregarResumoEscalaExtraMensal() {
       var consultaSeq=(consultasGestorSeq['carregarResumoEscalaExtraMensal']||0)+1;consultasGestorSeq['carregarResumoEscalaExtraMensal']=consultaSeq;var consultaToken=sessaoToken;
@@ -10529,21 +10532,22 @@
 
 
     function salvarFinanceiroGestor() {
-
-      google.script.run
-
-        .withSuccessHandler(function(resp) {
-          alert(resp);
-          cancelarEdicaoFinanceira();
-          carregarRelatorioFinanceiroAC4();
-        })
-
-        .withFailureHandler(capturarErroServidor)
-
-        .salvarConfiguracaoFinanceira(document.getElementById('cfg-cota-unidade').value, document.getElementById('cfg-sup-dic').value, document.getElementById('cfg-sup-dap').value, document.getElementById('cfg-sup-guarda').value, document.getElementById('cfg-sup-defau').value, document.getElementById('cfg-sup-dnd').value, document.getElementById('filtro-mes-pagamento-pse') ? document.getElementById('filtro-mes-pagamento-pse').value : '', sessaoToken);
-
+      var f=financeiroGestor,mes=document.getElementById('filtro-mes-pagamento-pse').value;
+      if(f.salvando||!f.editando||mes!==f.mesEdicao||mes!==f.mesCarregado)return;
+      var token=sessaoToken;
+      f.salvando=true;controlesFinanceiroGestor_();
+      document.getElementById('financeiro-status').textContent='Salvando valores de '+mes.split('-').reverse().join('/')+'…';
+      google.script.run.withSuccessHandler(function(resp){
+        f.salvando=false;
+        if(token!==sessaoToken){f.editando=false;f.mesCarregado='';controlesFinanceiroGestor_();return;}
+        f.editando=false;f.mesEdicao='';controlesFinanceiroGestor_();
+        document.getElementById('financeiro-status').textContent=resp;
+        carregarRelatorioFinanceiroAC4();
+      }).withFailureHandler(function(err){
+        f.salvando=false;controlesFinanceiroGestor_();
+        if(token===sessaoToken)document.getElementById('financeiro-status').textContent='Não foi possível confirmar a gravação: '+(err&&err.message||err)+'. Os valores foram mantidos; tente salvar novamente.';
+      }).salvarConfiguracaoFinanceira(document.getElementById('cfg-cota-unidade').value,document.getElementById('cfg-sup-dic').value,document.getElementById('cfg-sup-dap').value,document.getElementById('cfg-sup-guarda').value,document.getElementById('cfg-sup-defau').value,document.getElementById('cfg-sup-dnd').value,mes,token);
     }
-
 
 
     var voluntariosConsultaSeq=0;
@@ -10807,6 +10811,9 @@
 
 
     function carregarRelatorioFinanceiroAC4() {
+      if(financeiroGestor.editando||financeiroGestor.salvando)return;
+      var mesConsulta=document.getElementById('filtro-mes-pagamento-pse').value;
+      financeiroGestor.mesCarregado='';controlesFinanceiroGestor_();
       var consultaSeq=(consultasGestorSeq['carregarRelatorioFinanceiroAC4']||0)+1;consultasGestorSeq['carregarRelatorioFinanceiroAC4']=consultaSeq;var consultaToken=sessaoToken;
 
       document.getElementById('corpo-tabela-ac4').innerHTML = '<tr><td colspan="13" class="py-4 text-center"><div class="spinner-border text-success spinner-border-sm me-2"></div>Calculando execução financeira da cota AC-4...</td></tr>';
@@ -10815,6 +10822,8 @@
 
         .withSuccessHandler(function(res) {if(consultaSeq!==consultasGestorSeq['carregarRelatorioFinanceiroAC4']||consultaToken!==sessaoToken)return;
 
+          if(mesConsulta!==document.getElementById('filtro-mes-pagamento-pse').value)return;
+          financeiroGestor.mesCarregado=mesConsulta;controlesFinanceiroGestor_();
           document.getElementById('fin-cota-total').innerText = res.cotaTotal; document.getElementById('fin-detalhe-cota').innerText = 'Cota Inicial: ' + res.cotaInicial + ' | Suplementações: ' + res.totalSuplementacao;
 
           document.getElementById('fin-total-executado').innerText = res.totalExecutado; document.getElementById('fin-saldo-disponivel').innerText = res.saldoDisponivel;
@@ -10843,7 +10852,7 @@
 
         })
 
-        .withFailureHandler(function(err){if(consultaSeq!==consultasGestorSeq['carregarRelatorioFinanceiroAC4']||consultaToken!==sessaoToken)return;capturarErroServidor(err);})
+        .withFailureHandler(function(err){if(consultaSeq!==consultasGestorSeq['carregarRelatorioFinanceiroAC4']||consultaToken!==sessaoToken)return;document.getElementById('corpo-tabela-ac4').innerHTML='<tr><td colspan="13">Não foi possível carregar o relatório.</td></tr>';document.getElementById('financeiro-status').textContent='Erro ao consultar: '+(err&&err.message||err);})
 
         .obterDadosRelatorioAC4(
           document.getElementById('filtro-mes-pagamento-pse') ? document.getElementById('filtro-mes-pagamento-pse').value : '',

@@ -9169,90 +9169,48 @@ function obterUltimosOSEI(token) {
 
 function gerarPdfEscalaSEI(dataInicio, dataFim, token) {
   exigirPerfil_(token, ["GESTOR"]);
-
+  function dataValida(v) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(v || ""))) return false;
+    var d = new Date(v + "T12:00:00Z");
+    return !isNaN(d.getTime()) && d.toISOString().slice(0,10) === v;
+  }
+  if (!dataValida(dataInicio) || !dataValida(dataFim) || dataInicio > dataFim) {
+    throw new Error("Informe um período válido para gerar o PDF da escala.");
+  }
   var dados = obterVisualizacaoEscalaSEI_(dataInicio, dataFim);
   if (dados.erro) throw new Error(dados.erro);
-  if (!dados.registros || !dados.registros.length) {
-    throw new Error("Não há militares escalados no período selecionado.");
-  }
-
-  var doc = DocumentApp.create("TEMP_ESCALA_PSE_SEI_" + new Date().getTime());
-  var body = doc.getBody();
-
-  var titulo = body.appendParagraph("ESCALA PSE");
-  titulo.setHeading(DocumentApp.ParagraphHeading.HEADING1);
-  titulo.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-
-  var periodo = body.appendParagraph(dados.periodo || "");
-  periodo.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
-  periodo.setBold(true);
-
-  body.appendParagraph("");
-
-  var grupos = {};
-  var ordem = [];
-
+  if (!dados.registros || !dados.registros.length) throw new Error("Não há militares escalados no período selecionado.");
+  function esc(v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function(c) {
+    return {"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"}[c];
+  }); }
+  var grupos = {}, ordem = [];
   dados.registros.forEach(function(r) {
     var chave = String(r.data || "") + "|" + String(r.turno || "");
-    if (!grupos[chave]) {
-      grupos[chave] = {
-        data:r.data || "",
-        turno:r.turno || "",
-        registros:[]
-      };
-      ordem.push(chave);
-    }
-    grupos[chave].registros.push(r);
+    if (!grupos[chave]) { grupos[chave] = []; ordem.push(chave); }
+    grupos[chave].push(r);
   });
-
-  ordem.forEach(function(chave, idxGrupo) {
-    var g = grupos[chave];
-
-    var subtitulo = body.appendParagraph((g.data || "") + " - " + String(g.turno || "").toUpperCase());
-    subtitulo.setBold(true);
-
-    var tabelaDados = [["Ord", "Posto/Graduação", "RG", "Nome", "Função", "Horário"]];
-
-    g.registros.forEach(function(r) {
-      tabelaDados.push([
-        String(r.ord || ""),
-        String(r.postoGrad || ""),
-        String(r.rg || ""),
-        String(r.nome || ""),
-        String(r.funcao || ""),
-        String(r.horario || "")
-      ]);
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>' +
+    '@page{size:A4 landscape;margin:14mm}body{font-family:Arial,sans-serif;font-size:10pt;color:#111}' +
+    'h1{text-align:center;font-size:18pt}.periodo{text-align:center}h2{font-size:12pt;page-break-after:avoid}' +
+    'table{width:100%;border-collapse:collapse;margin-bottom:14pt}thead{display:table-header-group}' +
+    'th,td{border:1px solid #777;padding:5pt;text-align:left}th{background:#eee}tr{page-break-inside:avoid}' +
+    '</style></head><body><h1>ESCALA PSE</h1><p class="periodo">' + esc(dados.periodo) + '</p>';
+  ordem.forEach(function(chave) {
+    var lista = grupos[chave];
+    html += '<h2>' + esc(lista[0].data) + ' — ' + esc(lista[0].turno) + '</h2><table><thead><tr>';
+    ["Ord", "Posto/Graduação", "RG", "Nome", "Função", "Horário"].forEach(function(t) { html += '<th>' + esc(t) + '</th>'; });
+    html += '</tr></thead><tbody>';
+    lista.forEach(function(r) {
+      html += '<tr>'; [r.ord,r.postoGrad,r.rg,r.nome,r.funcao,r.horario].forEach(function(v) { html += '<td>' + esc(v) + '</td>'; }); html += '</tr>';
     });
-
-    var tabela = body.appendTable(tabelaDados);
-    tabela.getRow(0).editAsText().setBold(true);
-
-    if (idxGrupo < ordem.length - 1) {
-      body.appendParagraph("");
-    }
+    html += '</tbody></table>';
   });
-
-  doc.saveAndClose();
-
-  var arquivo = DriveApp.getFileById(doc.getId());
-  var pdf = arquivo.getBlob().getAs(MimeType.PDF);
-  var nome = "Escala_PSE_SEI_" +
-    String(dataInicio || "").replace(/-/g, "") +
-    "_" +
-    String(dataFim || "").replace(/-/g, "") +
-    ".pdf";
-  pdf.setName(nome);
-
-  arquivo.setTrashed(true);
-
-  return {
-    sucesso:true,
-    nomeArquivo:nome,
-    mimeType:"application/pdf",
-    base64:Utilities.base64Encode(pdf.getBytes())
-  };
+  html += '</body></html>';
+  var nome = "Escala_PSE_SEI_" + dataInicio.replace(/-/g, "") + "_" + dataFim.replace(/-/g, "") + ".pdf";
+  // Converte em memória: dispensa criação, autorização e limpeza de documentos no Drive.
+  var pdf = Utilities.newBlob(html, "text/html", "Escala.html").getAs(MimeType.PDF).setName(nome);
+  return {sucesso:true,nomeArquivo:nome,mimeType:"application/pdf",base64:Utilities.base64Encode(pdf.getBytes())};
 }
-
 
 function obterResumoEscalaExtraMensal(mesFiltro, token) {
   exigirPerfil_(token, ["GESTOR"]);
@@ -9416,15 +9374,12 @@ function salvarConfiguracaoPeriodo(dataInicioStr, dataFimStr, token) {
 
 function salvarConfiguracaoFinanceira(cotaUnidadeStr, supDicStr, supDapStr, supGuardaStr, supDefauStr, supDndStr, mesRef, token) {
   exigirPerfil_(token, ["GESTOR"]);
-  return salvarConfiguracaoFinanceiraMensal_(
-    mesRef,
-    cotaUnidadeStr,
-    supDicStr,
-    supDapStr,
-    supGuardaStr,
-    supDefauStr,
-    supDndStr
-  );
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    exigirPerfil_(token, ["GESTOR"]);
+    return salvarConfiguracaoFinanceiraMensal_(mesRef,cotaUnidadeStr,supDicStr,supDapStr,supGuardaStr,supDefauStr,supDndStr);
+  } finally { lock.releaseLock(); }
 }
 
 function obterInscricoesVoluntarios(dataFiltro, turnoFiltro, token) {
@@ -9755,7 +9710,7 @@ function obterConfiguracaoPeriodo() {
 
     fim: configExibidos[1] || "2026-09-30",
 
-    cota: parseFloat(configValores[5]) || 90000,
+    cota: configValores[5] === "" ? 90000 : valorFinanceiroMensal_(configValores[5]),
 
     supDic: parseFloat(configValores[6]) || 0,
 
@@ -9827,6 +9782,26 @@ function garantirConfigFinanceiroMensal_() {
 }
 
 
+function chaveMesFinanceiro_(valor) {
+  if (Object.prototype.toString.call(valor) === "[object Date]" && !isNaN(valor.getTime())) {
+    return Utilities.formatDate(valor, "America/Sao_Paulo", "yyyy-MM");
+  }
+  var s = String(valor || "").trim(), m;
+  if ((m = s.match(/^(\d{4})-(0[1-9]|1[0-2])(?:-\d{2})?$/))) return m[1] + "-" + m[2];
+  if ((m = s.match(/^(?:\d{2}\/)?(0[1-9]|1[0-2])\/(\d{4})$/))) return m[2] + "-" + m[1];
+  return "";
+}
+
+function valorFinanceiroMensal_(v) {
+  if (typeof v === "number" && isFinite(v) && v >= 0) return v;
+  var s = String(v == null ? "" : v).replace(/R\$/g, "").replace(/\s/g, "");
+  if (!s) return 0;
+  if (!/^(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,\d{1,2})?$/.test(s)) throw new Error("Informe os valores em reais, por exemplo 90.000,00.");
+  var n = Number(s.replace(/\./g, "").replace(",", "."));
+  if (!isFinite(n) || n < 0) throw new Error("Valor financeiro inválido.");
+  return Math.round(n * 100) / 100;
+}
+
 function obterConfiguracaoFinanceiraMensal_(mesRef) {
   var configBase = obterConfiguracaoPeriodo();
 
@@ -9837,7 +9812,7 @@ function obterConfiguracaoFinanceiraMensal_(mesRef) {
 
   var retorno = {
     mesRef:mesRef,
-    cota:parseFloat(configBase.cota) || 90000,
+    cota:configBase.cota == null ? 90000 : valorFinanceiroMensal_(configBase.cota),
     supDic:parseFloat(configBase.supDic) || 0,
     supDap:parseFloat(configBase.supDap) || 0,
     supGuarda:parseFloat(configBase.supGuarda) || 0,
@@ -9855,14 +9830,14 @@ function obterConfiguracaoFinanceiraMensal_(mesRef) {
   var vals = aba.getRange(2,1,aba.getLastRow()-1,8).getValues();
 
   for (var i = vals.length - 1; i >= 0; i--) {
-    if (String(vals[i][0] || "").trim() !== mesRef) continue;
+    if (chaveMesFinanceiro_(vals[i][0]) !== mesRef) continue;
 
-    retorno.cota = parseFloat(vals[i][1]) || 0;
-    retorno.supDic = parseFloat(vals[i][2]) || 0;
-    retorno.supDap = parseFloat(vals[i][3]) || 0;
-    retorno.supGuarda = parseFloat(vals[i][4]) || 0;
-    retorno.supDefau = parseFloat(vals[i][5]) || 0;
-    retorno.supDnd = parseFloat(vals[i][6]) || 0;
+    retorno.cota = valorFinanceiroMensal_(vals[i][1]);
+    retorno.supDic = valorFinanceiroMensal_(vals[i][2]);
+    retorno.supDap = valorFinanceiroMensal_(vals[i][3]);
+    retorno.supGuarda = valorFinanceiroMensal_(vals[i][4]);
+    retorno.supDefau = valorFinanceiroMensal_(vals[i][5]);
+    retorno.supDnd = valorFinanceiroMensal_(vals[i][6]);
     break;
   }
 
@@ -9871,40 +9846,21 @@ function obterConfiguracaoFinanceiraMensal_(mesRef) {
 
 
 function salvarConfiguracaoFinanceiraMensal_(mesRef, cotaUnidadeStr, supDicStr, supDapStr, supGuardaStr, supDefauStr, supDndStr) {
-  if (!mesRef || !/^\d{4}-\d{2}$/.test(String(mesRef))) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(mesRef || ""))) {
     throw new Error("Selecione o mês do pagamento antes de salvar a cota e as suplementações.");
   }
-
+  var registro = [mesRef].concat([cotaUnidadeStr,supDicStr,supDapStr,supGuardaStr,supDefauStr,supDndStr].map(valorFinanceiroMensal_));
+  registro.push(dataHoraSaoPauloTexto_());
   var aba = garantirConfigFinanceiroMensal_();
-  var vals = aba.getLastRow() >= 2
-    ? aba.getRange(2,1,aba.getLastRow()-1,8).getDisplayValues()
-    : [];
-
-  var linha = -1;
-  for (var i = 0; i < vals.length; i++) {
-    if (String(vals[i][0] || "").trim() === mesRef) {
-      linha = i + 2;
-      break;
-    }
+  var vals = aba.getLastRow() >= 2 ? aba.getRange(2,1,aba.getLastRow()-1,1).getValues() : [];
+  // Mesma regra da leitura: a última ocorrência é a vigente. Não apaga históricos antigos.
+  var linha = aba.getLastRow() + 1;
+  for (var i = vals.length - 1; i >= 0; i--) {
+    if (chaveMesFinanceiro_(vals[i][0]) === mesRef) { linha = i + 2; break; }
   }
-
-  var registro = [
-    mesRef,
-    parseMoedaBR(cotaUnidadeStr),
-    parseMoedaBR(supDicStr),
-    parseMoedaBR(supDapStr),
-    parseMoedaBR(supGuardaStr),
-    parseMoedaBR(supDefauStr),
-    parseMoedaBR(supDndStr),
-    dataHoraSaoPauloTexto_()
-  ];
-
-  if (linha > 0) {
-    aba.getRange(linha,1,1,registro.length).setValues([registro]);
-  } else {
-    aba.appendRow(registro);
-  }
-
+  aba.getRange(linha,1).setNumberFormat("@");
+  aba.getRange(linha,1,1,registro.length).setValues([registro]);
+  SpreadsheetApp.flush();
   return "Cota Inicial e Suplementações de " + mesRef.split("-").reverse().join("/") + " salvas com sucesso!";
 }
 
