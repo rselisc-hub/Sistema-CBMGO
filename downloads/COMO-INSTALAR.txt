@@ -77,3 +77,5 @@ REGRA PSE — ATENDIMENTO/CONFERÊNCIA: atualizar WebApp.gs e Index.html juntos.
 CORES E ORDEM NO ROTEIRO WEB: equipe de Emerson sempre à esquerda em azul-claro; equipe de Hélio sempre à direita em azul-escuro. Aplicado ao Roteiro dos Vistoriadores e à consulta do Atendimento. Atualize Index.html e publique nova versão. Sem mudanças no backend ou no banco de dados.
 
 FILTRO DE DATA — GERENCIAR / REMOVER ESCALADOS: campo Data dos escalados filtra automaticamente a lista pelo dia escolhido. Ver todos limpa a data e exibe a lista completa. Atualizar Lista Escalados e a atualização após remover mantêm a data selecionada. Basta atualizar Index.html e publicar nova versão. Backend e banco de dados preservados. Verificado no Chromium com serviços Google simulados.
+
+CORREÇÃO CONSULTAR DIA NA ESCALA PSE: datas exibidas sem zeros (5/11/2026) agora são reconhecidas pelo filtro 05/11/2026. Não modifica os dados da planilha. Atualizar WebApp.gs e publicar nova versão; Index.html continua igual ao da versão 2929d3a. O ZIP contém ambos atualizados para instalação completa.

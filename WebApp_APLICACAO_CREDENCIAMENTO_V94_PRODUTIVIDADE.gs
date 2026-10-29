@@ -12250,13 +12250,16 @@ function obterEscalaPSEVistorias(dataFiltro, token) {
 
   var filtroObj = criarDataSegura(dataFiltro);
   var filtroTexto = filtroObj ? formatarDataTexto(filtroObj) : "";
+  if (dataFiltro && !filtroTexto) throw new Error("Informe uma data válida para consultar a Escala PSE.");
 
   var itens = [];
   var obsGrupo = "";
   var chaveGrupoAnterior = "";
 
   vals.forEach(function(r, i) {
-    var data = String(r[1] || "").trim();
+    var dataOriginal = String(r[1] || "").trim();
+    // A planilha pode exibir 5/11/2026, enquanto o filtro usa 05/11/2026.
+    var data = formatarDataTexto(criarDataSegura(dataOriginal)) || dataOriginal;
     var turno = String(r[7] || "").trim();
     var chaveGrupo = data + "|" + turno;
 
