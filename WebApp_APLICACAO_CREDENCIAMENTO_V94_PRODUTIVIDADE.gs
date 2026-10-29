@@ -10281,6 +10281,44 @@ function verificarMilitarJaEscalado(dataServicoStr, rg, nome, turno) {
 
 
 
+// Regras de função são calculadas em memória usando a leitura já feita do controle.
+function chaveGrupoFuncaoPSE_(r) {
+  var d = criarDataSegura(r[0]);
+  return d ? formatarDataTexto(d) + "|" + normalizarTurnoPSE_(r[3]) : "";
+}
+function atendenteExclusivoPSE_(nome) {
+  return /(?:^| )(?:FABRICIO|LUCIENE)(?: |$)/.test(normalizarTextoChavePSE_(nome));
+}
+function planejarFuncoesPSE_(existentes, novas, gruposAlvo) {
+  var grupos = {}, alteracoes = {Atendente:[],Conferencista:[]};
+  existentes.concat(novas).forEach(function(r, i) {
+    if (String(r[6] || "").trim().toUpperCase() !== "ESCALADO") return;
+    var chave = chaveGrupoFuncaoPSE_(r);
+    if (!chave || !gruposAlvo[chave]) return;
+    var exclusivo = atendenteExclusivoPSE_(r[2]);
+    if (!exclusivo && normalizarFuncaoMilitar(r[4]) === "Vistoriador") return;
+    if (!grupos[chave]) grupos[chave] = [];
+    grupos[chave].push({r:r,linha:i < existentes.length ? i + 2 : 0,exclusivo:exclusivo});
+  });
+  Object.keys(grupos).forEach(function(chave) {
+    var lista = grupos[chave], exclusivos = lista.filter(function(x) { return x.exclusivo; });
+    // Preserva o atendente já definido quando não há pessoa exclusiva no grupo.
+    var atendente = exclusivos.length ? null : lista.filter(function(x) { return normalizarFuncaoMilitar(x.r[4]) === "Atendente"; })[0] || lista[0];
+    lista.forEach(function(x) {
+      var funcao = x.exclusivo || x === atendente ? "Atendente" : "Conferencista";
+      if (x.r[4] === funcao) return;
+      x.r[4] = funcao;
+      if (x.linha) alteracoes[funcao].push("E" + x.linha);
+    });
+  });
+  return alteracoes;
+}
+function gravarAjustesFuncoesPSE_(aba, alteracoes) {
+  Object.keys(alteracoes).forEach(function(funcao) {
+    if (alteracoes[funcao].length) aba.getRangeList(alteracoes[funcao]).setValue(funcao);
+  });
+}
+
 function lancarVoluntariosSelecionadosWeb_(listaSelecionados) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var abaControle = ss.getSheetByName("CONTROLE_ESCALAS");
@@ -10304,7 +10342,11 @@ function lancarVoluntariosSelecionadosWeb_(listaSelecionados) {
 
     // Chaves de militares já escalados na planilha:
     // DATA|RG ou, se não houver RG válido, DATA|NOME.
-    var ocupadosNoDia = {};
+    var ocupadosNoDia = {}, existentes = [], gruposFuncoes = {};
+    listaSelecionados.forEach(function(item) {
+      var chave = chaveGrupoFuncaoPSE_([item.dataServico,"","",item.turnoEscalar || item.turno || "Matutino"]);
+      if (chave) gruposFuncoes[chave] = true;
+    });
 
     if (abaControle.getLastRow() >= 2) {
       var existentes = abaControle
@@ -10378,7 +10420,7 @@ function lancarVoluntariosSelecionadosWeb_(listaSelecionados) {
 
       var turnoEfetivo = item.turnoEscalar || item.turno || "Matutino";
 
-      // A FUNÇÃO deve ser a mesma informada pelo militar no Forms.
+      // O Forms informa a função inicial; a regra do grupo define Atendimento/Conferência.
       var funcaoEfetiva = normalizarFuncaoMilitar(item.funcao || "Vistoriador");
 
       // O serviço financeiro/operacional é campo separado da função.
@@ -10440,10 +10482,11 @@ function lancarVoluntariosSelecionadosWeb_(listaSelecionados) {
 
       lancados++;
     });
+    var ajustesFuncoes = planejarFuncoesPSE_(existentes,novasEscalas,gruposFuncoes);
     if (novasEscalas.length) {
       abaControle.getRange(abaControle.getLastRow()+1,1,novasEscalas.length,13).setValues(novasEscalas);
     }
-
+    gravarAjustesFuncoesPSE_(abaControle,ajustesFuncoes);
 
     sincronizarEscalaPSE();
 
@@ -10508,7 +10551,8 @@ function lancarOrdemServicoWeb_Conteudo_(dadosOS) {
   var hIni = dadosOS.horaIni || (turnoNome === "Vespertino" ? "13:00" : (turnoNome === "Noturno" ? "19:00" : "07:00"));
   var hFim = dadosOS.horaFim || (turnoNome === "Vespertino" ? "19:00" : (turnoNome === "Noturno" ? "01:00" : "13:00"));
 
-  abaControle.appendRow([
+  var existentesFuncoes = abaControle.getLastRow() >= 2 ? abaControle.getRange(2,1,abaControle.getLastRow()-1,7).getDisplayValues() : [];
+  var novaEscala = [
     dataFormatadaLimpa,
     String(dadosOS.rg || ""),
     dadosOS.nome || "MILITAR",
@@ -10522,7 +10566,11 @@ function lancarOrdemServicoWeb_Conteudo_(dadosOS) {
     dataFormatadaLimpa + "|" + dadosOS.rg + "|" + turnoNome,
     obsTexto,
     "EXTRA"
-  ]);
+  ];
+  var gruposFuncoes = {}; gruposFuncoes[chaveGrupoFuncaoPSE_(novaEscala)] = true;
+  var ajustesFuncoes = planejarFuncoesPSE_(existentesFuncoes,[novaEscala],gruposFuncoes);
+  abaControle.appendRow(novaEscala);
+  gravarAjustesFuncoesPSE_(abaControle,ajustesFuncoes);
 
   salvarUltimosOSEI_(dadosOS.os, dadosOS.sei, dadosOS.rai);
   sincronizarEscalaPSE();
@@ -11579,7 +11627,16 @@ function removerMilitarDaEscala_Conteudo_(dataStr, rg, turno, nome) {
     }
   }
 
-  if(enderecos.length)abaControle.getRangeList(enderecos).setValue('CANCELADO');
+  if(enderecos.length) {
+    abaControle.getRangeList(enderecos).setValue('CANCELADO');
+    var gruposFuncoes = {};
+    enderecos.forEach(function(endereco) {
+      var r = dadosC[Number(endereco.slice(1))-2];
+      gruposFuncoes[chaveGrupoFuncaoPSE_(r)] = true;
+      r[6] = "CANCELADO";
+    });
+    gravarAjustesFuncoesPSE_(abaControle,planejarFuncoesPSE_(dadosC,[],gruposFuncoes));
+  }
   // A Escala PSE é reconstruída a partir dos registros que continuam ESCALADOS.
   sincronizarEscalaPSE();
 
@@ -11850,12 +11907,8 @@ function montarDadosEscalaPSE_(){
           ? cad.nomeGuerra
           : info.nome;
 
-      // FUNÇÃO correta:
-      // prioriza exatamente a função originada da Lista de Voluntários / Forms.
-      var funcao =
-        voluntario && voluntario.funcao
-          ? voluntario.funcao
-          : normalizarFuncaoMilitar(r[4] || "Vistoriador");
+      // A função efetivamente escalada prevalece sobre a inscrição original.
+      var funcao = normalizarFuncaoMilitar(r[4] || (voluntario && voluntario.funcao) || "Vistoriador");
 
       var hIni = String(r[7] || "").trim();
       var hFim = String(r[8] || "").trim();
@@ -12279,11 +12332,7 @@ function obterVisualizacaoEscalaSEI_(dataInicio, dataFim) {
       nomeControle
     );
 
-    var funcaoMilitar = (
-      voluntarioSEI && voluntarioSEI.funcao
-    )
-      ? voluntarioSEI.funcao
-      : normalizarFuncaoMilitar(r[4] || "Vistoriador");
+    var funcaoMilitar = normalizarFuncaoMilitar(r[4] || (voluntarioSEI && voluntarioSEI.funcao) || "Vistoriador");
     var status = String(r[6] || "").trim().toUpperCase();
 
     if (status !== "ESCALADO" || !rg || !dObj) return;

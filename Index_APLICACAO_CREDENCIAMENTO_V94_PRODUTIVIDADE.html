@@ -2981,6 +2981,8 @@
 
 
 
+              <div class="small text-muted mb-3">Funções no PSE: por dia e turno, um atendente entre os não vistoriadores e os demais na Conferência. Fabrício e Luciene ficam sempre no Atendimento; quando juntos, ambos são atendentes.</div>
+
               <div class="p-3 border rounded bg-light mb-3">
 
                 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -10644,7 +10646,7 @@
 
         item.servico = document.getElementById('servico-vol-' + idx).value || "DIC";
 
-        // Mantém item.funcao conforme veio do Forms / Lista de Voluntários.
+        // Função inicial do Forms; o servidor aplica a regra por dia/turno ao escalar.
         item.funcao = item.funcao || "Vistoriador";
 
         item.turnoEscalar = document.getElementById('turno-escalar-' + idx).value;
