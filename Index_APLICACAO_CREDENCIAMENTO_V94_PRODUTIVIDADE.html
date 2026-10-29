@@ -1873,7 +1873,7 @@
   <!-- ====================================================== -->
   <!-- VISTORIAS - CONSULTA ESCALA PSE -->
   <!-- ====================================================== -->
-  <div id="minhas-vistorias-screen" class="container my-4" style="display:none;"><div class="card card-custom p-4 mb-3"><div class="d-flex justify-content-between align-items-center flex-wrap gap-2"><div><h4>Minhas Vistorias</h4><p class="text-muted mb-0">Visitas atribuídas a você como primeiro ou segundo vistoriador. Marque somente as não realizadas. As demais não são confirmadas automaticamente como realizadas.</p></div><button class="btn btn-outline-secondary" onclick="abrirModuloVistorias()">Voltar</button></div></div><div class="card card-custom p-4"><div class="d-flex gap-2 mb-3"><input aria-label="Data das minhas vistorias" id="mv-data" type="date" class="form-control" style="max-width:220px;"><button id="mv-consultar" class="btn btn-primary" onclick="carregarMinhasVistorias()">Consultar</button></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th></th><th>Protocolo</th><th>Razão social / Bairro</th><th>Equipe / Período</th><th>Situação</th></tr></thead><tbody id="mv-tbody"></tbody></table></div><div class="row g-2"><div class="col-md-6"><label class="form-label" for="mv-motivo">Motivo das não realizadas selecionadas</label><select class="form-select" id="mv-motivo"><option value="">Selecione...</option><option>ESTABELECIMENTO FECHADO</option><option>RESPONSÁVEL AUSENTE</option><option>ENDEREÇO NÃO LOCALIZADO</option><option>IMPEDIMENTO OPERACIONAL</option><option>OUTRO</option></select></div><div class="col-md-6"><label class="form-label" for="mv-observacao">Observação (obrigatória em Outro)</label><textarea id="mv-observacao" class="form-control" maxlength="1000" rows="2"></textarea></div></div><button class="btn btn-danger mt-3" id="mv-salvar" onclick="salvarNaoRealizadasMinhasVistorias()">Registrar selecionadas como não realizadas</button><div id="mv-status" class="mt-3" role="status"></div></div></div>
+  <div id="minhas-vistorias-screen" class="container my-4" style="display:none;"><div class="card card-custom p-4 mb-3"><div class="d-flex justify-content-between align-items-center flex-wrap gap-2"><div><h4>Minhas Vistorias</h4><p class="text-muted mb-0">Visitas atribuídas a você como primeiro ou segundo vistoriador. Marque somente as não realizadas. As demais não são confirmadas automaticamente como realizadas.</p></div><button class="btn btn-outline-secondary" onclick="abrirModuloVistorias()">Voltar</button></div></div><div class="card card-custom p-4"><div class="d-flex gap-2 mb-3"><input aria-label="Data das minhas vistorias" id="mv-data" type="date" class="form-control" style="max-width:220px;"><button id="mv-consultar" class="btn btn-primary" onclick="carregarMinhasVistorias()">Consultar</button></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th></th><th>Protocolo</th><th>Razão social / Bairro</th><th>Equipe / Período</th><th>Situação</th></tr></thead><tbody id="mv-tbody"></tbody></table></div><div class="row g-2"><div class="col-md-6"><label class="form-label" for="mv-motivo">Motivo das não realizadas selecionadas</label><select class="form-select" id="mv-motivo"><option value="">Selecione...</option><option>IMPEDIMENTO OPERACIONAL (NÃO DEU TEMPO)</option><option>OUTRO</option></select></div><div class="col-md-6"><label class="form-label" for="mv-observacao">Observação (obrigatória em Outro)</label><textarea id="mv-observacao" class="form-control" maxlength="1000" rows="2"></textarea></div></div><button class="btn btn-danger mt-3" id="mv-salvar" onclick="salvarNaoRealizadasMinhasVistorias()">Registrar selecionadas como não realizadas</button><div id="mv-status" class="mt-3" role="status"></div></div></div>
   <div id="vistorias-escala-pse-screen" class="container-fluid px-3 px-lg-4 my-4" style="display:none;">
     <div class="card card-custom p-4 mb-4">
       <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
@@ -2733,6 +2733,7 @@
     </div>
 
     <div id="gestor-escala-area" style="display:none;">
+      <div id="pse-ajuste-novembro-status" class="alert alert-info small" role="status" aria-live="polite" hidden></div>
     <div class="d-flex flex-wrap gap-2 mb-4 gestor-nav">
       <button class="btn btn-success gestor-nav-btn active" id="gestor-btn-sub-config"
         onclick="abrirAreaGestor('sub-config', this, abrirEscalaPSEGestor)">
@@ -2982,6 +2983,8 @@
 
 
               <div class="small text-muted mb-3">Funções no PSE: por dia e turno, um atendente entre os não vistoriadores e os demais na Conferência. Fabrício e Luciene ficam sempre no Atendimento; quando juntos, ambos são atendentes.</div>
+
+
 
               <div class="p-3 border rounded bg-light mb-3">
 
@@ -3481,6 +3484,7 @@
 
       document.getElementById('home-perfil').textContent = perfil;
       if (permissoes.gestor) {
+        iniciarAjusteNovembroPSE_();
         var tokenConfiguracaoDados=sessaoToken;
         function podeApresentarConfiguracaoDados(){return sessaoToken===tokenConfiguracaoDados && document.getElementById('gestor-controle-dados').style.display==='none';}
         google.script.run.withSuccessHandler(function(r) { if(podeApresentarConfiguracaoDados())apresentarControleDadosGestor(r); })
@@ -7604,7 +7608,7 @@
     var conferenciaConclusaoEmAndamento = false;
     var conferenciaConclusaoNaoConfirmada = null;
     window.addEventListener('beforeunload',function(event){
-      if(financeiroGestor.salvando || financeiroGestor.editando || minhasVistorias.enviando || minhasVistorias.tentativa || conferenciaManualEnviando || conferenciaReabrindo || escalaGestorEnviando || voluntariosLancando || Object.keys(atendimentoEnvios||{}).length || docsCadastroEnviando || docsTentativaCadastro || conferenciaConclusaoEmAndamento || conferenciaConclusaoNaoConfirmada || Object.keys(preferenciasRascunhoPendentes||{}).length){event.preventDefault();event.returnValue='';}
+      if(pseAjusteNovembroEmCurso || financeiroGestor.salvando || financeiroGestor.editando || minhasVistorias.enviando || minhasVistorias.tentativa || conferenciaManualEnviando || conferenciaReabrindo || escalaGestorEnviando || voluntariosLancando || Object.keys(atendimentoEnvios||{}).length || docsCadastroEnviando || docsTentativaCadastro || conferenciaConclusaoEmAndamento || conferenciaConclusaoNaoConfirmada || Object.keys(preferenciasRascunhoPendentes||{}).length){event.preventDefault();event.returnValue='';}
     });
     function informarGravacaoConferencia(texto,erro) {
       var el=document.getElementById('conf-gravacao-status');
@@ -8089,7 +8093,7 @@
           carregarPendenciasRoteiro();
         })
         .withFailureHandler(capturarErroServidor)
-        .registrarVistoriaNaoRealizada(pendenciaSelecionadaBusca.protocolo, sessaoToken);
+        .registrarVistoriaNaoRealizada(pendenciaSelecionadaBusca.protocolo, sessaoToken, {data:pendenciaSelecionadaBusca.data});
     }
 
 
@@ -9976,6 +9980,7 @@
 
 
     function sairDoSistema() {
+      if(pseAjusteNovembroEmCurso){alert('Aguarde o ajuste automático da escala de novembro antes de sair.');return;}
       if(financeiroGestor.salvando){alert('Aguarde a confirmação dos valores do AC-4 antes de sair.');return;}
       if(financeiroGestor.editando&&!confirm('Descartar as alterações ainda não salvas da cota AC-4?'))return;
       if(minhasVistorias.enviando){alert('Aguarde a confirmação das não realizadas antes de sair.');return;}
@@ -10144,6 +10149,29 @@
       var btn=document.getElementById(botao),texto=btn.innerHTML,campos=Array.from(document.querySelectorAll('input[id^="'+prefixo+'"],select[id^="'+prefixo+'"]')).map(function(el){var x={el:el,disabled:el.disabled};el.disabled=true;return x;});btn.disabled=true;btn.textContent='Gravando…';
       var status=document.getElementById(botao+'-status');if(!status){status=document.createElement('div');status.id=botao+'-status';status.className='small mt-2';status.setAttribute('role','status');btn.parentNode.appendChild(status);}status.textContent='Aguardando confirmação da gravação.';
       return function(mensagem){escalaGestorEnviando=false;btn.disabled=false;btn.innerHTML=texto;campos.forEach(function(x){x.el.disabled=x.disabled;});status.textContent=String(mensagem||'Resposta não confirmada. Confira a escala.');};
+    }
+
+    var pseAjusteNovembroEmCurso=false,pseAjusteNovembroToken='';
+    function iniciarAjusteNovembroPSE_() {
+      if(!usuarioLogado||!usuarioLogado.permissoes||!usuarioLogado.permissoes.gestor||pseAjusteNovembroEmCurso||pseAjusteNovembroToken===sessaoToken)return;
+      var token=sessaoToken,status=document.getElementById('pse-ajuste-novembro-status');
+      pseAjusteNovembroEmCurso=true;
+      status.hidden=false;status.className='alert alert-info small';status.textContent='Atualizando automaticamente as funções da escala de novembro de 2026…';
+      google.script.run.withSuccessHandler(function(r){
+        pseAjusteNovembroEmCurso=false;
+        if(token!==sessaoToken)return;
+        if(!r||!r.sucesso){status.className='alert alert-warning small';status.textContent='Não foi possível confirmar o ajuste automático de novembro. Entre novamente como Gestor para repetir.';return;}
+        pseAjusteNovembroToken=token;status.hidden=!!r.ignorado;
+        status.className=r.semAtendimento&&r.semAtendimento.length?'alert alert-warning small':'alert alert-success small';status.textContent=r.mensagem||'';
+        escalaPSEGestorJaCarregada=false;escalaPSEVistoriasJaCarregada=false;
+        if(!r.ignorado){
+          var consulta=document.getElementById('sub-config');if(consulta&&consulta.offsetParent!==null)carregarEscalaPSEGestor(false);
+          var modal=document.getElementById('modalSEI');if(modal&&modal.classList.contains('show'))visualizarEscalaSEI();
+        }
+      }).withFailureHandler(function(err){
+        pseAjusteNovembroEmCurso=false;if(token!==sessaoToken)return;
+        status.className='alert alert-warning small';status.textContent='Ajuste automático de novembro não confirmado: '+(err&&err.message||err)+'. Entre novamente como Gestor para repetir com segurança.';
+      }).atualizarFuncoesPSENovembro2026(token);
     }
 
     function salvarOSeiRaiParaData() {

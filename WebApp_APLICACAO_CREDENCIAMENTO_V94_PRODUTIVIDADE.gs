@@ -7030,12 +7030,15 @@ function buscarProtocolosDistribuidosRoteiro(termo, token) {
   if (!aba || aba.getLastRow() < 2) return {sucesso:true, resultados:[]};
 
   var dados = aba.getRange(2,1,aba.getLastRow()-1,Math.max(19,aba.getLastColumn())).getDisplayValues();
-  var mapa = {};
+  var mapa = {}, hoje = Utilities.formatDate(new Date(),"America/Sao_Paulo","yyyy-MM-dd");
 
   dados.forEach(function(r) {
     var protocolo = normalizarProtocoloRoteiro_(r[1]);
     var status = String(r[10] || "").trim().toUpperCase();
     if (!protocolo || status === "CANCELADO" || protocolo.indexOf(termo) === -1) return;
+    var dataVisita = chaveDataRoteiro_(r[0]);
+    if (!dataVisita || dataVisita > hoje) return;
+    if (mapa[protocolo] && chaveDataRoteiro_(mapa[protocolo].data) > dataVisita) return;
 
     // Como percorremos em ordem, sobrescrever mantém a distribuição mais recente.
     mapa[protocolo] = {
@@ -7067,10 +7070,21 @@ function buscarProtocolosDistribuidosRoteiro(termo, token) {
 }
 
 
-function registrarVistoriaNaoRealizada(protocolo, token) {
+function registrarVistoriaNaoRealizada(protocolo, token, referencia) {
+  exigirPerfil_(token,["CONFERENCIA"]);
+  var lock = LockService.getScriptLock(); lock.waitLock(15000);
+  try { return registrarVistoriaNaoRealizada_(protocolo,token,referencia); }
+  finally { lock.releaseLock(); }
+}
+
+function registrarVistoriaNaoRealizada_(protocolo, token, referencia) {
   var sessao = exigirPerfil_(token, ["CONFERENCIA"]);
   protocolo = normalizarProtocoloRoteiro_(protocolo);
   if (!protocolo) throw new Error("Selecione um protocolo.");
+  var dataAlvo = referencia ? chaveDataRoteiro_(referencia.data) : "";
+  var hoje = Utilities.formatDate(new Date(),"America/Sao_Paulo","yyyy-MM-dd");
+  if (referencia && !dataAlvo) throw new Error("Confira a data da visita selecionada.");
+  if (dataAlvo && dataAlvo > hoje) throw new Error("Não é possível marcar uma visita futura como não realizada.");
 
   var estruturas = garantirEstruturaPendenciasRoteiro_();
   var pend = estruturas.pendencias;
@@ -7096,10 +7110,12 @@ function registrarVistoriaNaoRealizada(protocolo, token) {
   var encontrado = null;
 
   for (var i=dados.length-1; i>=0; i--) {
+    var dataVisita = chaveDataRoteiro_(dados[i][0]);
     if (normalizarProtocoloRoteiro_(dados[i][1]) === protocolo &&
-        String(dados[i][10] || "").trim().toUpperCase() !== "CANCELADO") {
+        String(dados[i][10] || "").trim().toUpperCase() !== "CANCELADO" &&
+        dataVisita && dataVisita <= hoje && (!dataAlvo || dataVisita === dataAlvo) &&
+        (!encontrado || dataVisita > chaveDataRoteiro_(encontrado[0]))) {
       encontrado = dados[i];
-      break;
     }
   }
 
@@ -7132,16 +7148,12 @@ function registrarVistoriaNaoRealizada(protocolo, token) {
   ]);
 
 
-  // Registra o resultado também no histórico, sem apagar a distribuição original.
+  // Evento vinculado à data/equipe desta visita; não modifica lançamentos futuros do protocolo.
   var hist = ss.getSheetByName("HISTORICO_VISTORIAS");
-  if (hist && hist.getLastRow() >= 2) {
-    var hv = hist.getRange(2,1,hist.getLastRow()-1,17).getDisplayValues();
-    for (var h=hv.length-1; h>=0; h--) {
-      if (normalizarProtocoloRoteiro_(hv[h][2]) === protocolo) {
-        hist.getRange(h+2,14).setValue("NÃO REALIZADA");
-        break;
-      }
-    }
+  if (hist && hist.getLastRow() >= 1) {
+    hist.appendRow([dataHoraSaoPauloTexto_(),encontrado[0],protocolo,encontrado[9] || "",encontrado[12] || "",
+      encontrado[2] || "",encontrado[3] || "",encontrado[4] || "",encontrado[5] || "",encontrado[6] || "",
+      encontrado[7] || "",encontrado[8] || "","DISTRIBUÍDO","NÃO REALIZADA",encontrado[11] || "",sessao.rg,sessao.nome]);
   }
 
   return {
@@ -10317,6 +10329,54 @@ function gravarAjustesFuncoesPSE_(aba, alteracoes) {
   Object.keys(alteracoes).forEach(function(funcao) {
     if (alteracoes[funcao].length) aba.getRangeList(alteracoes[funcao]).setValue(funcao);
   });
+}
+
+// Ajuste pontual autorizado para a escala já montada de novembro de 2026.
+function atualizarFuncoesPSENovembro2026(token) {
+  exigirPerfil_(token,["GESTOR"]);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (PropertiesService.getScriptProperties().getProperty("PSE_FUNCOES_NOVEMBRO_2026_V1_" + ss.getId())) {
+    return {sucesso:true,ignorado:true,alterados:0,mensagem:"Escala de novembro de 2026 já ajustada.",semAtendimento:[]};
+  }
+  return aplicarFuncoesPSEMes_("2026-11",token,true);
+}
+
+function aplicarFuncoesPSEMes_(mesRef, token, umaVez) {
+  exigirPerfil_(token,["GESTOR"]);
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(mesRef || ""))) throw new Error("Selecione o mês da escala que deseja ajustar.");
+  var lock = LockService.getScriptLock(); lock.waitLock(15000);
+  try {
+    exigirPerfil_(token,["GESTOR"]);
+    var ss = SpreadsheetApp.getActiveSpreadsheet(), props, chave;
+    if (umaVez) {
+      props = PropertiesService.getScriptProperties();
+      chave = "PSE_FUNCOES_NOVEMBRO_2026_V1_" + ss.getId();
+      if (props.getProperty(chave)) return {sucesso:true,ignorado:true,alterados:0,mensagem:"Escala de novembro de 2026 já ajustada.",semAtendimento:[]};
+    }
+    var aba = ss.getSheetByName("CONTROLE_ESCALAS");
+    if (!aba || aba.getLastRow() < 2) return {sucesso:true,alterados:0,mensagem:"Não há escalados para ajustar.",semAtendimento:[]};
+    var dados = aba.getRange(2,1,aba.getLastRow()-1,7).getDisplayValues(), grupos = {};
+    dados.forEach(function(r) {
+      var chave = chaveGrupoFuncaoPSE_(r), data = chave.split("|")[0];
+      if (String(r[6] || "").trim().toUpperCase() === "ESCALADO" && data.slice(6,10)+"-"+data.slice(3,5) === mesRef) grupos[chave] = true;
+    });
+    if (!Object.keys(grupos).length) return {sucesso:true,alterados:0,mensagem:"Não há militares escalados em " + mesRef.split("-").reverse().join("/") + ".",semAtendimento:[]};
+    var ajustes = planejarFuncoesPSE_(dados,[],grupos);
+    var alterados = ajustes.Atendente.length + ajustes.Conferencista.length;
+    gravarAjustesFuncoesPSE_(aba,ajustes);
+    SpreadsheetApp.flush();
+    // Reconstrói também quando repetido, para reparar uma eventual falha anterior na visualização.
+    sincronizarEscalaPSE();
+    var cobertos = {};
+    dados.forEach(function(r) {
+      if (String(r[6] || "").trim().toUpperCase() === "ESCALADO" && normalizarFuncaoMilitar(r[4]) === "Atendente") cobertos[chaveGrupoFuncaoPSE_(r)] = true;
+    });
+    var semAtendimento = Object.keys(grupos).filter(function(chave) { return !cobertos[chave]; });
+    if (umaVez) props.setProperty(chave, dataHoraSaoPauloTexto_());
+    return {sucesso:true,alterados:alterados,semAtendimento:semAtendimento,
+      mensagem:alterados + " função(ões) atualizada(s) em " + mesRef.split("-").reverse().join("/") + ". Escala PSE sincronizada." +
+      (semAtendimento.length ? " Atenção: há turnos somente com vistoriadores; inclua um não vistoriador para cobrir o Atendimento: " + semAtendimento.join(", ") : "")};
+  } finally { lock.releaseLock(); }
 }
 
 function lancarVoluntariosSelecionadosWeb_(listaSelecionados) {
@@ -13673,7 +13733,7 @@ function equipeVisitaPessoal_(r,a,b){return [rgVisitaPessoal_(r[a]),rgVisitaPess
 function lerPendenciasVisitaPessoal_(ss){var a=ss.getSheetByName('PENDENCIAS_VISTORIAS');return !a||a.getLastRow()<2?[]:a.getRange(2,1,a.getLastRow()-1,15).getDisplayValues();}
 function pendenciaDaVisitaPessoal_(r,pendencias){
   var id=String(r[26]||''),origem=String(r[21]||''),data=chaveDataRoteiro_(r[0]),p=normalizarProtocoloRoteiro_(r[1]),equipe=equipeVisitaPessoal_(r,2,4);
-  for(var i=pendencias.length-1;i>=0;i--){var x=pendencias[i];if(id&&String(x[0])==='NR-VIS-'+id)return x;
+  for(var i=pendencias.length-1;i>=0;i--){var x=pendencias[i];if(id&&String(x[0])==='NR-VIS-'+id&&chaveDataRoteiro_(x[5])===data&&normalizarProtocoloRoteiro_(x[2])===p)return x;
     if(String(x[0])===origem)continue;
     if(String(x[3]||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase()==='NAO REALIZADA'&&chaveDataRoteiro_(x[5])===data&&normalizarProtocoloRoteiro_(x[2])===p&&equipeVisitaPessoal_(x,6,8)===equipe)return x;
   }return null;
@@ -13694,7 +13754,8 @@ function obterMinhasVistorias(data,token){
 function registrarNaoRealizadasVistoriador(itens,motivo,observacao,token){
   exigirPerfil_(token,['VISTORIADOR','CONSULTA']);itens=Array.isArray(itens)?itens:[];motivo=String(motivo||'').trim();observacao=String(observacao||'').trim();
   if(!itens.length||itens.length>100)throw Error('Selecione entre 1 e 100 visitas.');
-  if(['ESTABELECIMENTO FECHADO','RESPONSÁVEL AUSENTE','ENDEREÇO NÃO LOCALIZADO','IMPEDIMENTO OPERACIONAL','OUTRO'].indexOf(motivo)<0||observacao.length>1000||(motivo==='OUTRO'&&!observacao))throw Error('Informe um motivo válido; em Outro, descreva o ocorrido.');
+  if(motivo==='IMPEDIMENTO OPERACIONAL')motivo='IMPEDIMENTO OPERACIONAL (NÃO DEU TEMPO)';
+  if(['IMPEDIMENTO OPERACIONAL (NÃO DEU TEMPO)','OUTRO'].indexOf(motivo)<0||observacao.length>1000||(motivo==='OUTRO'&&!observacao))throw Error('Informe um motivo válido; em Outro, descreva o ocorrido.');
   var lock=LockService.getScriptLock();lock.waitLock(15000);
   try{
     var sessao=exigirPerfil_(token,['VISTORIADOR','CONSULTA']),rg=rgVisitaPessoal_(sessao.rg);if(!rg)throw Error('RG inválido na sessão.');

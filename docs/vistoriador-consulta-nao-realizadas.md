@@ -37,3 +37,13 @@ Não envia e-mails, não altera o SIAPI, não implementa o checklist de confirma
 ## Instalação e testes
 
 Atualizar WebApp.gs e Index.html, salvar e publicar nova versão. Testes com dados fictícios e serviços Google simulados incluem acesso por perfil, proprietário/segundo integrante, lote com outra equipe, cancelamento e referência antiga, dia futuro, repetição, falha entre etapas, consulta de duas mil linhas, telas operacionais da Conferência e viewport móvel. A consulta pessoal não grava na planilha. Os testes não medem o tempo real da implantação Google nem substituem uma validação com a conta real do Vistoriador.
+
+## Motivos e vínculo com o dia da visita
+
+Novos registros pelo vistoriador oferecem somente IMPEDIMENTO OPERACIONAL (NÃO DEU TEMPO) e OUTRO. Outro continua exigindo observação. Os outros motivos são recusados para novos envios pessoais; os registros históricos não são reescritos. O valor antigo IMPEDIMENTO OPERACIONAL é aceito como equivalente e normalizado para o novo texto.
+
+A identificação de pendência pessoal exige também a mesma data e protocolo, mesmo quando há ID técnico coincidente. Uma nova visita do mesmo protocolo em outro dia não herda a indicação de não realizada.
+
+No fluxo manual da Conferência, a busca não oferece visitas futuras, o envio informa a data selecionada e o servidor valida esse vínculo sob trava. O histórico recebe um novo evento com a data e equipe corretas, sem sobrescrever o último evento apenas por número do protocolo. Chamadas antigas sem referência usam a visita mais recente até hoje. Consultar Vistorias do Dia mantém a separação já existente de data + protocolo. Não há limpeza nem correção automática de históricos antigos sem confirmação da visita a que pertencem.
+
+Validação desta entrega: 269 testes automatizados e 30 cenários Chromium relacionados (Gestor/escala, Vistoriador, Controle de dados e consulta PSE), com serviços Google simulados.

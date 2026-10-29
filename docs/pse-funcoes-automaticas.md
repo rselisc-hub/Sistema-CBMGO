@@ -28,3 +28,11 @@ Operações de planilha não são transações. As travas impedem concorrência 
 A versão inclui também a ampliação da lista Gerenciar / Remover Militares Escalados para até 420 pixels, limitada a 60% da altura da tela, e a grade interna dos gestores oculta. Layout verificado em larguras de 1440 e 390 pixels.
 
 Instalar os dois arquivos WebApp.gs e Index.html e publicar uma nova versão do Apps Script.
+
+## Ajuste pontual da escala já montada — novembro de 2026
+
+Por solicitação do usuário, não há seletor nem botão adicional. Ao entrar como Gestor, o HTML chama `atualizarFuncoesPSENovembro2026`, que ajusta somente os registros ESCALADO de novembro de 2026. Por exemplo, num turno com Luciene e Evangelina inicialmente como Atendentes, mantém Luciene e passa Evangelina para Conferencista. Mantém os vistoriadores, os demais meses, as linhas canceladas e todas as colunas além da função.
+
+A conclusão fica registrada em propriedade do script por ID da planilha, somente depois de atualizar as funções e reconstruir a Escala PSE. Falha de sincronização não marca concluído; a próxima entrada do Gestor repete de forma idempotente. Após concluir, as próximas entradas verificam a propriedade e dispensam trava, leitura dos registros e reconstrução da escala. Se ainda não houver registros de novembro, o ajuste não é marcado como concluído. Turnos só com vistoriadores geram aviso para incluir pessoa elegível; não são preenchidos com nomes inventados.
+
+A execução real acontecerá após instalar ambos os arquivos, publicar nova versão e entrar como Gestor. Não há acesso direto à planilha de produção neste ambiente.
