@@ -2993,6 +2993,11 @@
 
                 </div>
 
+                <div class="d-flex flex-wrap align-items-end gap-2 mb-3">
+                  <div><label for="filtro-data-escalados-remocao" class="form-label small fw-bold mb-1">Data dos escalados</label><input type="date" id="filtro-data-escalados-remocao" class="form-control form-control-sm" onchange="carregarMilitaresEscaladosParaRemocao()"></div>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('filtro-data-escalados-remocao').value='';carregarMilitaresEscaladosParaRemocao()">Ver todos</button>
+                </div>
+
                 <div class="table-responsive border rounded bg-white" id="lista-escalados-remocao" style="max-height: min(420px, 60vh); overflow-y: auto;">
 
                   <table class="table table-sm table-hover align-middle text-center mb-0" style="font-size:0.9rem;">
@@ -10751,13 +10756,15 @@
     function carregarMilitaresEscaladosParaRemocao() {
       var consultaSeq=(consultasGestorSeq['carregarMilitaresEscaladosParaRemocao']||0)+1;consultasGestorSeq['carregarMilitaresEscaladosParaRemocao']=consultaSeq;var consultaToken=sessaoToken;
 
+      var dataFiltro=document.getElementById('filtro-data-escalados-remocao').value;
+
       document.getElementById('tabela-escalados-remocao').innerHTML = '<tr><td colspan="6" class="py-3 text-muted">Buscando militares escalados...</td></tr>';
 
       google.script.run
 
         .withSuccessHandler(function(res) {if(consultaSeq!==consultasGestorSeq['carregarMilitaresEscaladosParaRemocao']||consultaToken!==sessaoToken)return;
 
-          if (!res || !res.registros || res.registros.length === 0) { document.getElementById('tabela-escalados-remocao').innerHTML = '<tr><td colspan="6" class="py-3 text-muted">Nenhum militar escalado no momento.</td></tr>'; return; }
+          if (!res || !res.registros || res.registros.length === 0) { document.getElementById('tabela-escalados-remocao').innerHTML = '<tr><td colspan="6" class="py-3 text-muted">Nenhum militar escalado ' + (dataFiltro ? 'em '+dataFiltro.split('-').reverse().join('/') : 'no momento') + '.</td></tr>'; return; }
 
           var html = '';
 
@@ -10769,7 +10776,7 @@
 
         .withFailureHandler(function(err){if(consultaSeq!==consultasGestorSeq['carregarMilitaresEscaladosParaRemocao']||consultaToken!==sessaoToken)return;capturarErroServidor(err);})
 
-        .obterVisualizacaoEscalaSEI("", "", sessaoToken);
+        .obterVisualizacaoEscalaSEI(dataFiltro, dataFiltro, sessaoToken);
 
     }
 
