@@ -4682,8 +4682,8 @@
     }
 
 
-    var RV_GRUPO_AZUL_CLARO = ['ADEMACI','JAENICK','KENIA','LOBO','KURAMOTO'];
-    var RV_GRUPO_AZUL_ESCURO = ['ALMEIDA','BRUNO','KENNEDY','LOURENCO','MARLON','RAPHAEL','MENDANHA','IURI','NOGUEIRA','MARCELO','BRENO'];
+    var RV_GRUPO_AZUL_CLARO = ['ADEMACI','JAENICK','KENIA','LOBO','KURAMOTO','EMERSON'];
+    var RV_GRUPO_AZUL_ESCURO = ['ALMEIDA','BRUNO','KENNEDY','LOURENCO','MARLON','RAPHAEL','MENDANHA','IURI','NOGUEIRA','MARCELO','BRENO','HELIO'];
 
     function normalizarNomeRoteiroTurno_(valor) {
       return String(valor || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
@@ -4696,6 +4696,8 @@
       eq = eq || {};
       var n1 = eq.militar1 || '', n2 = eq.militar2 || '';
       var periodo = normalizarNomeRoteiroTurno_((eq.periodo || '') + ' ' + (eq.periodo2 || ''));
+      if (/(?:^|\s)EMERSON(?:\s|$)/.test(normalizarNomeRoteiroTurno_(n1)) || /(?:^|\s)EMERSON(?:\s|$)/.test(normalizarNomeRoteiroTurno_(n2))) return {ordem:-1, classe:'rv-turno-claro'};
+      if (/(?:^|\s)HELIO(?:\s|$)/.test(normalizarNomeRoteiroTurno_(n1)) || /(?:^|\s)HELIO(?:\s|$)/.test(normalizarNomeRoteiroTurno_(n2))) return {ordem:5, classe:'rv-turno-escuro'};
       if (nomeEstaNoGrupoRoteiro_(n1, RV_GRUPO_AZUL_CLARO)) return {ordem:0, classe:'rv-turno-claro'};
       if (nomeEstaNoGrupoRoteiro_(n1, RV_GRUPO_AZUL_ESCURO)) return {ordem:2, classe:'rv-turno-escuro'};
       if (nomeEstaNoGrupoRoteiro_(n2, RV_GRUPO_AZUL_CLARO)) return {ordem:0, classe:'rv-turno-claro'};
