@@ -4519,6 +4519,15 @@ function dataHoraSaoPauloTexto_() {
 
 
 
+// Datas de planilha podem estar exibidas com ou sem zeros à esquerda.
+function normalizarDataTextoRoteiro_(valor) {
+  if (valor instanceof Date) return formatarDataTexto(valor);
+  var s = String(valor || "").trim(), m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:$|\s)/);
+  if (m) return m[1].padStart(2,"0") + "/" + m[2].padStart(2,"0") + "/" + m[3];
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T|\s)/);
+  return m ? m[3] + "/" + m[2] + "/" + m[1] : s;
+}
+
 function itemRascunhoRoteiroDaLinha_(r) {
   r = r || [];
   return {
@@ -4673,7 +4682,7 @@ function salvarRascunhosRoteiro(itens, dataRoteiro, token) {
         var status = String(dados[10] || "").trim().toUpperCase();
         if (status === "CANCELADO") return;
 
-        var dataExistente = String(dados[0] || "").trim();
+        var dataExistente = normalizarDataTextoRoteiro_(dados[0]);
 
         if (dataExistente === dataTxt) {
           distribuidosMesmoDia[p] = true;
@@ -4728,7 +4737,7 @@ function salvarRascunhosRoteiro(itens, dataRoteiro, token) {
         var dadosLinha =
           dadosRascunho[lr];
 
-        if (String(dadosLinha[0] || "").trim() !== dataTxt) {
+        if (normalizarDataTextoRoteiro_(dadosLinha[0]) !== dataTxt) {
           continue;
         }
 
@@ -4885,7 +4894,7 @@ function obterRascunhosRoteiro(dataRoteiro, token) {
       var status = String(r[10] || "").trim().toUpperCase();
 
       if (status === "CANCELADO") return;
-      if (String(r[0] || "").trim() !== dataTxt) return;
+      if (normalizarDataTextoRoteiro_(r[0]) !== dataTxt) return;
 
       var protocolo = normalizarProtocoloRoteiro_(r[1]);
 
@@ -4904,7 +4913,7 @@ function obterRascunhosRoteiro(dataRoteiro, token) {
     var corrigiuStatus = false;
 
     vals.forEach(function(r, idx) {
-      if (String(r[0] || "").trim() !== dataTxt) return;
+      if (normalizarDataTextoRoteiro_(r[0]) !== dataTxt) return;
 
       var status = String(r[20] || "").trim().toUpperCase();
       if (status !== "RASCUNHO") return;
@@ -4996,7 +5005,7 @@ function removerRascunhosSelecionadosRoteiro(protocolos, dataRoteiro, token) {
         var protocolo = normalizarProtocoloRoteiro_(vals[i][1]);
 
         if (
-          String(vals[i][0] || "").trim() === dataTxt &&
+          normalizarDataTextoRoteiro_(vals[i][0]) === dataTxt &&
           mapaProtocolos[protocolo] &&
           String(vals[i][20] || "").trim().toUpperCase() === "RASCUNHO"
         ) {
@@ -5030,7 +5039,7 @@ function limparRascunhosRoteiroData(dataRoteiro, token) {
       var vals = aba.getRange(2,1,qtd,23).getDisplayValues();
       var status = vals.map(function(r) { return [String(r[20] || "").trim()]; });
       vals.forEach(function(r, i) {
-        if (String(r[0] || "").trim() === dataTxt && String(r[20] || "").trim().toUpperCase() === "RASCUNHO") {
+        if (normalizarDataTextoRoteiro_(r[0]) === dataTxt && String(r[20] || "").trim().toUpperCase() === "RASCUNHO") {
           status[i][0] = "REMOVIDO";
           tocados.push("T"+(i+2));
           removidos++;
@@ -5066,7 +5075,7 @@ function removerRascunhoRoteiro(protocolo, dataRoteiro, token) {
     var vals = aba.getRange(2,1,aba.getLastRow()-1,23).getDisplayValues();
     for (var i=vals.length-1; i>=0; i--) {
       if (
-        String(vals[i][0] || "").trim() === dataTxt &&
+        normalizarDataTextoRoteiro_(vals[i][0]) === dataTxt &&
         normalizarProtocoloRoteiro_(vals[i][1]) === protocolo &&
         String(vals[i][20] || "").trim().toUpperCase() === "RASCUNHO"
       ) {
@@ -5114,7 +5123,7 @@ function finalizarRascunhosRoteiro_(itens) {
 
   for (var i=0; i<vals.length; i++) {
     var chave =
-      String(vals[i][0] || "").trim() + "|" +
+      normalizarDataTextoRoteiro_(vals[i][0]) + "|" +
       normalizarProtocoloRoteiro_(vals[i][1]);
 
     if (
@@ -6517,7 +6526,7 @@ function finalizarRascunhosRoteiroRapido_(itens) {
   var alvos=Object.create(null);itens.forEach(function(item){var d=criarDataSegura(item.dataRoteiro),p=normalizarProtocoloRoteiro_(item.protocolo);if(d&&p)alvos[formatarDataTexto(d)+'|'+p]=true;});
   // Somente data/protocolo e status, em duas leituras, sem os 18 campos intermediários.
   var chaves=aba.getRange(2,1,fim-1,2).getDisplayValues(),status=aba.getRange(2,21,fim-1,1).getDisplayValues(),enderecos=[];
-  chaves.forEach(function(r,i){if(alvos[String(r[0]||'').trim()+'|'+normalizarProtocoloRoteiro_(r[1])]&&String(status[i][0]||'').trim().toUpperCase()==='RASCUNHO')enderecos.push('U'+(i+2));});
+  chaves.forEach(function(r,i){if(alvos[normalizarDataTextoRoteiro_(r[0])+'|'+normalizarProtocoloRoteiro_(r[1])]&&String(status[i][0]||'').trim().toUpperCase()==='RASCUNHO')enderecos.push('U'+(i+2));});
   if(enderecos.length)aba.getRangeList(enderecos).setValue('LANÇADO');
 }
 
@@ -6547,12 +6556,12 @@ function localizarDistribuicoesExistentesRapido_(roteiro,itens){
   var fim=roteiro.getLastRow();if(fim<2)return existentes;
   var datas=Object.create(null);(itens||[]).forEach(function(item){var d=criarDataSegura(item.dataRoteiro);if(d)datas[formatarDataTexto(d)]=true;});
   if(Object.keys(datas).length<=3){
-    var linhas=[];Object.keys(datas).forEach(function(d){roteiro.getRange(2,1,fim-1,1).createTextFinder(d).matchEntireCell(true).findAll().forEach(function(c){linhas.push(c.getRow());});});
+    var linhas=[];Object.keys(datas).forEach(function(d){var p=d.split('/'),variantes=[d,Number(p[0])+'/'+p[1]+'/'+p[2],p[0]+'/'+Number(p[1])+'/'+p[2],Number(p[0])+'/'+Number(p[1])+'/'+p[2],p[2]+'-'+p[1]+'-'+p[0]];Array.from(new Set(variantes)).forEach(function(v){roteiro.getRange(2,1,fim-1,1).createTextFinder(v).matchEntireCell(true).findAll().forEach(function(c){if(linhas.indexOf(c.getRow())<0)linhas.push(c.getRow());});});});
     var valores=lerLinhasProtocolosRoteiro_(roteiro,{datas:linhas},11);
-    Object.keys(valores).forEach(function(l){var r=valores[l],chave=String(r[0]||'').trim()+'|'+normalizarProtocoloRoteiro_(r[1]);if(alvos[chave]&&String(r[10]||'').trim().toUpperCase()!=='CANCELADO')existentes[chave]=true;});return existentes;
+    Object.keys(valores).forEach(function(l){var r=valores[l],chave=normalizarDataTextoRoteiro_(r[0])+'|'+normalizarProtocoloRoteiro_(r[1]);if(alvos[chave]&&String(r[10]||'').trim().toUpperCase()!=='CANCELADO')existentes[chave]=true;});return existentes;
   }
   var dados=roteiro.getRange(2,1,fim-1,2).getDisplayValues(),candidatas=[];
-  dados.forEach(function(r,i){var chave=String(r[0]||'').trim()+'|'+normalizarProtocoloRoteiro_(r[1]);if(alvos[chave])candidatas.push({i:i,chave:chave});});
+  dados.forEach(function(r,i){var chave=normalizarDataTextoRoteiro_(r[0])+'|'+normalizarProtocoloRoteiro_(r[1]);if(alvos[chave])candidatas.push({i:i,chave:chave});});
   if(candidatas.length){var status=roteiro.getRange(2,11,fim-1,1).getDisplayValues();candidatas.forEach(function(c){if(String(status[c.i][0]||'').trim().toUpperCase()!=='CANCELADO')existentes[c.chave]=true;});}
   return existentes;
 }
@@ -7513,8 +7522,8 @@ function chaveDataRoteiro_(valor) {
   var iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (iso) return iso[1] + "-" + iso[2] + "-" + iso[3];
 
-  var br = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-  if (br) return br[3] + "-" + br[2] + "-" + br[1];
+  var br = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (br) return br[3] + "-" + br[2].padStart(2,"0") + "-" + br[1].padStart(2,"0");
 
   var d = criarDataSegura(valor);
   return d ? Utilities.formatDate(d, "America/Sao_Paulo", "yyyy-MM-dd") : "";
@@ -12861,7 +12870,7 @@ function atualizarPreferenciasRascunhosRoteiro(itens,token) {
   try {
     var a=garantirEstruturaRascunhoRoteiro_(),qtd=Math.max(0,a.getLastRow()-1),mapa=Object.create(null);
     var vals=qtd?a.getRange(2,1,qtd,2).getDisplayValues():[],status=qtd?a.getRange(2,21,qtd,1).getDisplayValues():[];
-    vals.forEach(function(r,i){if(String(status[i][0]).trim().toUpperCase()==='RASCUNHO')mapa[String(r[0]).trim()+'|'+normalizarProtocoloRoteiro_(r[1])]=i+2;});
+    vals.forEach(function(r,i){if(String(status[i][0]).trim().toUpperCase()==='RASCUNHO')mapa[normalizarDataTextoRoteiro_(r[0])+'|'+normalizarProtocoloRoteiro_(r[1])]=i+2;});
     var alteradas={},tocados=[],ignorados=[];
     itens.forEach(function(x){var chave=formatarDataTexto(criarDataSegura(x.dataRoteiro))+'|'+normalizarProtocoloRoteiro_(x.protocolo),l=mapa[chave];
       if(!l){ignorados.push(x.protocolo);return;}
