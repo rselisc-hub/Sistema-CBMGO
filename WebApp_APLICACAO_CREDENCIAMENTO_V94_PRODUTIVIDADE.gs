@@ -13884,10 +13884,10 @@ function cadastrarMilitarPessoal(dados, token) {
       var linha=base.linha||Math.max(2,a.getLastRow()+1);
       if(base.existente){
         // Completa somente campos conhecidos vazios; não regrava fórmulas/colunas alheias.
-        Object.keys(valores).forEach(function(k){if(valores[k]&&!String(base.existente[base.mapa[k]]||'').trim())a.getRange(linha,base.mapa[k]+1).setNumberFormat('@').setValue(valores[k]);});
+        Object.keys(valores).forEach(function(k){if(valores[k]&&!String(base.existente[base.mapa[k]]||'').trim())a.getRange(linha,base.mapa[k]+1).setValue(valores[k]);});
       }else{
         var r=Array(base.cab.length).fill('');Object.keys(valores).forEach(function(k){r[base.mapa[k]]=valores[k];});
-        a.getRange(linha,1,1,r.length).setNumberFormat('@').setValues([r]);
+        a.getRange(linha,1,1,r.length).setValues([r]);
       }
     });
     var funcoes=ss.getSheetByName('FUNCOES_PESSOAL');
