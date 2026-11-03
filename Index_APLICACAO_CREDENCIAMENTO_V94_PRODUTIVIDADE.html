@@ -10415,6 +10415,7 @@
           if (!res.registros || res.registros.length === 0) {
             html += '<div class="alert alert-secondary">Nenhum militar escalado no período selecionado.</div>';
             document.getElementById('corpo-modal-sei').innerHTML = html;
+          centralizarTabelaParaCopia_('corpo-modal-sei');
             new bootstrap.Modal(document.getElementById('modalSEI')).show();
             return;
           }
@@ -10454,6 +10455,7 @@
           });
 
           document.getElementById('corpo-modal-sei').innerHTML = html;
+          centralizarTabelaParaCopia_('corpo-modal-sei');
           new bootstrap.Modal(document.getElementById('modalSEI')).show();
         })
         .withFailureHandler(function(err){if(consultaSeq!==consultasGestorSeq['visualizarEscalaSEI']||consultaToken!==sessaoToken)return;capturarErroServidor(err);})
@@ -10478,7 +10480,18 @@
 
 
 
+    function centralizarTabelaParaCopia_(id) {
+      var area=document.getElementById(id);if(!area)return;
+      area.querySelectorAll('th,td').forEach(function(celula){
+        celula.style.setProperty('text-align','center','important');
+        celula.style.setProperty('vertical-align','middle','important');
+        // A formatação acompanha o HTML copiado para o editor do SEI.
+        celula.setAttribute('align','center');celula.setAttribute('valign','middle');
+      });
+    }
+
     function copiarConteudoSEI() {
+      centralizarTabelaParaCopia_('corpo-modal-sei');
 
       var range = document.createRange(); range.selectNode(document.getElementById('corpo-modal-sei'));
 
@@ -11041,6 +11054,7 @@
           });
 
           document.getElementById('corpo-tabela-ac4').innerHTML = html;
+          centralizarTabelaParaCopia_('tabela-pagamento-ac4');
 
         })
 
@@ -11055,6 +11069,7 @@
 
 
     function copiarTabelaAC4() {
+      centralizarTabelaParaCopia_('tabela-pagamento-ac4');
 
       var range = document.createRange(); range.selectNode(document.getElementById('tabela-pagamento-ac4'));
 
