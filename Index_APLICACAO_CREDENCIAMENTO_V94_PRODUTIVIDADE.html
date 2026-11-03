@@ -1332,6 +1332,7 @@
           <div class="text-muted">Administração dos acessos pelo programa. As planilhas permanecem apenas como banco de dados.</div>
         </div>
         <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-primary" onclick="abrirCadastroMilitarPessoal()"><i class="bi bi-person-plus me-1"></i>Cadastrar militar</button>
           <button class="btn btn-success" onclick="abrirModalCadastrarAcesso()"><i class="bi bi-person-plus-fill me-1"></i>Cadastrar acesso</button>
           <button class="btn btn-outline-secondary" onclick="carregarAcessosFuncoesPessoal()"><i class="bi bi-arrow-repeat me-1"></i>Atualizar</button>
           <button class="btn text-white" style="background:#6f42c1;" onclick="salvarAcessosFuncoesPessoalTela()"><i class="bi bi-floppy me-1"></i>Salvar todas</button>
@@ -1363,6 +1364,15 @@
     </div>
   </div>
 
+
+  <div class="modal fade" id="modal-cadastrar-militar" tabindex="-1" aria-labelledby="novo-militar-titulo" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="novo-militar-titulo">Cadastrar militar</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button></div><div class="modal-body"><p class="small text-muted">Inclui o militar nas listas do sistema. O acesso de login é cadastrado separadamente.</p><div class="row g-3">
+    <div class="col-md-4"><label for="novo-mil-rg" class="form-label">RG *</label><input id="novo-mil-rg" class="form-control" inputmode="numeric" maxlength="16"></div>
+    <div class="col-md-4"><label for="novo-mil-posto" class="form-label">Posto / graduação *</label><input id="novo-mil-posto" class="form-control" maxlength="40" placeholder="Ex.: 3º SGT"></div>
+    <div class="col-md-4"><label for="novo-mil-guerra" class="form-label">Nome de guerra *</label><input id="novo-mil-guerra" class="form-control" maxlength="80"></div>
+    <div class="col-md-12"><label for="novo-mil-nome" class="form-label">Nome completo *</label><input id="novo-mil-nome" class="form-control" maxlength="160"></div>
+    <div class="col-md-6"><label for="novo-mil-cpf" class="form-label">CPF (necessário para o AC-4)</label><input id="novo-mil-cpf" class="form-control" inputmode="numeric" maxlength="14"></div>
+    <div class="col-md-6"><label for="novo-mil-email" class="form-label">E-mail</label><input id="novo-mil-email" class="form-control" type="email" maxlength="200"></div>
+    <div class="col-12"><label><input id="novo-mil-vistoriador" class="form-check-input me-2" type="checkbox" checked>Disponível como vistoriador</label></div></div><div id="novo-mil-status" class="small mt-3" role="status"></div></div><div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button><button class="btn btn-primary" id="novo-mil-salvar" onclick="salvarCadastroMilitarPessoal()">Salvar militar</button></div></div></div></div>
 
   <div class="modal fade" id="modal-cadastrar-acesso" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -2635,7 +2645,7 @@
       <button class="btn btn-outline-dark" onclick="abrirVistoriasDoDia()">
         <i class="bi bi-clipboard-data me-1"></i>Vistorias do Dia
       </button>
-      <button class="btn btn-outline-primary" onclick="atualizarTelaVistoriasVisivel_(true)" title="Atualizar somente a tela atual">
+      <button class="pend-atualizar btn btn-outline-primary" onclick="carregarPendenciasRoteiro()" title="Atualizar somente a tela atual">
         <i class="bi bi-arrow-repeat me-1"></i>Atualizar
       </button>
     </div>
@@ -2691,7 +2701,7 @@
             Vermelho = vistoria não realizada. Azul = solicitação registrada pelo Atendimento.
           </div>
         </div>
-        <button class="btn btn-outline-secondary btn-sm" onclick="carregarPendenciasRoteiro()">
+        <button class="pend-atualizar btn btn-outline-secondary btn-sm" onclick="carregarPendenciasRoteiro()">
           <i class="bi bi-arrow-clockwise me-1"></i>Atualizar
         </button>
       </div>
@@ -2702,6 +2712,7 @@
         <span class="text-muted">Clique no protocolo para abrir os detalhes, editar, adicionar ao roteiro ou finalizar.</span>
       </div>
 
+      <div id="pend-consulta-status" class="small mb-2" role="status" aria-live="polite"></div>
       <div class="pendencias-grade-wrap border rounded">
         <table class="table table-bordered table-sm mb-0 pendencias-grade" id="pendencias-grade-regioes">
           <thead id="pendencias-grade-cabecalho"></thead>
@@ -3721,6 +3732,28 @@
 
     var acessosFuncoesPessoalCache=[];
     function abrirModuloPessoal(restaurando){if(!usuarioLogado||!usuarioLogado.permissoes||!usuarioLogado.permissoes.gestor){alert('A área Pessoal está disponível somente para GESTOR.');return;}esconderTelasPrincipais();var t=document.getElementById('pessoal-screen');if(t)t.style.display='block';registrarTelaAtual('pessoal');}
+    var novoMilitarEnviando=false;
+    function abrirCadastroMilitarPessoal(){
+      if(!usuarioLogado||!usuarioLogado.permissoes||!usuarioLogado.permissoes.gestor)return;
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-cadastrar-militar')).show();
+    }
+    function salvarCadastroMilitarPessoal(){
+      if(novoMilitarEnviando||!usuarioLogado||!usuarioLogado.permissoes||!usuarioLogado.permissoes.gestor)return;
+      var get=function(id){return document.getElementById('novo-mil-'+id).value.trim();},st=document.getElementById('novo-mil-status');
+      var dados={rg:get('rg'),posto:get('posto'),nomeGuerra:get('guerra'),nomeCompleto:get('nome'),cpf:get('cpf'),email:get('email'),vistoriador:document.getElementById('novo-mil-vistoriador').checked};
+      if(!dados.rg||!dados.posto||!dados.nomeGuerra||!dados.nomeCompleto){st.textContent='Preencha os quatro campos obrigatórios.';return;}
+      var token=sessaoToken,campos=Array.from(document.querySelectorAll('#modal-cadastrar-militar input,#modal-cadastrar-militar button'));
+      novoMilitarEnviando=true;campos.forEach(function(el){el.disabled=true;});st.textContent='Salvando cadastro…';
+      function liberar(){novoMilitarEnviando=false;campos.forEach(function(el){el.disabled=false;});}
+      google.script.run.withSuccessHandler(function(r){
+        if(!r||!r.sucesso){liberar();st.textContent='Não foi possível confirmar o cadastro. Os dados foram mantidos.';return;}
+        liberar();if(token!==sessaoToken)return;st.textContent=r.mensagem;
+        ['rg','posto','guerra','nome','cpf','email'].forEach(function(id){document.getElementById('novo-mil-'+id).value='';});
+        if(typeof militaresRoteiro!=='undefined')militaresRoteiro=[];militaresGlobal=[];
+        carregarAcessosFuncoesPessoal();
+      }).withFailureHandler(function(err){liberar();if(token===sessaoToken)st.textContent='Cadastro não confirmado. Os dados foram mantidos; repita para conferir sem duplicar o RG. '+(err&&err.message||err);}).cadastrarMilitarPessoal(dados,token);
+    }
+
     function abrirAcessosFuncoesPessoal(restaurando){if(!usuarioLogado||!usuarioLogado.permissoes||!usuarioLogado.permissoes.gestor){alert('A área Acessos e Funções está disponível somente para GESTOR.');return;}esconderTelasPrincipais();var t=document.getElementById('pessoal-funcoes-screen');if(t)t.style.display='block';registrarTelaAtual('pessoal-funcoes');carregarAcessosFuncoesPessoal();}
     function abrirFuncoesPessoal(restaurando){abrirAcessosFuncoesPessoal(restaurando);}
     function carregarAcessosFuncoesPessoal(){var t=document.getElementById('acessos-pessoal-tbody');if(t)t.innerHTML='<tr><td colspan="8" class="text-muted">Carregando...</td></tr>';google.script.run.withSuccessHandler(function(r){acessosFuncoesPessoalCache=(r&&r.registros)||[];renderizarAcessosFuncoesPessoal();}).withFailureHandler(capturarErroServidor).listarAcessosFuncoesPessoal(sessaoToken);}
@@ -4175,7 +4208,7 @@
     function abrirDetalhePendenciaAtendimento(indice){
       if(!podeConsultarPendenciasAtendimento_())return;
       var item=atendimentoPendencias.visiveis[indice];if(!item)return;var x=item.dados;
-      var campos=[['Protocolo',x.protocolo],['Razão social',x.razaoSocial],['Origem',x.origem||'NÃO REALIZADA'],['Motivo',x.motivo],['Região',x.regiao],['Bairro',x.bairro],['Serviço',x.servico],['Divisão',x.divisao],['Área',x.area],['Andamento',x.andamento],['Vistoriado por',x.vistoriadoPor],['Distribuição anterior',x.dataAnterior],['Equipe anterior',[x.militar1,x.militar2].filter(Boolean).join(' / ')],['Solicitado por',x.atendente],['Data da solicitação',x.dataCadastro],['Evento temporário',x.eventoTemporario?'Sim':''],['Observação',x.observacao]];
+      var campos=[['Protocolo',x.protocolo],['Razão social',x.razaoSocial],['Origem',x.origem||'NÃO REALIZADA'],['Motivo',x.motivo],['Região',x.regiao],['Bairro',x.bairro],['Serviço',x.servico],['Divisão',x.divisao],['Área',String(x.area==null?'':x.area).trim()?formatarAreaM2Roteiro_(String(x.area)):''],['Andamento',x.andamento],['Vistoriado por',x.vistoriadoPor],['Distribuição anterior',x.dataAnterior],['Equipe anterior',[x.militar1,x.militar2].filter(Boolean).join(' / ')],['Solicitado por',x.atendente],['Data da solicitação',x.dataCadastro],['Evento temporário',x.eventoTemporario?'Sim':''],['Observação',x.observacao]];
       document.getElementById('atd-pend-modal-titulo').textContent=x.protocolo||'Informações da pendência';document.getElementById('atd-pend-modal-corpo').innerHTML=campos.filter(function(c){return c[1]!==undefined&&c[1]!==null&&String(c[1]).trim()!=='';}).map(function(c){return '<p><strong>'+c[0]+':</strong> '+escaparHtmlRoteiro(c[1])+'</p>';}).join('');
       bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-atd-pendencia')).show();
     }
@@ -7760,7 +7793,7 @@
     var conferenciaConclusaoEmAndamento = false;
     var conferenciaConclusaoNaoConfirmada = null;
     window.addEventListener('beforeunload',function(event){
-      if(pseAjusteNovembroEmCurso || financeiroGestor.salvando || financeiroGestor.editando || minhasVistorias.enviando || minhasVistorias.tentativa || conferenciaManualEnviando || conferenciaReabrindo || escalaGestorEnviando || voluntariosLancando || Object.keys(atendimentoEnvios||{}).length || docsCadastroEnviando || docsTentativaCadastro || conferenciaConclusaoEmAndamento || conferenciaConclusaoNaoConfirmada || Object.keys(preferenciasRascunhoPendentes||{}).length){event.preventDefault();event.returnValue='';}
+      if(novoMilitarEnviando || pseAjusteNovembroEmCurso || financeiroGestor.salvando || financeiroGestor.editando || minhasVistorias.enviando || minhasVistorias.tentativa || conferenciaManualEnviando || conferenciaReabrindo || escalaGestorEnviando || voluntariosLancando || Object.keys(atendimentoEnvios||{}).length || docsCadastroEnviando || docsTentativaCadastro || conferenciaConclusaoEmAndamento || conferenciaConclusaoNaoConfirmada || Object.keys(preferenciasRascunhoPendentes||{}).length){event.preventDefault();event.returnValue='';}
     });
     function informarGravacaoConferencia(texto,erro) {
       var el=document.getElementById('conf-gravacao-status');
@@ -8249,16 +8282,27 @@
     }
 
 
+    var pendenciasRoteiroConsultaSeq=0;
     function carregarPendenciasRoteiro() {
-      google.script.run
-        .withSuccessHandler(function(r) {
-          pendenciasRoteiroCache = r || {naoRealizadas:[], atendimento:[]};
-          renderizarPendenciasRoteiro();
-        })
-        .withFailureHandler(capturarErroServidor)
-        .obterPendenciasRoteiro(sessaoToken);
+      var seq=++pendenciasRoteiroConsultaSeq,token=sessaoToken,st=document.getElementById('pend-consulta-status');
+      var botoes=document.querySelectorAll('#roteiro-pendencias-screen .pend-atualizar');
+      botoes.forEach(function(b){if(!b.dataset.pendTexto)b.dataset.pendTexto=b.innerHTML;b.disabled=true;b.textContent='Atualizando…';});
+      st.textContent='Consultando as pendências na planilha…';
+      function atual(){return seq===pendenciasRoteiroConsultaSeq&&token===sessaoToken;}
+      function liberar(){botoes.forEach(function(b){b.disabled=false;b.innerHTML=b.dataset.pendTexto||'Atualizar';delete b.dataset.pendTexto;});}
+      function falhar(err){if(!atual())return;liberar();st.textContent='Não foi possível atualizar. A lista anterior foi mantida. '+(err&&err.message||err||'Tente novamente.');}
+      google.script.run.withSuccessHandler(function(r){
+        if(!atual())return;if(!r||!r.sucesso){falhar('Resposta não confirmada.');return;}
+        pendenciasRoteiroCache=r;renderizarPendenciasRoteiro();liberar();
+        var total=(r.naoRealizadas||[]).length+(r.atendimento||[]).length;
+        st.textContent='Atualizado às '+new Date().toLocaleTimeString('pt-BR')+' — '+total+' pendência(s).';
+      }).withFailureHandler(falhar).obterPendenciasRoteiro(token);
     }
 
+    function linhaAreaPendencia_(x){
+      var area=String(x.area==null?'':x.area).trim();
+      return area?'<p><strong>Área:</strong> '+escaparHtmlRoteiro(formatarAreaM2Roteiro_(area))+'</p>':'';
+    }
 
     function normalizarRegiaoPendencia(valor) {
       return String(valor || '')
@@ -8453,6 +8497,11 @@
       var lista = pendenciasRoteiroCache[tipo] || [];
       var x = lista[idx];
       if (!x) return;
+      function indiceAtual(){
+        var i=(pendenciasRoteiroCache[tipo]||[]).findIndex(function(item){return String(item.id)===String(x.id)&&String(item.protocolo)===String(x.protocolo);});
+        if(i<0)alert('Esta pendência mudou ou saiu da lista. Atualize a consulta e abra novamente o protocolo.');
+        return i;
+      }
 
       var ehAtd = tipo === 'atendimento';
       var ehManual = !ehAtd && String(x.origem || '').toUpperCase() === 'CADASTRO MANUAL';
@@ -8461,6 +8510,7 @@
       if (ehAtd) {
         htmlCorpo =
           '<p><strong>Protocolo:</strong> ' + escaparHtmlRoteiro(x.protocolo) + '</p>' +
+          linhaAreaPendencia_(x) +
           '<p><strong>Razão Social:</strong> ' + escaparHtmlRoteiro(x.razaoSocial || '-') + '</p>' +
           '<p><strong>Motivo:</strong> ' + escaparHtmlRoteiro(x.motivo || '-') + '</p>' +
           '<p><strong>Setor/Região:</strong> ' + escaparHtmlRoteiro(x.regiao || '-') + '</p>' +
@@ -8479,7 +8529,7 @@
           '<p><strong>Razão Social:</strong> ' + escaparHtmlRoteiro(x.razaoSocial || '-') + '</p>' +
           '<p><strong>Divisão:</strong> ' + escaparHtmlRoteiro(x.divisao || '-') + '</p>' +
           '<p><strong>Vistoriado por:</strong> ' + escaparHtmlRoteiro(x.vistoriadoPor || '-') + '</p>' +
-          '<p><strong>Área:</strong> ' + escaparHtmlRoteiro(x.area || '-') + '</p>' +
+          linhaAreaPendencia_(x) +
           '<p><strong>Observação:</strong> ' + escaparHtmlRoteiro(x.observacao || '-') + '</p>' +
           '</div>';
       } else {
@@ -8490,6 +8540,7 @@
           '<p><strong>Distribuição anterior:</strong> ' + escaparHtmlRoteiro(x.dataAnterior || '-') + '</p>' +
           '<p><strong>Equipe anterior:</strong> ' + escaparHtmlRoteiro(equipe || '-') + '</p>' +
           '<p><strong>Região:</strong> ' + escaparHtmlRoteiro(x.regiao || '-') + '</p>' +
+          linhaAreaPendencia_(x) +
           '<p><strong>Observação anterior:</strong> ' + escaparHtmlRoteiro(x.observacao || '-') + '</p>';
       }
 
@@ -8502,15 +8553,15 @@
       var btnEditar = document.getElementById('pend-modal-editar');
       btnEditar.style.display = ehManual ? 'inline-block' : 'none';
       btnEditar.onclick = function() {
-        abrirEdicaoPendenciaManual(idx);
+        var i=indiceAtual();if(i>=0)abrirEdicaoPendenciaManual(i);
       };
 
       document.getElementById('pend-modal-finalizar').onclick = function() {
-        finalizarPendenciaNaTela(tipo, idx);
+        var i=indiceAtual();if(i>=0)finalizarPendenciaNaTela(tipo,i);
       };
 
       document.getElementById('pend-modal-adicionar').onclick = function() {
-        adicionarPendenciaAoRoteiro(tipo, idx);
+        var i=indiceAtual();if(i>=0)adicionarPendenciaAoRoteiro(tipo,i);
       };
 
       var modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-pendencia-roteiro'));
@@ -10117,6 +10168,7 @@
 
 
     function limparSessaoLocal() {
+      pendenciasRoteiroConsultaSeq++;document.getElementById('pend-consulta-status').textContent='';
       roteiroVistoriadoresConsultaSeq++;roteirosResponsivos_={};document.getElementById('rv-conteudo').textContent='';document.getElementById('atd-rv-conteudo').textContent='';
       financeiroGestor.editando=false;financeiroGestor.mesCarregado='';financeiroGestor.mesEdicao='';controlesFinanceiroGestor_();
       minhasVistorias.seq++;minhasVistorias.itens=[];minhasVistorias.tentativa=null;document.getElementById('mv-tbody').textContent='';document.body.classList.remove('perfil-vistoriador');
@@ -10133,6 +10185,7 @@
 
 
     function sairDoSistema() {
+      if(novoMilitarEnviando){alert('Aguarde a confirmação do novo militar antes de sair.');return;}
       if(pseAjusteNovembroEmCurso){alert('Aguarde o ajuste automático da escala de novembro antes de sair.');return;}
       if(financeiroGestor.salvando){alert('Aguarde a confirmação dos valores do AC-4 antes de sair.');return;}
       if(financeiroGestor.editando&&!confirm('Descartar as alterações ainda não salvas da cota AC-4?'))return;

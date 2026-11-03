@@ -7185,6 +7185,11 @@ function consultarPendenciasVistoriasAtendimento(token) {
   return lerPendenciasRoteiro_({pendencias:ss.getSheetByName('PENDENCIAS_VISTORIAS'),solicitacoes:ss.getSheetByName('SOLICITACOES_VISTORIA')});
 }
 
+function areaCadastradaPendencia_(valor) {
+  var area=String(valor==null?'':valor).trim();
+  return /^(?:-|—|N\/A|N[AÃ]O INFORMAD[AO])$/i.test(area)?'':area;
+}
+
 function lerPendenciasRoteiro_(est) {
   var vermelhas = [];
   var azuis = [];
@@ -7202,7 +7207,7 @@ function lerPendenciasRoteiro_(est) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var roteiro = ss.getSheetByName("ROTEIRO_VISTORIAS");
   var pendenciasJaRedistribuidas = {};
-  var solicitacoesJaDistribuidas = {};
+  var solicitacoesJaDistribuidas = {}, areasCadastradas = {};
 
   if (roteiro && roteiro.getLastRow() >= 2) {
     var rv = roteiro.getRange(
@@ -7213,6 +7218,8 @@ function lerPendenciasRoteiro_(est) {
     ).getDisplayValues();
 
     rv.forEach(function(r) {
+      var prArea = normalizarProtocoloRoteiro_(r[1]), areaBase = areaCadastradaPendencia_(r[17]);
+      if (prArea && areaBase) areasCadastradas[prArea] = areaBase;
       var status = String(r[10] || "").trim().toUpperCase();
       if (status === "CANCELADO") return;
 
@@ -7300,6 +7307,36 @@ function lerPendenciasRoteiro_(est) {
       });
     });
   }
+
+  var itensArea = vermelhas.concat(azuis), faltantes = {};
+  itensArea.forEach(function(x) {
+    var pr = normalizarProtocoloRoteiro_(x.protocolo);
+    var conhecida=areaCadastradaPendencia_(x.area);
+    if(conhecida)return;
+    if(Object.prototype.hasOwnProperty.call(x,"area"))x.area="";
+    if (areasCadastradas[pr]) x.area = areasCadastradas[pr];
+    else if (pr) faltantes[pr] = true;
+  });
+  // Consulta em lote somente os protocolos que ainda não possuem área conhecida.
+  [["RASCUNHO_ROTEIRO",2,10,9],["CONFERENCIA_PROTOCOLOS",1,8,7]].forEach(function(fonte) {
+    var protocolos = Object.keys(faltantes); if (!protocolos.length) return;
+    var aba = ss.getSheetByName(fonte[0]); if (!aba || aba.getLastRow()<2) return;
+    var linhas = localizarLinhasProtocolosRoteiro_(aba,fonte[1],protocolos);
+    var dados = lerLinhasProtocolosRoteiro_(aba,linhas,fonte[2]);
+    protocolos.forEach(function(pr) {
+      var ls = linhas[pr] || [];
+      for (var i=ls.length-1;i>=0;i--) {
+        var area = areaCadastradaPendencia_(dados[ls[i]][fonte[3]]);
+        if (area) { areasCadastradas[pr]=area;delete faltantes[pr];break; }
+      }
+    });
+  });
+  itensArea.forEach(function(x) {
+    if (!String(x.area == null ? "" : x.area).trim()) {
+      var area = areasCadastradas[normalizarProtocoloRoteiro_(x.protocolo)];
+      if (area) x.area=area;
+    }
+  });
 
   return {
     sucesso:true,
@@ -13805,5 +13842,60 @@ function registrarNaoRealizadasVistoriador(itens,motivo,observacao,token){
     if(novasPendencias.length){pend.getRange(pend.getLastRow()+1,1,novasPendencias.length,22).setValues(novasPendencias);SpreadsheetApp.flush();}
     if(novosEventos.length)hist.getRange(hist.getLastRow()+1,1,novosEventos.length,18).setValues(novosEventos);
     SpreadsheetApp.flush();return {sucesso:true,itens:saida,mensagem:'Não realizadas registradas nas Pendências. As demais visitas não foram alteradas.'};
+  }finally{lock.releaseLock();}
+}
+
+// Inclusão cadastral pelo Gestor, sem conceder acesso de login.
+function cadastrarMilitarPessoal(dados, token) {
+  var sessao=exigirPerfil_(token,['GESTOR']);dados=dados||{};
+  var texto=function(v){return String(v==null?'':v).trim().replace(/\s+/g,' ');};
+  if(!/^[\d.\s-]+$/.test(String(dados.rg||'').trim()))throw Error('Informe o RG numérico do militar.');
+  var rg=rgVisitaPessoal_(dados.rg),cpf=texto(dados.cpf).replace(/\D/g,''),email=texto(dados.email).toLowerCase();
+  var nome=texto(dados.nomeCompleto).toUpperCase(),guerra=texto(dados.nomeGuerra).toUpperCase(),posto=texto(dados.posto).toUpperCase();
+  if(!rg||rg.length>12||!nome||!guerra||!posto||nome.length>160||guerra.length>80||posto.length>40)throw Error('Preencha RG, nome completo, nome de guerra e posto/graduação válidos.');
+  if(cpf&&(!/^\d{11}$/.test(cpf)||/^(\d)\1{10}$/.test(cpf)))throw Error('Informe um CPF com 11 dígitos ou deixe o campo vazio.');
+  if(email&&(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>200))throw Error('Informe um e-mail válido ou deixe o campo vazio.');
+  if([nome,guerra,posto,email].some(function(v){return /^[=+@]/.test(v);}))throw Error('Os campos do cadastro não podem começar com caracteres de fórmula.');
+  var valores={rg:rg,cpf:cpf,nome:nome,guerra:guerra,posto:posto,email:email,id:posto+' '+guerra};
+  var padrao={rg:'RG',cpf:'CPF',nome:'NOME COMPLETO',guerra:'NOME DE GUERRA',posto:'POSTO/GRADUAÇÃO',email:'EMAIL',id:'ID MILITAR'};
+  var mapaCab=function(cab){var m={};cab.forEach(function(v,i){var h=texto(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/_/g,' ').toUpperCase();var k='';if(h==='RG'||/^RG\b/.test(h))k='rg';else if(h.indexOf('CPF')!==-1)k='cpf';else if(h.indexOf('GUERRA')!==-1)k='guerra';else if(h==='NOME'||h.indexOf('NOME COMPLETO')!==-1)k='nome';else if(h.indexOf('POSTO')!==-1||h.indexOf('GRAD')!==-1)k='posto';else if(h==='EMAIL'||h==='E-MAIL'||h.indexOf('EMAIL')!==-1)k='email';else if(h.indexOf('ID MILITAR')!==-1)k='id';if(k&&m[k]===undefined)m[k]=i;});return m;};
+  var lock=LockService.getScriptLock();lock.waitLock(15000);
+  try{
+    sessao=exigirPerfil_(token,['GESTOR']);
+    var ss=SpreadsheetApp.getActiveSpreadsheet(),cad=ss.getSheetByName('Cadastro'),oficial=ss.getSheetByName('DADOS'),bases=cad?[{nome:'Cadastro',aba:cad},{nome:'DADOS',aba:oficial}]:[{nome:'DADOS',aba:oficial}],jaExistia=false;
+    // Planeja e valida as duas bases antes de gravar qualquer dado.
+    bases.forEach(function(base){
+      var a=base.aba,col=a&&a.getLastRow()?a.getLastColumn():0,cab=col?a.getRange(1,1,1,col).getDisplayValues()[0]:[],mapa=mapaCab(cab),linhas=a&&a.getLastRow()>1?a.getRange(2,1,a.getLastRow()-1,col).getDisplayValues():[];
+      if(linhas.length&&mapa.rg===undefined)throw Error('Cabeçalho RG não reconhecido em '+base.nome+'. Nenhum cadastro foi alterado.');
+      base.col=col;base.cab=cab.slice();base.mapa=mapa;base.linha=0;base.existente=null;
+      Object.keys(padrao).forEach(function(k){if(mapa[k]===undefined){mapa[k]=base.cab.length;base.cab.push(padrao[k]);}});
+      linhas.forEach(function(r,i){
+        var outroRg=rgVisitaPessoal_(r[mapa.rg]),outroCpf=texto(r[mapa.cpf]).replace(/\D/g,'');
+        if(cpf&&outroCpf===cpf&&outroRg!==rg)throw Error('Este CPF já está cadastrado com outro RG. Confira o cadastro existente.');
+        if(outroRg!==rg)return;
+        if(base.existente)throw Error('Há RG duplicado em '+base.nome+'. Confira os registros antes de cadastrar.');
+        ['nome','guerra','posto','cpf','email','id'].forEach(function(k){var atual=texto(r[mapa[k]]);if(k==='cpf')atual=atual.replace(/\D/g,'');else if(k==='email')atual=atual.toLowerCase();else atual=atual.toUpperCase();if(atual&&valores[k]&&atual!==valores[k])throw Error('RG já cadastrado com dados diferentes em '+base.nome+'. O registro existente foi preservado.');});
+        base.linha=i+2;base.existente=r;jaExistia=true;
+      });
+    });
+    bases.forEach(function(base){
+      var a=base.aba||ss.insertSheet(base.nome);
+      if(base.cab.length>base.col)a.getRange(1,base.col+1,1,base.cab.length-base.col).setValues([base.cab.slice(base.col)]);
+      var linha=base.linha||Math.max(2,a.getLastRow()+1);
+      if(base.existente){
+        // Completa somente campos conhecidos vazios; não regrava fórmulas/colunas alheias.
+        Object.keys(valores).forEach(function(k){if(valores[k]&&!String(base.existente[base.mapa[k]]||'').trim())a.getRange(linha,base.mapa[k]+1).setNumberFormat('@').setValue(valores[k]);});
+      }else{
+        var r=Array(base.cab.length).fill('');Object.keys(valores).forEach(function(k){r[base.mapa[k]]=valores[k];});
+        a.getRange(linha,1,1,r.length).setNumberFormat('@').setValues([r]);
+      }
+    });
+    var funcoes=ss.getSheetByName('FUNCOES_PESSOAL');
+    if(!funcoes)funcoes=ss.insertSheet('FUNCOES_PESSOAL');
+    if(!funcoes.getLastRow()){funcoes.getRange(1,1,1,6).setValues([['RG','NOME','GRADUAÇÃO','FUNÇÕES','ATUALIZADO_EM','ATUALIZADO_POR']]);}
+    var existeFuncao=funcoes.getLastRow()>1&&funcoes.getRange(2,1,funcoes.getLastRow()-1,1).getDisplayValues().some(function(r){return rgVisitaPessoal_(r[0])===rg;});
+    if(!existeFuncao)funcoes.getRange(Math.max(2,funcoes.getLastRow()+1),1,1,6).setValues([[rg,guerra,posto,dados.vistoriador===true?'VISTORIADOR':'',dataHoraSaoPauloTexto_(),sessao.nome||sessao.rg]]);
+    SpreadsheetApp.flush();cacheMilitaresRoteiroExecucao_=null;
+    return {sucesso:true,rg:rg,jaCadastrado:jaExistia,mensagem:jaExistia?'Cadastro já existente conferido, sem duplicar o militar.':'Militar cadastrado com sucesso. Para conceder login, utilize Cadastrar acesso.'};
   }finally{lock.releaseLock();}
 }
