@@ -47,3 +47,7 @@ A identificação de pendência pessoal exige também a mesma data e protocolo, 
 No fluxo manual da Conferência, a busca não oferece visitas futuras, o envio informa a data selecionada e o servidor valida esse vínculo sob trava. O histórico recebe um novo evento com a data e equipe corretas, sem sobrescrever o último evento apenas por número do protocolo. Chamadas antigas sem referência usam a visita mais recente até hoje. Consultar Vistorias do Dia mantém a separação já existente de data + protocolo. Não há limpeza nem correção automática de históricos antigos sem confirmação da visita a que pertencem.
 
 Validação desta entrega: 269 testes automatizados e 30 cenários Chromium relacionados (Gestor/escala, Vistoriador, Controle de dados e consulta PSE), com serviços Google simulados.
+
+## Roteiro próprio e leitura mobile — 03/11/2026
+
+A restrição por titular/canga no Roteiro dos Vistoriadores aplica-se exclusivamente a VISTORIADOR, conforme confirmação do usuário. Os demais perfis conservam a resposta completa, incluindo CONSULTA. O filtro por RG ocorre antes do agrupamento e não permite que o segundo integrante veja protocolos atribuídos a outro canga do mesmo titular. A visualização mobile por equipe utiliza a resposta filtrada; a limitação não é feita apenas no navegador. Minhas Vistorias mantém seu filtro próprio anterior. Ver detalhes em layout-responsivo.md.

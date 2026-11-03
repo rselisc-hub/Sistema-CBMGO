@@ -445,6 +445,46 @@
       .modal-body { padding:1rem; }
     }
 
+    /* Leitura móvel: equipe e protocolos na largura do aparelho. */
+    .rv-mobile-data { font-size:1rem; font-weight:800; margin:0 0 12px; }
+    .rv-mobile-equipe { border:1px solid #c8d3de; border-radius:10px; overflow:hidden; margin-bottom:16px; background:#fff; }
+    .rv-mobile-equipe h3 { font-size:1.05rem; font-weight:800; padding:12px; margin:0; overflow-wrap:anywhere; }
+    .rv-mobile-resumo { padding:12px; font-size:.95rem; }
+    .rv-mobile-resumo p { margin-bottom:8px; overflow-wrap:anywhere; }
+    .rv-mobile-equipe details { border-top:1px solid #e2e6ea; margin-top:10px; padding-top:10px; }
+    .rv-mobile-equipe summary { min-height:44px; padding:10px 0; font-weight:600; color:#234f7a; cursor:pointer; }
+    .rv-mobile-equipe dl { margin:0; }
+    .rv-mobile-equipe dt { font-size:.8rem; color:#526170; margin-top:8px; }
+    .rv-mobile-equipe dd { margin:0; overflow-wrap:anywhere; }
+    .rv-mobile-protocolos { display:flex; flex-wrap:wrap; gap:8px; padding:0 12px 12px; }
+    .rv-mobile-protocolo { display:flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:10px; border:1px solid #a9b5c0; border-radius:6px; font-size:1rem; font-weight:700; color:#111; flex:1 1 130px; overflow-wrap:anywhere; }
+    .rv-mobile-afastamento { border:1px solid #d8c1f3; border-radius:8px; background:#f7efff; padding:12px; margin-bottom:10px; overflow-wrap:anywhere; }
+    @media screen and (max-width:767.98px) {
+      #roteiro-screen .table-responsive { overflow-x:auto !important; }
+      .navbar-cbmgo small { display:none; }
+      #vistorias-roteiro-vistoriadores-screen, #atendimento-roteiro-vistoriadores-screen { margin-top:12px !important; }
+      #vistorias-roteiro-vistoriadores-screen > .card:first-child, #atendimento-roteiro-vistoriadores-screen > .card:first-child { padding:12px !important; margin-bottom:12px !important; }
+      #vistorias-roteiro-vistoriadores-screen > .card:first-child .text-muted, #atendimento-roteiro-vistoriadores-screen > .card:first-child .text-muted { display:none; }
+      #vistorias-roteiro-vistoriadores-screen > .card:first-child h4, #atendimento-roteiro-vistoriadores-screen > .card:first-child h4 { font-size:1rem; }
+      #vistorias-roteiro-vistoriadores-screen .row.g-3, #atendimento-roteiro-vistoriadores-screen .row.g-3 { --bs-gutter-x:.5rem; --bs-gutter-y:.5rem; }
+      #rv-resumo, #atd-rv-resumo { font-size:.8rem !important; }
+
+      .card-custom h4 { font-size:1.2rem; }
+      .btn, .form-control, .form-select { min-height:44px; }
+      .form-check-input, .mv-check, .vd-check-item { width:22px; height:22px; }
+      .mobile-list-wrap { overflow:visible !important; max-height:none !important; }
+      table.mobile-list-table { display:block; width:100%; min-width:0; border:0; }
+      .mobile-list-table thead { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); }
+      .mobile-list-table tbody { display:block; }
+      .mobile-list-table tr { display:block; margin:0 0 14px; border:1px solid #d4dce3; border-radius:10px; padding:8px; background:#fff; }
+      .mobile-list-table td { display:block; width:auto !important; min-width:0 !important; max-width:none; text-align:left !important; white-space:normal !important; overflow-wrap:anywhere; padding:8px !important; border:0; }
+      .mobile-list-table td[data-mobile-label]::before { content:attr(data-mobile-label); display:block; font-size:.75rem; font-weight:700; color:#526170; margin-bottom:3px; }
+      .mobile-list-table td.mobile-cell-grupo { display:none; }
+      .mobile-list-table tr[data-mobile-grupo]::before { content:attr(data-mobile-grupo); display:block; font-weight:800; background:#eaf4fc; padding:10px; border-radius:6px; overflow-wrap:anywhere; }
+      .mobile-list-table td[colspan]::before { content:none; }
+      .mobile-list-table .btn { min-width:44px; margin-bottom:4px; }
+    }
+
     /* Tablets: de 768 a 1199 px, incluindo orientação horizontal. */
     @media screen and (min-width:768px) and (max-width:1199.98px) {
       .navbar-cbmgo { padding:14px 16px; flex-wrap:wrap; gap:12px; }
@@ -4304,6 +4344,7 @@
             totalProtocolos + ' protocolo(s)';
 
           if (!blocos.length) {
+            delete roteirosResponsivos_[conteudo.id];
             status.className = 'alert alert-warning mb-3';
 
             status.textContent = data
@@ -4328,6 +4369,7 @@
         })
         .withFailureHandler(function(err) {
           if(seq!==atdRoteiroSeq||token!==sessaoToken)return;
+          delete roteirosResponsivos_[conteudo.id];
           atdRoteiroCarregando=null;
           if(!roteiroVistoriadoresAtendimentoJaCarregado)resumo.textContent = '0 equipe(s)';
 
@@ -4347,8 +4389,65 @@
     }
 
 
+    var roteirosResponsivos_ = {};
+    var mediaRoteiroMobile_ = window.matchMedia('(max-width:767.98px)');
+    function renderizarRoteiroMobile_(blocos, conteudo) {
+      roteirosResponsivos_[conteudo.id] = blocos || [];
+      if(!mediaRoteiroMobile_.matches)return false;
+      var esc=escaparHtmlRoteiro,html='';
+      (blocos||[]).forEach(function(bloco){
+        var equipes=ordenarEquipesRoteiroVistoriadores_(bloco.equipes||[]),afastamentos=bloco.afastamentos||[];
+        if(!equipes.length&&!afastamentos.length)return;
+        html+='<section class="mb-4"><h2 class="rv-mobile-data">ROTEIRO DE VISTORIAS — '+esc(bloco.data||'')+'</h2>';
+        if(!equipes.length)html+='<p class="text-muted">Nenhum protocolo distribuído para esta data.</p>';
+        equipes.forEach(function(eq){
+          var protocolos=eq.protocolos||[],periodo=eq.militar2&&eq.periodo2&&eq.periodo2!==eq.periodo?'V1: '+(eq.periodo||'-')+' / V2: '+eq.periodo2:eq.periodo||'-';
+          html+='<article class="rv-mobile-equipe"><h3 class="'+infoTurnoEquipeRoteiro_(eq).classe+'">'+esc(eq.militar1||'Equipe')+'</h3><div class="rv-mobile-resumo">';
+          if(eq.militar2)html+='<p><strong>Canga:</strong> '+esc(eq.militar2)+'</p>';
+          html+='<p><strong>Período:</strong> '+esc(periodo)+'</p><p><strong>Região:</strong> '+esc(eq.regiao||'Não informada')+'</p><span class="badge text-bg-secondary">'+protocolos.length+' protocolo(s)</span>';
+          html+='<details><summary>Ver detalhes da equipe</summary><dl>';
+          [['Tipo de serviço',eq.tipoEquipe],['VTR',eq.vtr],['Situação da VTR',eq.situacaoVtr],['Setor / bairro',eq.setores]].forEach(function(par){html+='<dt>'+esc(par[0])+'</dt><dd>'+esc(par[1]||'Não informado')+'</dd>';});
+          html+='</dl></details></div><div class="rv-mobile-protocolos">';
+          protocolos.forEach(function(item){
+            var obs=!!String(item.observacao||'').trim(),classe='rv-mobile-protocolo '+classeCorProtocoloRoteiroWeb(item.cor);
+            if(obs)html+='<button type="button" class="'+classe+'" data-protocolo="'+esc(item.protocolo||'')+'" data-observacao="'+esc(item.observacao||'')+'" aria-label="Protocolo '+esc(item.protocolo||'')+'. Ver observação" onclick="abrirObservacaoRoteiroElemento_(this)">'+esc(item.protocolo||'')+iconeObservacaoRoteiro_(item)+'</button>';
+            else html+='<span class="'+classe+'">'+esc(item.protocolo||'')+'</span>';
+          });
+          if(!protocolos.length)html+='<span class="small text-muted">Nenhum protocolo nesta equipe.</span>';
+          html+='</div></article>';
+        });
+        if(afastamentos.length)html+='<h3 class="h6">Afastamentos</h3>';
+        afastamentos.forEach(function(a){html+='<div class="rv-mobile-afastamento"><strong>'+esc(a.militar||'')+'</strong><div>'+esc(a.dataInicial||'')+' a '+esc(a.dataFinal||'')+'</div><div>'+esc(a.motivo||'')+'</div><div>'+esc(a.observacao||'')+'</div></div>';});
+        html+='</section>';
+      });
+      conteudo.innerHTML=html;return true;
+    }
+    function atualizarModoRoteiroResponsivo_(){
+      Object.keys(roteirosResponsivos_).forEach(function(id){var blocos=roteirosResponsivos_[id];if(id==='rv-conteudo')renderizarRoteiroVistoriadores(blocos);else if(id==='atd-rv-conteudo')renderizarRoteiroVistoriadoresAtendimento(blocos);});
+      if(mediaRoteiroMobile_.matches){prepararListaMobile_(document.getElementById('mv-tbody'));prepararListaMobile_(document.getElementById('vd-tbody'),1);}
+    }
+    if(mediaRoteiroMobile_.addEventListener)mediaRoteiroMobile_.addEventListener('change',atualizarModoRoteiroResponsivo_);
+    else mediaRoteiroMobile_.addListener(atualizarModoRoteiroResponsivo_);
+
+    // Somente apresentação: mantém as mesmas células, inputs e índices dos eventos.
+    function prepararListaMobile_(tbody,grupo) {
+      if(!tbody||!mediaRoteiroMobile_.matches)return;
+      var tabela=tbody.closest('table');if(!tabela)return;
+      tabela.classList.add('mobile-list-table');
+      var wrap=tabela.closest('.table-responsive');if(wrap)wrap.classList.add('mobile-list-wrap');
+      var labels=Array.from(tabela.querySelectorAll('thead th')).map(function(th,i){return th.textContent.trim()||(i===0?'Selecionar':'Informação');}),ocupadas=[],valores=[];
+      Array.from(tbody.rows).forEach(function(tr){
+        ocupadas=ocupadas.map(function(v){return Math.max(0,v-1);});
+        if(tr.cells.length===1&&tr.cells[0].colSpan>1)return;
+        var col=0;
+        Array.from(tr.cells).forEach(function(td){while(ocupadas[col]>0)col++;td.setAttribute('data-mobile-label',labels[col]||'Informação');valores[col]=(col===grupo?(td.querySelector('.d-flex span')||td):td).textContent.trim();if(td.rowSpan>1)ocupadas[col]=td.rowSpan;if(col===grupo)td.classList.add('mobile-cell-grupo');col++;});
+        if(grupo!=null&&valores[grupo])tr.setAttribute('data-mobile-grupo',valores[grupo]);
+      });
+    }
+
     function renderizarRoteiroVistoriadoresAtendimento(blocos) {
       var conteudo = document.getElementById('atd-rv-conteudo');
+      if(renderizarRoteiroMobile_(blocos,conteudo))return;
       var htmlFinal = '';
 
       (blocos || []).forEach(function(bloco) {
@@ -4501,7 +4600,8 @@
     var minhasVistorias={itens:[],seq:0,enviando:false,tentativa:null};
     function abrirMinhasVistorias(){if(!perfilVistoriadorLeitura_())return;esconderTelasPrincipais();document.getElementById('minhas-vistorias-screen').style.display='block';registrarTelaAtual('minhas-vistorias');var d=document.getElementById('mv-data');if(!d.value)d.value=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());carregarMinhasVistorias();}
     function carregarMinhasVistorias(){if(!perfilVistoriadorLeitura_()||minhasVistorias.enviando)return;var e=minhasVistorias,seq=++e.seq,token=sessaoToken,st=document.getElementById('mv-status');st.textContent='Consultando suas visitas…';google.script.run.withSuccessHandler(function(r){if(seq!==e.seq||token!==sessaoToken)return;if(!r||!r.sucesso){st.textContent='Consulta não confirmada.';return;}e.itens=r.itens||[];e.tentativa=null;document.getElementById('mv-motivo').disabled=false;document.getElementById('mv-observacao').disabled=false;renderizarMinhasVistorias_();st.textContent=e.itens.length+' visita(s) da sua equipe.';}).withFailureHandler(function(err){if(seq===e.seq&&token===sessaoToken)st.textContent='Não foi possível consultar. '+String(err.message||err);}).obterMinhasVistorias(document.getElementById('mv-data').value,token);}
-    function renderizarMinhasVistorias_(){document.getElementById('mv-tbody').innerHTML=minhasVistorias.itens.map(function(x,i){return '<tr><td><input type="checkbox" class="mv-check" data-idx="'+i+'" '+(!x.podeInformar?'disabled':'')+' aria-label="Selecionar '+escaparHtmlRoteiro(x.protocolo)+'"></td><td>'+escaparHtmlRoteiro(x.protocolo)+'</td><td>'+escaparHtmlRoteiro(x.razaoSocial)+'<div class="small text-muted">'+escaparHtmlRoteiro(x.bairro)+'</div></td><td>'+escaparHtmlRoteiro(x.equipe)+'<div class="small">'+escaparHtmlRoteiro(x.periodo)+'</div></td><td>'+escaparHtmlRoteiro(x.registroPendente?'Envio pendente de confirmação':x.naoRealizada?'NÃO REALIZADA — '+x.motivo:x.podeInformar?'Sem registro de não realizada':'Visita futura')+'</td></tr>';}).join('')||'<tr><td colspan="5">Nenhuma visita atribuída à sua equipe nesta data.</td></tr>';}
+    function renderizarMinhasVistorias_(){document.getElementById('mv-tbody').innerHTML=minhasVistorias.itens.map(function(x,i){return '<tr><td><input type="checkbox" class="mv-check" data-idx="'+i+'" '+(!x.podeInformar?'disabled':'')+' aria-label="Selecionar '+escaparHtmlRoteiro(x.protocolo)+'"></td><td>'+escaparHtmlRoteiro(x.protocolo)+'</td><td>'+escaparHtmlRoteiro(x.razaoSocial)+'<div class="small text-muted">'+escaparHtmlRoteiro(x.bairro)+'</div></td><td>'+escaparHtmlRoteiro(x.equipe)+'<div class="small">'+escaparHtmlRoteiro(x.periodo)+'</div></td><td>'+escaparHtmlRoteiro(x.registroPendente?'Envio pendente de confirmação':x.naoRealizada?'NÃO REALIZADA — '+x.motivo:x.podeInformar?'Sem registro de não realizada':'Visita futura')+'</td></tr>';}).join('')||'<tr><td colspan="5">Nenhuma visita atribuída à sua equipe nesta data.</td></tr>';prepararListaMobile_(document.getElementById('mv-tbody'));}
+
     function salvarNaoRealizadasMinhasVistorias(){
       var e=minhasVistorias;if(!perfilVistoriadorLeitura_()||e.enviando)return;var st=document.getElementById('mv-status');
       if(!e.tentativa){var itens=Array.from(document.querySelectorAll('.mv-check:checked')).map(function(c){var x=e.itens[Number(c.dataset.idx)];return {linha:x.linha,data:x.data,protocolo:x.protocolo,assinatura:x.assinatura,idVisita:x.idVisita};}),motivo=document.getElementById('mv-motivo').value,obs=document.getElementById('mv-observacao').value.trim();if(!itens.length||itens.length>100||!motivo||(motivo==='OUTRO'&&!obs)){st.textContent='Selecione entre 1 e 100 visitas e informe o motivo. Descreva o ocorrido em Outro.';return;}e.tentativa={itens:itens,motivo:motivo,obs:obs};}
@@ -4654,6 +4754,7 @@
 
 
     var roteiroVistoriadoresJaCarregado = false;
+    var roteiroVistoriadoresConsultaSeq=0;
 
     function abrirRoteiroVistoriadores(restaurando) {
       if (!usuarioLogado || !usuarioLogado.permissoes || !usuarioLogado.permissoes.vistorias) {
@@ -4680,6 +4781,7 @@
 
 
     function carregarRoteiroVistoriadores(completo) {
+      var consultaSeq=++roteiroVistoriadoresConsultaSeq,consultaToken=sessaoToken;
       var campo = document.getElementById('rv-data');
       var data = completo ? '' : (campo ? campo.value : '');
       var status = document.getElementById('rv-status');
@@ -4693,6 +4795,7 @@
 
       google.script.run
         .withSuccessHandler(function(r) {
+          if(consultaSeq!==roteiroVistoriadoresConsultaSeq||consultaToken!==sessaoToken)return;
           r = r || {};
           var blocos = r.blocos || [];
           roteiroVistoriadoresJaCarregado = true;
@@ -4709,10 +4812,10 @@
           resumo.textContent = totalEquipes + ' equipe(s) • ' + totalProtocolos + ' protocolo(s)';
 
           if (!blocos.length) {
+            delete roteirosResponsivos_[conteudo.id];
             status.className = 'alert alert-warning mb-3';
-            status.textContent = data
-              ? 'Nenhum roteiro distribuído para a data selecionada.'
-              : 'Nenhum roteiro distribuído foi encontrado.';
+            var proprio=usuarioLogado&&usuarioLogado.perfil==='VISTORIADOR';
+            status.textContent=proprio?'Nenhum roteiro atribuído a você'+(data?' nesta data.':'.'):(data?'Nenhum roteiro distribuído para a data selecionada.':'Nenhum roteiro distribuído foi encontrado.');
             conteudo.innerHTML =
               '<div class="card card-custom p-5 text-center text-muted">Nenhum roteiro encontrado.</div>';
             return;
@@ -4726,6 +4829,8 @@
           renderizarRoteiroVistoriadores(blocos);
         })
         .withFailureHandler(function(err) {
+          if(consultaSeq!==roteiroVistoriadoresConsultaSeq||consultaToken!==sessaoToken)return;
+          delete roteirosResponsivos_[conteudo.id];
           resumo.textContent = '0 equipe(s)';
           status.className = 'alert alert-danger mb-3';
           status.textContent = (err && err.message) ? err.message : 'Erro ao carregar o roteiro.';
@@ -4811,6 +4916,7 @@
 
     function renderizarRoteiroVistoriadores(blocos) {
       var conteudo = document.getElementById('rv-conteudo');
+      if(renderizarRoteiroMobile_(blocos,conteudo))return;
       var htmlFinal = '';
 
       blocos.forEach(function(bloco) {
@@ -5370,6 +5476,7 @@
       });
 
       tbody.innerHTML = h;
+      prepararListaMobile_(tbody,1);
       aplicarRestricoesVistoriador_();
 
       var todos = document.getElementById('vd-check-todos');
@@ -10010,6 +10117,7 @@
 
 
     function limparSessaoLocal() {
+      roteiroVistoriadoresConsultaSeq++;roteirosResponsivos_={};document.getElementById('rv-conteudo').textContent='';document.getElementById('atd-rv-conteudo').textContent='';
       financeiroGestor.editando=false;financeiroGestor.mesCarregado='';financeiroGestor.mesEdicao='';controlesFinanceiroGestor_();
       minhasVistorias.seq++;minhasVistorias.itens=[];minhasVistorias.tentativa=null;document.getElementById('mv-tbody').textContent='';document.body.classList.remove('perfil-vistoriador');
       escalaPSEConsultaSeq++;escalaPSEVistoriasJaCarregada=false;escalaPSEConsultaOrigem='vistorias';document.getElementById('pse-vist-tbody').textContent='';document.getElementById('pse-vist-total').textContent='0 militar(es)';

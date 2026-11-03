@@ -1,15 +1,29 @@
-# Layout responsivo
+# Layout responsivo e roteiro móvel
 
-O HTML contém a meta tag `viewport` com `width=device-width, initial-scale=1`. O backend já configurava o mesmo viewport via `HtmlOutput.addMetaTag`, mecanismo próprio do Apps Script, e foi preservado.
+O HTML tem viewport `width=device-width, initial-scale=1`; o Apps Script conserva o mesmo viewport em `doGet`. O CSS permanece no Index.html, sem arquivo adicional.
 
-Como o projeto usa CSS no bloco `<style>` do Index, as regras continuam ali: não é necessário instalar um arquivo extra. As faixas de tela são explícitas e não se sobrepõem:
+Faixas: celulares até 767,98 px; tablets de 768 a 1199,98 px; computadores a partir de 1200 px. As regras adaptam cabeçalho, navegação, campos e espaçamentos, preservando o zoom do navegador.
 
-- Celulares: até 767,98 px. Cabeçalho e menus quebram linha, símbolo menor, cartões com espaçamento reduzido, campos com fonte de 16 px e botões com altura mínima de 40 px. Filtros de Minhas Vistorias e Controle de Escala podem ocupar mais de uma linha.
-- Tablets: de 768 a 1199,98 px. Cabeçalho flexível, espaçamento intermediário e símbolo de 56 x 42 px.
-- Computadores: a partir de 1200 px. Mantém o espaçamento original, símbolo de 62 x 46 px e altura máxima de 520 px nos contêineres de tabelas.
+## Roteiro dos Vistoriadores no celular
 
-Tabelas e roteiros extensos continuam com rolagem horizontal dentro de seus contêineres. As regras não limitam o zoom do navegador nem alteram permissões, operações, cores das equipes ou dados. O JavaScript foi comparado integralmente com a versão anterior e permaneceu idêntico. Backend sem alterações.
+Abaixo de 768 px, o roteiro usa blocos por equipe, com militar, canga, períodos, região e protocolos legíveis sem grade horizontal. Tipo de serviço, VTR, situação da viatura e setores ficam em Ver detalhes da equipe. Os protocolos mantêm suas cores e os que possuem observação abrem o mesmo modal pelo toque. Afastamentos visíveis na resposta também aparecem.
 
-Verificado no Chromium em larguras de 320, 390, 834 e 1440 px, usando viewport móvel nos tamanhos menores, nas telas de login, Controle de Escala, Minhas Vistorias e Roteiro. Sem transbordamento horizontal da página nos cenários verificados; grades mantêm sua rolagem própria. Mais 20 cenários existentes de Vistoriador, PSE/Atendimento e Gestor/Escalas passaram com serviços Google simulados. Isso não equivale a teste em aparelhos físicos ou na implantação Google.
+O computador conserva a grade existente. Apenas uma representação do roteiro é montada de cada vez; ao mudar de faixa de largura, a tela usa os dados já carregados. Não dispara RPC nem nova leitura da planilha. Ao sair, os dados dessa adaptação são apagados. Uma consulta vazia ou com erro invalida a cópia anterior para evitar que ela reapareça ao redimensionar.
 
-Instalação: substituir Index.html, salvar e publicar uma nova versão. O ZIP inclui também o backend atual, sem mudanças nesta entrega.
+Minhas Vistorias e Vistorias do Dia usam listas verticais no celular, com rótulos por campo. São os mesmos inputs, seleções e eventos, sem duplicação de formulários. Nas linhas com equipe mesclada, o nome acompanha cada protocolo na apresentação móvel. As permissões de leitura continuam aplicadas. A preparação desses rótulos roda apenas na faixa móvel.
+
+No rascunho editável, a tabela continua permitindo edição e seleção; a regra que impedia conter sua rolagem horizontal foi corrigida. Não foram alterados parser SIAPI, distribuição, prioridades ou salvamentos.
+
+## Consulta por perfil
+
+Somente o perfil VISTORIADOR recebe os protocolos cujo RG coincide com o primeiro ou segundo integrante. O filtro é aplicado no servidor, antes de agrupar por titular, para não incluir protocolos de outro canga que trabalhe com o mesmo titular. Ver todos também continua limitado às próprias visitas. A identificação não usa aproximação por nome; ausência de RG válido solicita correção no cadastro. Afastamentos dessa resposta ficam limitados ao próprio RG.
+
+GESTOR, CONFERENCIA, ATENDIMENTO e CONSULTA mantêm exatamente o conteúdo completo anterior. A restrição adicional se aplica somente ao endpoint do Roteiro dos Vistoriadores; não muda os demais acessos já existentes.
+
+## Verificação
+
+281 testes locais passaram, incluindo sete comparações de perfil e de titular/canga. Para os quatro outros perfis, respostas por dia e completas foram comparadas com a versão anterior.
+
+40 cenários Chromium relacionados passaram: sete novos de roteiro móvel, sete de Vistoriador, seis de Atendimento, três de distribuição, oito de rascunhos/DOCs e nove de Pendências/Atendimento. Incluem larguras de 320, 390 e 1200 px, toque em protocolo, detalhes, mudança de faixa, seleção preservada, ocultação de ações não autorizadas e limpeza ao sair. Serviços Google simulados, sem publicação ou acesso à planilha em produção. Não equivale a teste em aparelho físico.
+
+Instalação: atualizar WebApp.gs e Index.html juntos, salvar e publicar nova versão. O backend mudou para aplicar o filtro por perfil.

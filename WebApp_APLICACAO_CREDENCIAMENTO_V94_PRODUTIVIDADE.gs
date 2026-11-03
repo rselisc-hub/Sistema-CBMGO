@@ -8169,9 +8169,16 @@ function gerarPlanilhaModeloVistoriadores_() {
 
 
 function obterRoteiroVistoriadoresWeb(dataFiltro, token) {
-  // Todos os perfis que possuem acesso ao módulo Vistorias podem consultar
-  // o Roteiro dos Vistoriadores, inclusive a faixa de AFASTAMENTOS.
-  exigirPerfil_(token, ["CONFERENCIA","ATENDIMENTO","VISTORIADOR","CONSULTA"]);
+  // Somente o perfil VISTORIADOR recebe as próprias visitas, antes do agrupamento.
+  // Demais perfis conservam a consulta completa existente.
+  var sessao = exigirPerfil_(token, ["CONFERENCIA","ATENDIMENTO","VISTORIADOR","CONSULTA"]);
+  var somenteProprio = String(sessao.perfil || "").trim().toUpperCase() === "VISTORIADOR";
+  var rgProprio = somenteProprio ? rgVisitaPessoal_(sessao.rg) : "";
+  if (somenteProprio && !rgProprio) throw new Error("Confira o RG do seu cadastro para consultar seu roteiro.");
+  function afastamentosVisiveis(data) {
+    var lista = obterAfastamentosVistoriadoresNaData_(data);
+    return somenteProprio ? lista.filter(function(x) { return rgVisitaPessoal_(x.rg) === rgProprio; }) : lista;
+  }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var aba = ss.getSheetByName("ROTEIRO_VISTORIAS");
@@ -8197,6 +8204,7 @@ function obterRoteiroVistoriadoresWeb(dataFiltro, token) {
     var status = String(r[10] || "").trim().toUpperCase();
 
     if (!dataTxt || !protocolo || status === "CANCELADO") return;
+    if (somenteProprio && rgVisitaPessoal_(r[2]) !== rgProprio && rgVisitaPessoal_(r[4]) !== rgProprio) return;
 
     var chaveData = chaveDataRoteiro_(dataTxt);
     if (!chaveData) return;
@@ -8230,7 +8238,7 @@ function obterRoteiroVistoriadoresWeb(dataFiltro, token) {
   // Se foi escolhida uma data específica e ainda não existe protocolo lançado
   // nela, cria um bloco vazio para permitir exibir os afastamentos do dia.
   if (filtroChave && !gruposData[filtroChave]) {
-    var afastamentosSemRoteiro = obterAfastamentosVistoriadoresNaData_(dataFiltro);
+    var afastamentosSemRoteiro = afastamentosVisiveis(dataFiltro);
     if (afastamentosSemRoteiro.length) {
       gruposData[filtroChave] = {
         data:exibirDataRoteiro_(dataFiltro),
@@ -8349,7 +8357,7 @@ function obterRoteiroVistoriadoresWeb(dataFiltro, token) {
       return eq;
     });
 
-    var afastamentosDoDia = obterAfastamentosVistoriadoresNaData_(grupo.data);
+    var afastamentosDoDia = afastamentosVisiveis(grupo.data);
     if (equipes.length || afastamentosDoDia.length) {
       blocos.push({
         data:grupo.data,
