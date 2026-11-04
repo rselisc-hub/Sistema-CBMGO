@@ -12338,8 +12338,15 @@ function obterDadosEscala_(dataInicio, dataFim) {
 // ----------------------------------------------------------
 // CONSULTA DA ESCALA PSE NO MÓDULO VISTORIAS
 // ----------------------------------------------------------
-function obterEscalaPSEVistorias(dataFiltro, token) {
+function obterEscalaPSEVistorias(dataFiltro, token, dataFim) {
   var sessao=exigirPerfil_(token, ["GESTOR","CONFERENCIA","ATENDIMENTO","VISTORIADOR","CONSULTA"]);
+
+  var temPeriodo=dataFim!==undefined&&dataFim!==null&&dataFim!=="",inicioPeriodo="",fimPeriodo="";
+  if(temPeriodo){
+    function limite(v){var m=String(v||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);if(!m)throw Error("Informe início e fim válidos para o período.");var d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));if(d.getFullYear()!==Number(m[1])||d.getMonth()+1!==Number(m[2])||d.getDate()!==Number(m[3]))throw Error("Informe início e fim válidos para o período.");return String(v);}
+    inicioPeriodo=limite(dataFiltro);fimPeriodo=limite(dataFim);
+    if(inicioPeriodo>fimPeriodo)throw Error("A data final não pode ser anterior à inicial.");
+  }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var aba = ss.getSheetByName("Escala PSE");
@@ -12384,7 +12391,10 @@ function obterEscalaPSEVistorias(dataFiltro, token) {
       obsGrupo = String(r[8] || "").trim();
     }
 
-    if (filtroTexto && data !== filtroTexto) return;
+    if(temPeriodo){
+      var m=String(data).match(/^(\d{2})\/(\d{2})\/(\d{4})$/),chave=m?m[3]+"-"+m[2]+"-"+m[1]:"";
+      if(!chave||chave<inicioPeriodo||chave>fimPeriodo)return;
+    }else if (filtroTexto && data !== filtroTexto) return;
 
     itens.push({
       numero:String(r[0] || "").trim(),
@@ -12414,7 +12424,7 @@ function obterEscalaPSEVistorias(dataFiltro, token) {
   return {
     sucesso:true,
     itens:itens,
-    dataExibicao:filtroTexto
+    dataExibicao:temPeriodo?filtroTexto+" a "+formatarDataTexto(criarDataSegura(dataFim)):filtroTexto
   };
 }
 

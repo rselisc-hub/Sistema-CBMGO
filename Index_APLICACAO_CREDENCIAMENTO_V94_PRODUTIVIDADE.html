@@ -2016,7 +2016,7 @@
         </div>
         <div class="col-auto">
           <button class="btn btn-outline-secondary" onclick="carregarEscalaPSEVistorias(true)">
-            <i class="bi bi-calendar3 me-1"></i>Ver escala completa
+            <i class="bi bi-calendar3 me-1"></i>Ver mês completo
           </button>
         </div>
         <div class="col">
@@ -2026,6 +2026,12 @@
         </div>
       </div>
     </div>
+
+    <details class="border rounded bg-white p-3 mb-3"><summary class="fw-semibold">Consultar outro período</summary><div class="row g-2 align-items-end mt-1">
+      <div class="col-sm-4"><label class="form-label small" for="pse-vist-inicio">Data inicial</label><input type="date" class="form-control" id="pse-vist-inicio"></div>
+      <div class="col-sm-4"><label class="form-label small" for="pse-vist-fim">Data final</label><input type="date" class="form-control" id="pse-vist-fim"></div>
+      <div class="col-sm-4"><button class="btn btn-outline-success w-100" onclick="carregarEscalaPSEVistorias('periodo')">Consultar período</button></div>
+    </div></details>
 
     <div id="pse-vist-status" class="alert alert-light border mb-3">Selecione uma data para consultar a escala.</div>
 
@@ -2882,11 +2888,17 @@
                   </div>
                   <div class="col-md-3">
                     <button class="btn btn-outline-secondary btn-sm w-100" onclick="carregarEscalaPSEGestor(true)">
-                      <i class="bi bi-calendar3 me-1"></i> Ver escala completa
+                      <i class="bi bi-calendar3 me-1"></i> Ver mês completo
                     </button>
                   </div>
                 </div>
               </div>
+
+    <details class="border rounded bg-white p-3 mb-3"><summary class="fw-semibold">Consultar outro período</summary><div class="row g-2 align-items-end mt-1">
+      <div class="col-sm-4"><label class="form-label small" for="gestor-pse-inicio">Data inicial</label><input type="date" class="form-control" id="gestor-pse-inicio"></div>
+      <div class="col-sm-4"><label class="form-label small" for="gestor-pse-fim">Data final</label><input type="date" class="form-control" id="gestor-pse-fim"></div>
+      <div class="col-sm-4"><button class="btn btn-outline-success w-100" onclick="carregarEscalaPSEGestor('periodo')">Consultar período</button></div>
+    </div></details>
 
               <div id="gestor-pse-status" class="alert alert-light border mb-3">Selecione uma data para consultar a Escala PSE.</div>
 
@@ -4688,20 +4700,37 @@
 
       // Depois que a escala já foi carregada uma vez, navegar entre as abas
       // não dispara nova consulta. Ela só muda ao clicar em Consultar dia
-      // ou Ver escala completa.
+      // ou Ver mês completo.
       if (origem==='atendimento'||!escalaPSEVistoriasJaCarregada) {
         carregarEscalaPSEVistorias(false);
       }
     }
 
+    function filtroPeriodoConsultaPSE_(prefixo,modo){
+      var campo=document.getElementById(prefixo+'-data'),data=campo&&campo.value;
+      if(!data){data=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());if(campo)campo.value=data;}
+      var inicio=data,fim='',descricao=data.split('-').reverse().join('/');
+      if(modo==='periodo'){
+        inicio=document.getElementById(prefixo+'-inicio').value;fim=document.getElementById(prefixo+'-fim').value;
+        if(!inicio||!fim||inicio>fim)return {erro:'Preencha um período válido: a data final deve ser igual ou posterior à inicial.'};
+        descricao=inicio.split('-').reverse().join('/')+' a '+fim.split('-').reverse().join('/');
+      }else if(modo===true){
+        var partes=data.split('-'),ultimo=new Date(Number(partes[0]),Number(partes[1]),0).getDate();
+        inicio=data.slice(0,7)+'-01';fim=data.slice(0,7)+'-'+String(ultimo).padStart(2,'0');descricao=partes[1]+'/'+partes[0]+' (mês completo)';
+        document.getElementById(prefixo+'-inicio').value=inicio;document.getElementById(prefixo+'-fim').value=fim;
+      }
+      return {inicio:inicio,fim:fim,descricao:descricao};
+    }
+
     function carregarEscalaPSEVistorias(completa) {
-      var seq=++escalaPSEConsultaSeq,token=sessaoToken;
-      var campo = document.getElementById('pse-vist-data');
-      var data = completa ? '' : (campo ? campo.value : '');
+      var filtro=filtroPeriodoConsultaPSE_('pse-vist',completa);
+      var data=filtro.inicio;
 
       var status = document.getElementById('pse-vist-status');
       var tbody = document.getElementById('pse-vist-tbody');
       var total = document.getElementById('pse-vist-total');
+      if(filtro.erro){status.className='alert alert-warning mb-3';status.textContent=filtro.erro;return;}
+      var seq=++escalaPSEConsultaSeq,token=sessaoToken;
 
       status.className = 'alert alert-light border mb-3';
       status.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Carregando Escala PSE...';
@@ -4717,17 +4746,13 @@
 
           if (!itens.length) {
             status.className = 'alert alert-warning mb-3';
-            status.textContent = data
-              ? 'Não há militares na Escala PSE para a data selecionada.'
-              : 'A Escala PSE está vazia.';
+            status.textContent='Não há militares na Escala PSE para '+filtro.descricao+'.';
             tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-5">Nenhum militar encontrado.</td></tr>';
             return;
           }
 
           status.className = 'alert alert-success mb-3';
-          status.textContent = data
-            ? 'Escala de ' + (r.dataExibicao || data) + ' carregada.'
-            : 'Escala PSE completa carregada.';
+          status.textContent='Escala de '+filtro.descricao+' carregada.';
 
           renderizarEscalaPSEVistorias(itens);
         })
@@ -4738,7 +4763,7 @@
           status.textContent = (err && err.message) ? err.message : 'Erro ao carregar a Escala PSE.';
           tbody.innerHTML = '<tr><td colspan="11" class="text-center text-danger py-5">Não foi possível carregar a escala.</td></tr>';
         })
-        .obterEscalaPSEVistorias(data, token);
+        .obterEscalaPSEVistorias(data, token, filtro.fim);
     }
 
     function renderizarEscalaPSEVistorias(itens) {
@@ -10590,12 +10615,13 @@
 
 
     function carregarEscalaPSEGestor(completa) {
-      var consultaSeq=(consultasGestorSeq['carregarEscalaPSEGestor']||0)+1;consultasGestorSeq['carregarEscalaPSEGestor']=consultaSeq;var consultaToken=sessaoToken;
-      var campo = document.getElementById('gestor-pse-data');
-      var data = completa ? '' : (campo ? campo.value : '');
+      var filtro=filtroPeriodoConsultaPSE_('gestor-pse',completa);
+      var data=filtro.inicio;
       var status = document.getElementById('gestor-pse-status');
       var tbody = document.getElementById('gestor-pse-tbody');
       var total = document.getElementById('gestor-pse-total');
+      if(filtro.erro){status.className='alert alert-warning mb-3';status.textContent=filtro.erro;return;}
+      var consultaSeq=(consultasGestorSeq['carregarEscalaPSEGestor']||0)+1;consultasGestorSeq['carregarEscalaPSEGestor']=consultaSeq;var consultaToken=sessaoToken;
 
       if (!status || !tbody || !total) return;
 
@@ -10612,17 +10638,17 @@
 
           if (!itens.length) {
             status.className = 'alert alert-warning mb-3';
-            status.textContent = data ? 'Não há militares na Escala PSE para a data selecionada.' : 'A Escala PSE está vazia.';
+            status.textContent='Não há militares na Escala PSE para '+filtro.descricao+'.';
             tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-5">Nenhum militar encontrado.</td></tr>';
             return;
           }
 
           status.className = 'alert alert-success mb-3';
-          status.textContent = data ? 'Escala de ' + (r.dataExibicao || data) + ' carregada.' : 'Escala PSE completa carregada.';
+          status.textContent='Escala de '+filtro.descricao+' carregada.';
           renderizarEscalaPSEGestor(itens);
         })
         .withFailureHandler(function(err){if(consultaSeq!==consultasGestorSeq['carregarEscalaPSEGestor']||consultaToken!==sessaoToken)return;capturarErroServidor(err);})
-        .obterEscalaPSEVistorias(data, sessaoToken);
+        .obterEscalaPSEVistorias(data, consultaToken, filtro.fim);
     }
 
 
