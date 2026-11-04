@@ -35,3 +35,9 @@ Somente no perfil VISTORIADOR e em telas de até 767,98 px, os registros cujo RG
 No computador e nos outros perfis, o HTML da lista mantém a apresentação anterior. A mudança de largura reapresenta os dados locais, sem nova chamada à planilha. Ao sair, o cache e a seleção são limpos.
 
 Verificação: 294 testes locais e 20 cenários Chromium relacionados passaram, incluindo comparação com a versão c7946ce para os demais perfis e computador. Serviços Google simulados; sem validação em produção ou aparelho físico. Nesta entrega basta atualizar Index.html e publicar nova versão.
+
+## Entrada direta do Vistoriador
+
+Ao aplicar a sessão do perfil VISTORIADOR, abre Vistorias do Dia na data atual de Brasília, independentemente da última tela armazenada. Isso vale no celular e computador. Outros perfis mantêm a navegação anterior. Ao sair, limpa a data e a marca de consulta carregada. Consulta vazia também limpa os registros em cache, evitando reapresentação de resultado anterior ao mudar a largura da tela.
+
+Cinco novos cenários Chromium com Google simulado verificam a entrada, data, consulta vazia, falha/recuperação e preservação dos outros perfis. O erro informado pelo usuário ainda não teve mensagem fornecida e não foi reproduzido nesses cenários.

@@ -3629,6 +3629,13 @@
         cardConsulta.style.display = (perfil === 'CONSULTA') ? 'block' : 'none';
       }
 
+      if (String(perfil).toUpperCase() === 'VISTORIADOR' && permissoes.vistorias) {
+        document.getElementById('vd-data').value = new Intl.DateTimeFormat('sv-SE', {timeZone:'America/Sao_Paulo', year:'numeric', month:'2-digit', day:'2-digit'}).format(new Date());
+        document.getElementById('vd-razao-social').value = '';
+        vistoriasDiaJaCarregadas = false;
+        abrirVistoriasDoDia();
+        return;
+      }
       restaurarUltimaTela();
     }
 
@@ -5166,6 +5173,7 @@
           document.getElementById('vd-total-nao-realizadas').textContent = resumo.naoRealizadas || 0;
           document.getElementById('vd-total-resultados').textContent = resumo.comResultado || 0;
 
+          window.__vistoriasDiaItens = itens;
           if (!itens.length) {
             status.className = 'alert alert-warning mb-4';
             status.textContent = razaoSocial
@@ -10202,6 +10210,7 @@
 
 
     function limparSessaoLocal() {
+      vistoriasDiaJaCarregadas=false;document.getElementById('vd-data').value='';
       window.__vistoriasDiaItens=null;vistoriasDiaSelecionados={};document.getElementById('vd-tbody').textContent='';
       pendenciasRoteiroConsultaSeq++;document.getElementById('pend-consulta-status').textContent='';
       roteiroVistoriadoresConsultaSeq++;roteirosResponsivos_={};document.getElementById('rv-conteudo').textContent='';document.getElementById('atd-rv-conteudo').textContent='';
