@@ -10657,6 +10657,8 @@ function lancarOrdemServicoWeb_Conteudo_(dadosOS) {
   var turnoNome = dadosOS.turno || "Matutino";
   var funcaoNome = normalizarFuncaoMilitar(dadosOS.funcao || "Vistoriador");
 
+  if (["Vistoriador","Atendente","Conferencista"].indexOf(funcaoNome)<0) throw new Error("Função inválida para a escala extra.");
+
   if (verificarMilitarJaEscalado(dataFormatadaLimpa, dadosOS.rg, dadosOS.nome, turnoNome)) {
     return "⚠️ ATENÇÃO: O militar " + dadosOS.nome + " já está escalado no dia " + dataFormatadaLimpa + " no turno " + turnoNome + ".";
   }
@@ -10691,7 +10693,7 @@ function lancarOrdemServicoWeb_Conteudo_(dadosOS) {
 
   var mVal = dObj.getMonth() + 1;
   recalcularRankingGeral("TOTAL", dObj.getFullYear() + "-" + (mVal < 10 ? "0" + mVal : mVal));
-  return "Ordem de Serviço Extra lançada com sucesso para " + dadosOS.nome + "!";
+  return "Ordem de Serviço Extra lançada com sucesso para " + dadosOS.nome + "! Função: " + novaEscala[4] + (novaEscala[4]!==funcaoNome?" (ajustada pela regra de Atendimento/Conferência do dia e turno).":".");
 }
 
 
@@ -13690,7 +13692,7 @@ function criarIdentidadesIndicadores_(fontes){
 function obterIndicadoresOperacionaisGestor(filtros,token){
   exigirPerfil_(token,['GESTOR']);filtros=filtros||{};
   var area=String(filtros.area||'atendimento'),inicio=dataIndicador_(filtros.inicio),fim=dataIndicador_(filtros.fim);
-  if(['atendimento','conferencia','vistorias','pse'].indexOf(area)<0)throw new Error('Área de indicadores inválida.');
+  if(['atendimento','conferencia','vistorias','pse','docs'].indexOf(area)<0)throw new Error('Área de indicadores inválida.');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(String(filtros.inicio||''))||!/^\d{4}-\d{2}-\d{2}$/.test(String(filtros.fim||''))||!inicio||!fim||inicio>fim)throw new Error('Informe um período válido, com início anterior ou igual ao fim.');
   var ss=SpreadsheetApp.getActiveSpreadsheet(),hoje=Utilities.formatDate(new Date(),'America/Sao_Paulo','yyyy-MM-dd'),faltantes=[],avisos=[],grupos=Object.create(null),totais={},invalidas=0;
   function ler(nome,colunas){var aba=ss.getSheetByName(nome);if(!aba){faltantes.push(nome);return [];}return aba.getLastRow()<2?[]:aba.getRange(2,1,aba.getLastRow()-1,colunas).getValues();}
@@ -13700,7 +13702,7 @@ function obterIndicadoresOperacionaisGestor(filtros,token){
   function somar(alvo,metricas){Object.keys(metricas).forEach(function(k){alvo[k]=(alvo[k]||0)+metricas[k];});}
   function agrupar(campo,valor,metricas){var identidade=valor&&typeof valor==='object'?valor:null,chave=identidade?identidade.chave:n(valor)||'Não informado',nome=identidade?identidade.nome:chave;grupos[campo]=grupos[campo]||Object.create(null);var g=grupos[campo][chave]||(grupos[campo][chave]={nome:nome});somar(g,metricas);}
   function contar(d,dimensoes,metricas){somar(totais,metricas);dimensoes.dia=d;dimensoes.mes=d.slice(0,7);Object.keys(dimensoes).forEach(function(campo){agrupar(campo,dimensoes[campo],metricas);});}
-  var identidades=null;
+  var opcoesDocs=null,identidades=null;
   if(area==='atendimento'){
     var atendimentos=ler('ATENDIMENTOS',8);identidades=criarIdentidadesIndicadores_([{linhas:atendimentos,pares:[[1,2]]}]);
     atendimentos.forEach(function(r){var d=dataIndicador_(r[0]);if(!d){if(r.some(function(x){return n(x);}))invalidas++;return;}if(!noPeriodo(d))return;contar(d,{tipo:n(r[3]),motivo:n(r[7]),atendente:identidades.pessoa(r[1],r[2])},{quantidade:1});});
@@ -13739,6 +13741,49 @@ function obterIndicadoresOperacionaisGestor(filtros,token){
     avisos.push('Por militar: cada integrante recebe uma participação na visita. Uma visita em dupla soma uma para cada militar, mas continua contando uma única vez no total geral. Equipes são agrupadas sem considerar a ordem.');
     if(semVinculo)avisos.push(semVinculo+' registro(s) de não realizada no período sem distribuição identificável; não foram descontados de outra visita.');
     avisos.push('Realizadas = distribuições não canceladas até hoje, sem registro de não realizada nas Pendências. Cores não interferem. Futuras ficam separadas. Retorno = nova visita realizada após outra realizada do mesmo protocolo registrada no sistema; redistribuição após não realizada não conta como retorno.');
+  }else if(area==='docs'){
+    var docs=ler('DOCS_DESPACHO',26),historico=ler('HISTORICO_DOCS_DESPACHO',10),finais=Object.create(null),ids=Object.create(null),protos=Object.create(null),somaDias=0,tempos=0;
+    var fila={abertos:0,aguardandoResposta:0,concluidos:0,arquivados:0,ate8:0,de9a17:0,mais18:0,semData:0};
+    function finalDoc(v){return ['CONCLUIDO','ARQUIVADO'].indexOf(norm(v))>=0;}
+    historico.forEach(function(r){
+      if(!finalDoc(r[5])||finalDoc(r[4]))return;
+      var d=dataIndicador_(r[2]),id=n(r[1]);if(!id||!d)return;
+      // Ordem de inclusão desempata eventos do mesmo dia; não usa ATUALIZADO_EM.
+      if(!finais[id]||d>=finais[id].dia)finais[id]={dia:d,nome:n(r[9])||'Não informado',status:norm(r[5])};
+    });
+    opcoesDocs={origens:[],responsaveis:[]};var origensDocs=Object.create(null),responsaveisDocs=Object.create(null);
+    docs.forEach(function(r){
+      var id=n(r[0]);if(!id||ids[id])return;ids[id]=true;
+      var status=norm(r[2]),final=finalDoc(status),cad=dataIndicador_(r[19]),dtDoc=dataIndicador_(r[7]),f=finais[id];
+      var origem=n(r[1])||'Não informado',responsavel=f?f.nome:'Não informado';origensDocs[origem]=true;responsaveisDocs[responsavel]=true;
+      if(filtros.origem&&n(filtros.origem)!==origem||filtros.responsavel&&n(filtros.responsavel)!==responsavel)return;
+      var dim={tipoDocumento:n(r[3]),origem:origem,responsavel:responsavel};
+      if(final){if(status==='CONCLUIDO')fila.concluidos++;else fila.arquivados++;}
+      else{fila.abertos++;if(status==='AGUARDANDO RESPOSTA')fila.aguardandoResposta++;
+        var dias=dtDoc?Math.floor((Date.parse(hoje)-Date.parse(dtDoc))/86400000):null;
+        var faixa=dias===null||dias<0?'Sem data válida':dias<=8?'0–8 dias':dias<=17?'9–17 dias':'18 dias ou mais';
+        fila[dias===null||dias<0?'semData':dias<=8?'ate8':dias<=17?'de9a17':'mais18']++;
+        agrupar('prazoAtual',faixa,{emAberto:1});
+      }
+      agrupar('situacaoAtual',n(r[2])||'Não informado',{documentos:1});
+      var entrou=false;
+      if(noPeriodo(cad)){contar(cad,dim,{recebidos:1});entrou=true;}
+      // Só conta finalização atual comprovada no histórico. Reabertos não são conclusões atuais.
+      if(final&&f&&noPeriodo(f.dia)){
+        var m={concluidos:f.status==='CONCLUIDO'?1:0,arquivados:f.status==='ARQUIVADO'?1:0};
+        if(cad&&cad<=f.dia){var diasAte=(Date.parse(f.dia)-Date.parse(cad))/86400000;m.somaDias=diasAte;m.comTempo=1;somaDias+=diasAte;tempos++;}
+        contar(f.dia,dim,m);entrou=true;
+      }else if(final&&!f)totais.semHistorico=(totais.semHistorico||0)+1;
+      if(entrou&&n(r[4]))protos[n(r[4]).toUpperCase()]=true;
+      if(!cad)invalidas++;
+    });
+    opcoesDocs.origens=Object.keys(origensDocs).sort();opcoesDocs.responsaveis=Object.keys(responsaveisDocs).sort();
+    totais.protocolosDistintos=Object.keys(protos).length;totais.tempoMedioDias=tempos?somaDias/tempos:null;
+    Object.keys(grupos).forEach(function(k){Object.keys(grupos[k]).forEach(function(ch){var g=grupos[k][ch];g.tempoMedioDias=g.comTempo?g.somaDias/g.comTempo:null;});});
+    totais.filaAtual=fila;
+    avisos.push('Recebidos: data de cadastro. Concluídos e arquivados: tipo e data da última entrada em finalização comprovada no histórico, somente para documentos atualmente finalizados; reabertos ficam na fila. Cada documento conta uma vez por medida. Protocolos distintos consideram a união de recebidos e finalizados no período. Tempo médio em dias corridos entre cadastro e finalização, incluindo arquivados, apenas com datas válidas.');
+    avisos.push('Situação e prazos da fila são atuais, fora do filtro de período. Prazos usam a data do documento, como na fila operacional. Responsável vem do usuário do histórico; não é inferido de quem preencheu.');
+    if(totais.semHistorico)avisos.push(totais.semHistorico+' documento(s) finalizado(s) sem histórico de conclusão: não entram na produção por período nem no tempo médio.');
   }else{
     var config=null,linhas=ler('CONTROLE_ESCALAS',13);if(linhas.length){config=obterConfiguracaoPeriodo();var configAba=ss.getSheetByName('CONFIG');if(!configAba||configAba.getLastRow()<2)avisos.push('Configuração financeira não preenchida: cálculo usa os valores padrão do sistema.');}var errosValor=0;identidades=criarIdentidadesIndicadores_([{linhas:linhas,pares:[[1,2]]}]);
     linhas.forEach(function(r){if(norm(r[6])!=='ESCALADO')return;var d=dataIndicador_(r[0]);if(!d){invalidas++;return;}if(!noPeriodo(d))return;
@@ -13753,7 +13798,7 @@ function obterIndicadoresOperacionaisGestor(filtros,token){
   if(invalidas)avisos.push(invalidas+' registro(s) com data ou identificação inválida foram desconsiderados.');
   if(faltantes.length)avisos.push('Base ainda ausente: '+faltantes.join(', ')+'.');
   var saida={};Object.keys(grupos).forEach(function(k){saida[k]=Object.keys(grupos[k]).map(function(x){return grupos[k][x];}).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR',{numeric:true});});});
-  return {sucesso:true,area:area,inicio:inicio,fim:fim,atualizadoEm:dataHoraSaoPauloTexto_(),totais:totais,grupos:saida,avisos:avisos};
+  return {sucesso:true,area:area,inicio:inicio,fim:fim,atualizadoEm:dataHoraSaoPauloTexto_(),totais:totais,grupos:saida,avisos:avisos,opcoesDocs:opcoesDocs};
 }
 
 function lancarOrdemServicoWeb_(){var lock=LockService.getScriptLock();lock.waitLock(15000);try{return lancarOrdemServicoWeb_Conteudo_.apply(null,arguments);}finally{lock.releaseLock();}}
