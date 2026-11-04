@@ -481,6 +481,7 @@
       .mobile-list-table td[data-mobile-label]::before { content:attr(data-mobile-label); display:block; font-size:.75rem; font-weight:700; color:#526170; margin-bottom:3px; }
       .mobile-list-table td.mobile-cell-grupo { display:none; }
       .mobile-list-table tr[data-mobile-grupo]::before { content:attr(data-mobile-grupo); display:block; font-weight:800; background:#eaf4fc; padding:10px; border-radius:6px; overflow-wrap:anywhere; }
+      .mobile-list-table tr[data-mobile-lista][data-mobile-grupo]::before { content:attr(data-mobile-lista) "\A" attr(data-mobile-grupo); white-space:pre-line; }
       .mobile-list-table td[colspan]::before { content:none; }
       .mobile-list-table .btn { min-width:44px; margin-bottom:4px; }
     }
@@ -4469,6 +4470,7 @@
     }
     function atualizarModoRoteiroResponsivo_(){
       Object.keys(roteirosResponsivos_).forEach(function(id){var blocos=roteirosResponsivos_[id];if(id==='rv-conteudo')renderizarRoteiroVistoriadores(blocos);else if(id==='atd-rv-conteudo')renderizarRoteiroVistoriadoresAtendimento(blocos);});
+      if(usuarioLogado&&usuarioLogado.perfil==='VISTORIADOR'&&Array.isArray(window.__vistoriasDiaItens)&&window.__vistoriasDiaItens.length)renderizarVistoriasDoDia(window.__vistoriasDiaItens);
       if(mediaRoteiroMobile_.matches){prepararListaMobile_(document.getElementById('mv-tbody'));prepararListaMobile_(document.getElementById('vd-tbody'),1);}
     }
     if(mediaRoteiroMobile_.addEventListener)mediaRoteiroMobile_.addEventListener('change',atualizarModoRoteiroResponsivo_);
@@ -5392,19 +5394,24 @@
        * Dentro de cada equipe, os protocolos ficam ordenados por SETOR / BAIRRO.
        * A primeira coluna usa ROWSPAN para dar o efeito visual de célula mesclada.
        */
-      var gruposEquipes = {};
+      var rgMobile=function(v){var rg=String(v==null?'':v).trim().replace(/\.0$/,'').replace(/\D/g,'');return /^0+$/.test(rg)?'':rg;};
+      var rgUsuario=rgMobile(usuarioLogado&&usuarioLogado.rg);
+      var minhasPrimeiro=mediaRoteiroMobile_.matches&&String(usuarioLogado&&usuarioLogado.perfil||'').toUpperCase()==='VISTORIADOR'&&!!rgUsuario;
+      var gruposEquipes = {},nomesEquipes={},prioridadesEquipes={};
       var ordemEquipes = [];
 
       (itens || []).forEach(function(x, idx) {
         var equipe = [x.militar1, x.militar2].filter(Boolean).join(' / ') || 'SEM VISTORIADOR';
         var bairro = String(x.bairro || '').trim() || 'SEM BAIRRO';
 
-        if (!gruposEquipes[equipe]) {
-          gruposEquipes[equipe] = [];
-          ordemEquipes.push(equipe);
+        var propria=minhasPrimeiro&&(rgMobile(x.rg1)===rgUsuario||rgMobile(x.rg2)===rgUsuario);
+        var chaveEquipe=(minhasPrimeiro?(propria?'PROPRIA|':'OUTRA|'):'')+equipe;
+        if (!gruposEquipes[chaveEquipe]) {
+          gruposEquipes[chaveEquipe] = [];nomesEquipes[chaveEquipe]=equipe;prioridadesEquipes[chaveEquipe]=propria?0:1;
+          ordemEquipes.push(chaveEquipe);
         }
 
-        gruposEquipes[equipe].push({
+        gruposEquipes[chaveEquipe].push({
           item: x,
           idx: idx,
           bairro: bairro
@@ -5412,15 +5419,17 @@
       });
 
       ordemEquipes.sort(function(a, b) {
-        if (a === 'SEM VISTORIADOR') return 1;
-        if (b === 'SEM VISTORIADOR') return -1;
-        return a.localeCompare(b, 'pt-BR');
+        if(minhasPrimeiro&&prioridadesEquipes[a]!==prioridadesEquipes[b])return prioridadesEquipes[a]-prioridadesEquipes[b];
+        if (nomesEquipes[a] === 'SEM VISTORIADOR') return 1;
+        if (nomesEquipes[b] === 'SEM VISTORIADOR') return -1;
+        return nomesEquipes[a].localeCompare(nomesEquipes[b], 'pt-BR');
       });
 
       var h = '';
 
-      ordemEquipes.forEach(function(equipe) {
-        var registros = gruposEquipes[equipe];
+      ordemEquipes.forEach(function(chaveEquipe) {
+        var equipe=nomesEquipes[chaveEquipe];
+        var registros = gruposEquipes[chaveEquipe];
 
         registros.sort(function(a, b) {
           if (a.bairro === 'SEM BAIRRO') return 1;
@@ -5443,7 +5452,7 @@
           var novoBairro = pos === 0 || reg.bairro !== bairroAnterior;
           var classeLinha = novoBairro && pos > 0 ? ' class="border-top border-3"' : '';
 
-          h += '<tr' + classeLinha + '>';
+          h += '<tr' + classeLinha + (minhasPrimeiro?' data-mobile-lista="'+(prioridadesEquipes[chaveEquipe]===0?'Suas vistorias':'Demais vistorias')+'"':'') + '>';
 
           var chaveSel = chaveSelecaoVistoriaDia_(x);
           h += '<td class="text-center">' +
@@ -10193,6 +10202,7 @@
 
 
     function limparSessaoLocal() {
+      window.__vistoriasDiaItens=null;vistoriasDiaSelecionados={};document.getElementById('vd-tbody').textContent='';
       pendenciasRoteiroConsultaSeq++;document.getElementById('pend-consulta-status').textContent='';
       roteiroVistoriadoresConsultaSeq++;roteirosResponsivos_={};document.getElementById('rv-conteudo').textContent='';document.getElementById('atd-rv-conteudo').textContent='';
       financeiroGestor.editando=false;financeiroGestor.mesCarregado='';financeiroGestor.mesEdicao='';controlesFinanceiroGestor_();

@@ -27,3 +27,11 @@ GESTOR, CONFERENCIA, ATENDIMENTO e CONSULTA mantêm exatamente o conteúdo compl
 40 cenários Chromium relacionados passaram: sete novos de roteiro móvel, sete de Vistoriador, seis de Atendimento, três de distribuição, oito de rascunhos/DOCs e nove de Pendências/Atendimento. Incluem larguras de 320, 390 e 1200 px, toque em protocolo, detalhes, mudança de faixa, seleção preservada, ocultação de ações não autorizadas e limpeza ao sair. Serviços Google simulados, sem publicação ou acesso à planilha em produção. Não equivale a teste em aparelho físico.
 
 Instalação: atualizar WebApp.gs e Index.html juntos, salvar e publicar nova versão. O backend mudou para aplicar o filtro por perfil.
+
+## Vistorias do Dia: próprias primeiro no celular (04/11/2026)
+
+Somente no perfil VISTORIADOR e em telas de até 767,98 px, os registros cujo RG do titular ou canga coincide com o usuário aparecem primeiro, identificados como Suas vistorias. Depois aparecem Demais vistorias. Nenhum protocolo é ocultado. Homônimos são distinguidos por RG. A ordenação dentro de cada equipe e os índices usados pela tela são preservados.
+
+No computador e nos outros perfis, o HTML da lista mantém a apresentação anterior. A mudança de largura reapresenta os dados locais, sem nova chamada à planilha. Ao sair, o cache e a seleção são limpos.
+
+Verificação: 294 testes locais e 20 cenários Chromium relacionados passaram, incluindo comparação com a versão c7946ce para os demais perfis e computador. Serviços Google simulados; sem validação em produção ou aparelho físico. Nesta entrega basta atualizar Index.html e publicar nova versão.
