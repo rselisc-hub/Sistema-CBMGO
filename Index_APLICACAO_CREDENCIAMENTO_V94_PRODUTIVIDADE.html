@@ -7169,13 +7169,13 @@
               '<td><input type="checkbox" class="conf-atrib-check" data-protocolo="' +
                 escaparHtmlRoteiro(x.protocolo || '') + '"></td>' +
               '<td class="fw-bold">' + escaparHtmlRoteiro(x.protocolo || '') + '</td>' +
-              '<td>' + escaparHtmlRoteiro(x.movimentacao || '-') + '</td>' +
+              '<td>' + escaparHtmlRoteiro(formatarDataExibicaoConferencia_(x.movimentacao || '-')) + '</td>' +
               '<td>' + escaparHtmlRoteiro(x.razaoSocial || '-') + '</td>' +
               '<td class="text-center">' + escaparHtmlRoteiro(x.divisao || '-') + '</td>' +
               '<td>' + escaparHtmlRoteiro(x.statusSiapi || '-') + '</td>' +
               '<td>' + sinalizacaoConferenciaHtml(x) + '</td>' +
               '<td>' + origem + '</td>' +
-              '<td>' + escaparHtmlRoteiro(x.atualizadoEm || '-') + '</td>' +
+              '<td>' + escaparHtmlRoteiro(formatarDataExibicaoConferencia_(x.atualizadoEm || '-')) + '</td>' +
               '<td>' + escaparHtmlRoteiro(x.observacao || '-') + '</td>' +
               '<td><button class="btn btn-sm btn-outline-secondary" onclick="abrirHistoricoConferencia(\'' +
                 escaparJsConferencia(x.protocolo) + '\')"><i class="bi bi-clock-history"></i></button></td>' +
@@ -7418,6 +7418,15 @@
     }
 
 
+    function formatarDataExibicaoConferencia_(valor){
+      var texto=valor==null?'':String(valor),pad=function(n){return ('0'+n).slice(-2);};
+      return texto.replace(/\b(?:(\d{1,2})\/(\d{1,2})\/(\d{4})|(\d{4})-(\d{1,2})-(\d{1,2}))(?:(?:T|[ \t]+)(\d{1,2}):(\d{2})(?::(\d{2}))?)?/g,function(original,d,m,a,ai,mi,di,h,min,seg){
+        d=d||di;m=m||mi;a=a||ai;
+        if(Number(d)<1||Number(d)>31||Number(m)<1||Number(m)>12||(h!==undefined&&(Number(h)>23||Number(min)>59||Number(seg||0)>59)))return original;
+        return pad(d)+'/'+pad(m)+'/'+a+(h!==undefined?' '+pad(h)+':'+min+(seg!==undefined?':'+seg:''):'');
+      });
+    }
+
     function timestampMovimentacaoConferencia_(x) {
       return dataConferenciaParaTimestamp_(
         x.dataHoraUltimaMovimentacao ||
@@ -7647,14 +7656,14 @@
         return '<tr' + classeLinha + '>' +
           '<td class="text-center">' + seletor + '</td>' +
           '<td class="fw-bold">' + escaparHtmlRoteiro(x.protocolo || '') + '</td>' +
-          '<td>' + escaparHtmlRoteiro(x.movimentacao || '-') + '</td>' +
+          '<td>' + escaparHtmlRoteiro(formatarDataExibicaoConferencia_(x.movimentacao || '-')) + '</td>' +
           '<td>' + escaparHtmlRoteiro(x.razaoSocial || '-') + '</td>' +
           '<td class="text-center">' + escaparHtmlRoteiro(x.divisao || '-') + '</td>' +
           '<td>' + escaparHtmlRoteiro(x.statusSiapi || '-') + '</td>' +
           '<td>' + sinalizacaoConferenciaHtml(x) + '</td>' +
           '<td>' + situacao + '</td>' +
           '<td>' + escaparHtmlRoteiro(x.conferente || '-') + '</td>' +
-          '<td>' + escaparHtmlRoteiro(x.atribuidoEm || '-') + '</td>' +
+          '<td>' + escaparHtmlRoteiro(formatarDataExibicaoConferencia_(x.atribuidoEm || '-')) + '</td>' +
           '<td class="text-nowrap">' + acao +
             ' <button class="btn btn-sm btn-outline-secondary" onclick="abrirHistoricoConferencia(\'' +
             escaparJsConferencia(x.protocolo) + '\')" title="Histórico"><i class="bi bi-clock-history"></i></button></td>' +
@@ -7864,14 +7873,14 @@
       document.getElementById('conf-trab-observacao').value = x.observacao || '';
 
       var campos = [
-        ['Movimentação',x.movimentacao],
+        ['Movimentação',formatarDataExibicaoConferencia_(x.movimentacao)],
         ['Logradouro',x.logradouro],
         ['Bairro',x.bairro],
         ['Cidade',x.cidade],
         ['Razão Social',x.razaoSocial],
         ['Divisão',x.divisao],
         ['Área',x.area],
-        ['Última captura SIAPI',x.ultimaCapturaSiapi]
+        ['Última captura SIAPI',formatarDataExibicaoConferencia_(x.ultimaCapturaSiapi)]
       ];
 
       document.getElementById('conf-trab-dados').innerHTML = campos.map(function(c) {
@@ -8151,12 +8160,12 @@
             return '<tr>' +
               '<td class="fw-bold">' + escaparHtmlRoteiro(x.protocolo || '') + '</td>' +
               '<td>' + escaparHtmlRoteiro(x.razaoSocial || '-') + '</td>' +
-              '<td>' + escaparHtmlRoteiro(x.movimentacao || '-') + '</td>' +
+              '<td>' + escaparHtmlRoteiro(formatarDataExibicaoConferencia_(x.movimentacao || '-')) + '</td>' +
               '<td class="text-center">' + escaparHtmlRoteiro(x.divisao || '-') + '</td>' +
               '<td><span class="badge text-bg-light border">' + escaparHtmlRoteiro(x.statusSiapi || '-') + '</span></td>' +
               '<td>' + escaparHtmlRoteiro(x.ultimoConferente || '-') + '</td>' +
-              '<td>' + escaparHtmlRoteiro(x.concluidoEm || '-') + '</td>' +
-              '<td>' + escaparHtmlRoteiro(x.atualizadoEm || '-') + '</td>' +
+              '<td>' + escaparHtmlRoteiro(formatarDataExibicaoConferencia_(x.concluidoEm || '-')) + '</td>' +
+              '<td>' + escaparHtmlRoteiro(formatarDataExibicaoConferencia_(x.atualizadoEm || '-')) + '</td>' +
               '<td>'+escaparHtmlRoteiro(x.observacao||'-')+'</td>'+
               '<td><button class="btn btn-sm btn-outline-secondary" onclick="abrirHistoricoConferencia(\'' +
                 escaparJsConferencia(x.protocolo) + '\')"><i class="bi bi-clock-history me-1"></i>Ver</button>'+((podeReabrirConferenciaTela_()&&x.estadoInterno==='CONCLUÍDO')?'<button type="button" class="btn btn-sm btn-outline-warning ms-1 conf-btn-reabrir" onclick="abrirReaberturaConferencia('+idx+')">Reabrir</button>':'')+'</td>' +
@@ -8211,7 +8220,7 @@
               var status = [e.statusAnterior, e.statusNovo].filter(Boolean).join(' → ');
 
               return '<tr>' +
-                '<td>' + escaparHtmlRoteiro(e.dataHora || '') + '</td>' +
+                '<td>' + escaparHtmlRoteiro(formatarDataExibicaoConferencia_(e.dataHora || '')) + '</td>' +
                 '<td class="fw-bold">' + escaparHtmlRoteiro(e.evento || '') + '</td>' +
                 '<td>' + escaparHtmlRoteiro(e.usuario || '') + '</td>' +
                 '<td>' + escaparHtmlRoteiro(estado || '-') + '</td>' +
