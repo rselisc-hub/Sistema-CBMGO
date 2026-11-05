@@ -3682,7 +3682,7 @@ function timestampConferenciaOrdenacao_(x) {
   );
   if (!s) return 0;
 
-  var m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
   if (m) {
     return new Date(
       parseInt(m[3],10), parseInt(m[2],10)-1, parseInt(m[1],10),
@@ -3690,7 +3690,7 @@ function timestampConferenciaOrdenacao_(x) {
     ).getTime();
   }
 
-  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (m) return new Date(parseInt(m[1],10),parseInt(m[2],10)-1,parseInt(m[3],10)).getTime();
   return 0;
 }
