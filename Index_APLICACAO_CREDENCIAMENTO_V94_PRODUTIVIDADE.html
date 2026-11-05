@@ -3115,7 +3115,7 @@
 
                   <table class="table table-sm table-hover align-middle text-center mb-0" style="font-size:0.9rem;">
 
-                    <thead class="table-danger sticky-top"><tr><th>Data</th><th>Turno</th><th>Militar</th><th>RG</th><th>Serviço</th><th>Ação</th></tr></thead>
+                    <thead class="table-danger sticky-top"><tr><th>Data</th><th>Turno</th><th>Militar</th><th>RG</th><th>Função</th><th>Ação</th></tr></thead>
 
                     <tbody id="tabela-escalados-remocao"><tr><td colspan="6" class="py-3 text-muted">Clique em "Atualizar Lista Escalados" para listar os militares na escala.</td></tr></tbody>
 
@@ -10255,6 +10255,7 @@
       atendimentoPendencias.seq++;atendimentoPendencias.grade=null;document.getElementById('atd-pend-sem-regiao').textContent='';document.getElementById('atd-pend-sem-regiao-box').style.display='none';atendimentoPendencias.itens=[];atendimentoPendencias.visiveis=[];atendimentoPendencias.carregando=false;document.getElementById('atd-pend-tbody').textContent='';document.getElementById('atd-pend-modal-corpo').textContent='';document.getElementById('atd-pend-modal-titulo').textContent='Informações da pendência';document.getElementById('atd-pend-busca').value='';document.getElementById('atd-pend-origem').value='';document.getElementById('atd-pend-status').textContent='';document.getElementById('atd-pend-total').textContent='';document.getElementById('atd-pend-atualizar').disabled=false;
       conferenciaConsultaCache=[];conferenciaReaberturaAtual=null;conferenciaConsultaSequencia++;
       ['ind-docs-origem','ind-docs-responsavel'].forEach(function(id){document.getElementById(id).innerHTML='<option value="">Todos</option>';});
+      escaladosEdicaoFuncao=[];
       indOperacional.seq++;indOperacional.cache={};indOperacional.dados=null;indOperacional.emCurso=null;indOperacional.token=null;
       textosPadraoEstado.sequencia++;textosPadraoEstado.token=null;textosPadraoEstado.modelos=null;textosPadraoEstado.ajustes={};textosPadraoEstado.selecionado=null;textosPadraoEstado.enviando=false;
       sessaoToken = '';
@@ -11081,7 +11082,9 @@
 
 
 
+    var escaladosEdicaoFuncao=[],funcaoEscaladoEnviando=false;
     function carregarMilitaresEscaladosParaRemocao() {
+      if(funcaoEscaladoEnviando)return;
       var consultaSeq=(consultasGestorSeq['carregarMilitaresEscaladosParaRemocao']||0)+1;consultasGestorSeq['carregarMilitaresEscaladosParaRemocao']=consultaSeq;var consultaToken=sessaoToken;
 
       var dataFiltro=document.getElementById('filtro-data-escalados-remocao').value;
@@ -11096,7 +11099,11 @@
 
           var html = '';
 
-          res.registros.forEach(function(item) { html += '<tr><td class="fw-bold text-dark">' + item.data + '</td><td><span class="badge bg-secondary">' + item.turno + '</span></td><td class="fw-bold text-start">' + item.nome + '</td><td>' + item.rg + '</td><td>' + item.servico + '</td><td><button class="btn btn-danger btn-sm px-2 py-0" onclick="solicitarRemocao(\'' + item.data + '\', \'' + item.rg + '\', \'' + item.turno + '\', \'' + item.nome + '\')"><i class="bi bi-trash-fill"></i> Remover</button></td></tr>'; });
+          escaladosEdicaoFuncao=res.registros;
+          res.registros.forEach(function(item,i) {
+            var opts=['Vistoriador','Atendente','Conferencista'].map(function(f){return '<option value="'+f+'"'+(f===item.funcao?' selected':'')+'>'+({Atendente:'Atendimento',Conferencista:'Conferência'}[f]||f)+'</option>';}).join('');
+            html+='<tr><td>'+escaparHtmlRoteiro(item.data)+'</td><td>'+escaparHtmlRoteiro(item.turno)+'</td><td class="text-start">'+escaparHtmlRoteiro(item.nome)+'</td><td>'+escaparHtmlRoteiro(item.rg)+'</td><td><select class="form-select form-select-sm" id="funcao-escalado-'+i+'" aria-label="Função de '+escaparHtmlRoteiro(item.nome)+'">'+opts+'</select></td><td><div class="d-flex gap-1"><button type="button" class="btn btn-primary btn-sm" onclick="salvarFuncaoEscaladoGestor_('+i+',this)">Salvar função</button><button type="button" class="btn btn-danger btn-sm" data-indice="'+i+'" onclick="var x=escaladosEdicaoFuncao[this.dataset.indice];solicitarRemocao(x.data,x.rg,x.turno,x.nome)">Remover</button></div><div class="small funcao-escalado-status" role="status"></div></td></tr>';
+          });
 
           document.getElementById('tabela-escalados-remocao').innerHTML = html;
 
@@ -11109,6 +11116,15 @@
     }
 
 
+
+    function salvarFuncaoEscaladoGestor_(i,botao){
+      if(funcaoEscaladoEnviando||!usuarioLogado||!usuarioLogado.permissoes||!usuarioLogado.permissoes.gestor)return;
+      var x=escaladosEdicaoFuncao[i],campo=document.getElementById('funcao-escalado-'+i);if(!x||!campo)return;
+      var status=botao.closest('td').querySelector('.funcao-escalado-status'),token=sessaoToken,funcao=campo.value;
+      funcaoEscaladoEnviando=true;var controles=Array.from(document.querySelectorAll('#lista-escalados-remocao button,#lista-escalados-remocao select')).map(function(el){var c={el:el,disabled:el.disabled};el.disabled=true;return c;});status.textContent='Salvando função e atualizando escala…';
+      function liberar(){funcaoEscaladoEnviando=false;controles.forEach(function(c){c.el.disabled=c.disabled;});}
+      google.script.run.withSuccessHandler(function(r){liberar();if(token!==sessaoToken)return;if(!r||!r.sucesso){status.textContent='Gravação não confirmada. Confira e tente novamente.';return;}x.funcao=r.funcao;status.textContent=r.mensagem;escalaPSEGestorJaCarregada=false;escalaPSEVistoriasJaCarregada=false;}).withFailureHandler(function(err){liberar();if(token===sessaoToken)status.textContent='Não foi possível confirmar. Confira e repita para concluir a sincronização. '+String(err&&err.message||err||'');}).alterarFuncaoEscaladoGestor({data:x.data,rg:x.rg,turno:x.turno,funcao:funcao},token);
+    }
 
     function solicitarRemocao(data, rg, turno, nome) {
 

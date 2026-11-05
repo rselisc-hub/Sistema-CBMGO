@@ -8412,8 +8412,10 @@ function obterRoteiroVistoriadoresWeb(dataFiltro, token) {
 }
 
 function obterVistoriasDoDiaWeb(dataFiltro, razaoSocialFiltro, token) {
-  exigirPerfil_(token, ["CONFERENCIA","VISTORIADOR","CONSULTA"]);
+  var sessao = exigirPerfil_(token, ["CONFERENCIA","VISTORIADOR","CONSULTA"]);
 
+  var somenteProprias=String(sessao.perfil||'').toUpperCase()==='VISTORIADOR',rgProprio=rgVisitaPessoal_(sessao.rg);
+  if(somenteProprias&&!rgProprio)throw new Error('RG inválido na sessão. Confira o cadastro de acesso.');
   var razaoBusca = normalizarChaveTextoRoteiro_(razaoSocialFiltro);
   var dataChave = chaveDataRoteiro_(dataFiltro);
 
@@ -8457,7 +8459,7 @@ function obterVistoriasDoDiaWeb(dataFiltro, razaoSocialFiltro, token) {
 
     var razaoSocial = String(r[15] || "").trim();
     if (
-      razaoBusca &&
+      !somenteProprias && razaoBusca &&
       normalizarChaveTextoRoteiro_(razaoSocial).indexOf(razaoBusca) === -1
     ) return;
 
@@ -8475,6 +8477,8 @@ function obterVistoriasDoDiaWeb(dataFiltro, razaoSocialFiltro, token) {
       linhaRoteiro:idxLinha + 2
     };
   });
+
+  if(somenteProprias)ordem=ordem.filter(function(chave){var r=candidatos[chave].r;if([rgVisitaPessoal_(r[2]),rgVisitaPessoal_(r[4])].indexOf(rgProprio)>=0&&(!razaoBusca||normalizarChaveTextoRoteiro_(r[15]).indexOf(razaoBusca)>=0))return true;delete candidatos[chave];return false;});
 
   if (!ordem.length) {
     return {
@@ -10362,16 +10366,18 @@ function planejarFuncoesPSE_(existentes, novas, gruposAlvo) {
     var chave = chaveGrupoFuncaoPSE_(r);
     if (!chave || !gruposAlvo[chave]) return;
     var exclusivo = atendenteExclusivoPSE_(r[2]);
+    if(!exclusivo&&String(r[13]||'').trim()==='SIM'&&normalizarFuncaoMilitar(r[4])!=='Atendente')return;
     if (!exclusivo && normalizarFuncaoMilitar(r[4]) === "Vistoriador") return;
     if (!grupos[chave]) grupos[chave] = [];
-    grupos[chave].push({r:r,linha:i < existentes.length ? i + 2 : 0,exclusivo:exclusivo});
+    grupos[chave].push({r:r,linha:i < existentes.length ? i + 2 : 0,exclusivo:exclusivo,manual:String(r[13]||'').trim()==='SIM'});
   });
   Object.keys(grupos).forEach(function(chave) {
     var lista = grupos[chave], exclusivos = lista.filter(function(x) { return x.exclusivo; });
     // Preserva o atendente já definido quando não há pessoa exclusiva no grupo.
-    var atendente = exclusivos.length ? null : lista.filter(function(x) { return normalizarFuncaoMilitar(x.r[4]) === "Atendente"; })[0] || lista[0];
+    var atendenteManual=lista.some(function(x){return x.manual&&normalizarFuncaoMilitar(x.r[4])==='Atendente';});
+    var atendente = exclusivos.length||atendenteManual ? null : lista.filter(function(x) { return normalizarFuncaoMilitar(x.r[4]) === "Atendente"; })[0] || lista[0];
     lista.forEach(function(x) {
-      var funcao = x.exclusivo || x === atendente ? "Atendente" : "Conferencista";
+      var funcao = x.exclusivo || (x.manual&&normalizarFuncaoMilitar(x.r[4])==='Atendente') || x === atendente ? "Atendente" : "Conferencista";
       if (x.r[4] === funcao) return;
       x.r[4] = funcao;
       if (x.linha) alteracoes[funcao].push("E" + x.linha);
@@ -10409,7 +10415,7 @@ function aplicarFuncoesPSEMes_(mesRef, token, umaVez) {
     }
     var aba = ss.getSheetByName("CONTROLE_ESCALAS");
     if (!aba || aba.getLastRow() < 2) return {sucesso:true,alterados:0,mensagem:"Não há escalados para ajustar.",semAtendimento:[]};
-    var dados = aba.getRange(2,1,aba.getLastRow()-1,7).getDisplayValues(), grupos = {};
+    var dados = aba.getRange(2,1,aba.getLastRow()-1,14).getDisplayValues(), grupos = {};
     dados.forEach(function(r) {
       var chave = chaveGrupoFuncaoPSE_(r), data = chave.split("|")[0];
       if (String(r[6] || "").trim().toUpperCase() === "ESCALADO" && data.slice(6,10)+"-"+data.slice(3,5) === mesRef) grupos[chave] = true;
@@ -10464,7 +10470,7 @@ function lancarVoluntariosSelecionadosWeb_(listaSelecionados) {
 
     if (abaControle.getLastRow() >= 2) {
       var existentes = abaControle
-        .getRange(2, 1, abaControle.getLastRow() - 1, 7)
+        .getRange(2, 1, abaControle.getLastRow() - 1, 14)
         .getDisplayValues();
 
       existentes.forEach(function(r) {
@@ -10667,7 +10673,7 @@ function lancarOrdemServicoWeb_Conteudo_(dadosOS) {
   var hIni = dadosOS.horaIni || (turnoNome === "Vespertino" ? "13:00" : (turnoNome === "Noturno" ? "19:00" : "07:00"));
   var hFim = dadosOS.horaFim || (turnoNome === "Vespertino" ? "19:00" : (turnoNome === "Noturno" ? "01:00" : "13:00"));
 
-  var existentesFuncoes = abaControle.getLastRow() >= 2 ? abaControle.getRange(2,1,abaControle.getLastRow()-1,7).getDisplayValues() : [];
+  var existentesFuncoes = abaControle.getLastRow() >= 2 ? abaControle.getRange(2,1,abaControle.getLastRow()-1,14).getDisplayValues() : [];
   var novaEscala = [
     dataFormatadaLimpa,
     String(dadosOS.rg || ""),
@@ -11691,7 +11697,7 @@ function removerMilitarDaEscala_Conteudo_(dataStr, rg, turno, nome) {
 
   if (abaControle && abaControle.getLastRow() >= 2) {
     var dadosC = abaControle
-      .getRange(2, 1, abaControle.getLastRow() - 1, 7)
+      .getRange(2, 1, abaControle.getLastRow() - 1, 14)
       .getDisplayValues();
 
     for (var i = 0; i < dadosC.length; i++) {
@@ -13743,21 +13749,22 @@ function obterIndicadoresOperacionaisGestor(filtros,token){
     avisos.push('Realizadas = distribuições não canceladas até hoje, sem registro de não realizada nas Pendências. Cores não interferem. Futuras ficam separadas. Retorno = nova visita realizada após outra realizada do mesmo protocolo registrada no sistema; redistribuição após não realizada não conta como retorno.');
   }else if(area==='docs'){
     var docs=ler('DOCS_DESPACHO',26),historico=ler('HISTORICO_DOCS_DESPACHO',10),finais=Object.create(null),ids=Object.create(null),protos=Object.create(null),somaDias=0,tempos=0;
+    identidades=criarIdentidadesIndicadores_([{linhas:historico,pares:[[8,9]]}]);
     var fila={abertos:0,aguardandoResposta:0,concluidos:0,arquivados:0,ate8:0,de9a17:0,mais18:0,semData:0};
     function finalDoc(v){return ['CONCLUIDO','ARQUIVADO'].indexOf(norm(v))>=0;}
     historico.forEach(function(r){
       if(!finalDoc(r[5])||finalDoc(r[4]))return;
       var d=dataIndicador_(r[2]),id=n(r[1]);if(!id||!d)return;
       // Ordem de inclusão desempata eventos do mesmo dia; não usa ATUALIZADO_EM.
-      if(!finais[id]||d>=finais[id].dia)finais[id]={dia:d,nome:n(r[9])||'Não informado',status:norm(r[5])};
+      if(!finais[id]||d>=finais[id].dia)finais[id]={dia:d,pessoa:identidades.pessoa(r[8],r[9]),status:norm(r[5])};
     });
     opcoesDocs={origens:[],responsaveis:[]};var origensDocs=Object.create(null),responsaveisDocs=Object.create(null);
     docs.forEach(function(r){
       var id=n(r[0]);if(!id||ids[id])return;ids[id]=true;
       var status=norm(r[2]),final=finalDoc(status),cad=dataIndicador_(r[19]),dtDoc=dataIndicador_(r[7]),f=finais[id];
-      var origem=n(r[1])||'Não informado',responsavel=f?f.nome:'Não informado';origensDocs[origem]=true;responsaveisDocs[responsavel]=true;
+      var origem=n(r[1])||'Não informado',pessoa=f&&f.pessoa,identificado=!!(pessoa&&pessoa.chave!=='SEM_IDENTIFICACAO'&&!/^(?:NAO INFORMADO|NAO REGISTRADO|N\/A|RG \d+)(?:$| \[)/.test(norm(pessoa.nome))),responsavel=identificado?pessoa.nome:'';origensDocs[origem]=true;if(identificado)responsaveisDocs[responsavel]=true;
       if(filtros.origem&&n(filtros.origem)!==origem||filtros.responsavel&&n(filtros.responsavel)!==responsavel)return;
-      var dim={tipoDocumento:n(r[3]),origem:origem,responsavel:responsavel};
+      var dim={tipoDocumento:n(r[3]),origem:origem};if(identificado)dim.responsavel=pessoa;
       if(final){if(status==='CONCLUIDO')fila.concluidos++;else fila.arquivados++;}
       else{fila.abertos++;if(status==='AGUARDANDO RESPOSTA')fila.aguardandoResposta++;
         var dias=dtDoc?Math.floor((Date.parse(hoje)-Date.parse(dtDoc))/86400000):null;
@@ -13782,7 +13789,7 @@ function obterIndicadoresOperacionaisGestor(filtros,token){
     Object.keys(grupos).forEach(function(k){Object.keys(grupos[k]).forEach(function(ch){var g=grupos[k][ch];g.tempoMedioDias=g.comTempo?g.somaDias/g.comTempo:null;});});
     totais.filaAtual=fila;
     avisos.push('Recebidos: data de cadastro. Concluídos e arquivados: tipo e data da última entrada em finalização comprovada no histórico, somente para documentos atualmente finalizados; reabertos ficam na fila. Cada documento conta uma vez por medida. Protocolos distintos consideram a união de recebidos e finalizados no período. Tempo médio em dias corridos entre cadastro e finalização, incluindo arquivados, apenas com datas válidas.');
-    avisos.push('Situação e prazos da fila são atuais, fora do filtro de período. Prazos usam a data do documento, como na fila operacional. Responsável vem do usuário do histórico; não é inferido de quem preencheu.');
+    avisos.push('Situação e prazos da fila são atuais, fora do filtro de período. Prazos usam a data do documento, como na fila operacional. Responsável é unificado por RG ou alias exato do cadastro e apresentado pelo nome de guerra; não é inferido de quem preencheu. Sem identificação fica nos totais gerais, fora dos grupos e filtro de responsável.');
     if(totais.semHistorico)avisos.push(totais.semHistorico+' documento(s) finalizado(s) sem histórico de conclusão: não entram na produção por período nem no tempo médio.');
   }else{
     var config=null,linhas=ler('CONTROLE_ESCALAS',13);if(linhas.length){config=obterConfiguracaoPeriodo();var configAba=ss.getSheetByName('CONFIG');if(!configAba||configAba.getLastRow()<2)avisos.push('Configuração financeira não preenchida: cálculo usa os valores padrão do sistema.');}var errosValor=0;identidades=criarIdentidadesIndicadores_([{linhas:linhas,pares:[[1,2]]}]);
@@ -13952,5 +13959,27 @@ function cadastrarMilitarPessoal(dados, token) {
     if(!existeFuncao)funcoes.getRange(Math.max(2,funcoes.getLastRow()+1),1,1,6).setValues([[rg,guerra,posto,dados.vistoriador===true?'VISTORIADOR':'',dataHoraSaoPauloTexto_(),sessao.nome||sessao.rg]]);
     SpreadsheetApp.flush();cacheMilitaresRoteiroExecucao_=null;
     return {sucesso:true,rg:rg,jaCadastrado:jaExistia,mensagem:jaExistia?'Cadastro já existente conferido, sem duplicar o militar.':'Militar cadastrado com sucesso. Para conceder login, utilize Cadastrar acesso.'};
+  }finally{lock.releaseLock();}
+}
+
+// Correção pontual da função pelo Gestor; não altera perfil, serviço, valores ou OS/SEI/RAI.
+function alterarFuncaoEscaladoGestor(dados,token){
+  exigirPerfil_(token,['GESTOR']);dados=dados||{};
+  var rg=rgVisitaPessoal_(dados.rg),dataChave=dataIndicador_(dados.data),data=dataChave?criarDataSegura(dataChave):null,turno=normalizarTurnoPSE_(dados.turno),funcao=String(dados.funcao||'');
+  if(!rg||!data||['MATUTINO','VESPERTINO','NOTURNO'].indexOf(turno)<0||['Vistoriador','Atendente','Conferencista'].indexOf(funcao)<0)throw Error('Confira RG, data, turno e função.');
+  var lock=LockService.getScriptLock();lock.waitLock(15000);
+  try{
+    exigirPerfil_(token,['GESTOR']);var aba=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('CONTROLE_ESCALAS');
+    if(!aba||aba.getLastRow()<2)throw Error('Escalado não encontrado. Atualize a lista.');
+    var linhas=aba.getRange(2,1,aba.getLastRow()-1,14).getDisplayValues(),alvos=[];
+    linhas.forEach(function(r,i){if(rgVisitaPessoal_(r[1])===rg&&formatarDataTexto(criarDataSegura(r[0]))===formatarDataTexto(data)&&normalizarTurnoPSE_(r[3])===turno&&String(r[6]||'').trim().toUpperCase()==='ESCALADO')alvos.push(i);});
+    if(alvos.length!==1)throw Error(alvos.length?'Há registros duplicados para esse militar, data e turno. Confira a planilha antes de editar.':'Escalado não encontrado. Atualize a lista.');
+    var i=alvos[0],r=linhas[i];if(atendenteExclusivoPSE_(r[2])&&funcao!=='Atendente')throw Error('Fabrício e Luciene devem permanecer no Atendimento.');
+    var cab=String(aba.getRange(1,14).getDisplayValues()[0][0]||'').trim();if((cab&&cab!=='FUNCAO_MANUAL_GESTOR')||(!cab&&linhas.some(function(l){return String(l[13]||'').trim()!=='';})))throw Error('Coluna N já está em uso. Nenhum dado foi alterado.');
+    if(!cab)aba.getRange(1,14).setValue('FUNCAO_MANUAL_GESTOR');
+    aba.getRange(i+2,14).setValue('SIM');aba.getRange(i+2,5).setValue(funcao);
+    // Repetir o mesmo pedido é seguro se a reconstrução falhar após gravar a função.
+    sincronizarEscalaPSE();
+    return {sucesso:true,funcao:funcao,mensagem:'Função atualizada para '+funcao+'. Escala PSE sincronizada.'};
   }finally{lock.releaseLock();}
 }
