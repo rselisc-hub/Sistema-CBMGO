@@ -45,3 +45,15 @@ Quem pode registrar/consultar: Gestor e perfis Atendimento/Conferência que aces
 ## Verificação
 
 323 testes locais e 39 cenários Chromium relacionados passaram, com Google simulado. Oito testes novos verificam cadastro inicial sem AV-857, nomes de guerra de não vistoriadores, permissões, cautela/devolução, cadastro/baixa/reativação, histórico, concorrência e repetição após perda da resposta. Sete cenários novos no navegador exercitam consulta/busca, permissões, clique duplo, resposta perdida, devolução/relatório, cadastro do Gestor, largura mobile e limpeza da sessão. Outros cenários cobrem Atendimento (6), Pendências/Atendimento (9), PSE (10) e Vistoriador (7). Não houve publicação no Google, integração com Forms ou medição de latência real de produção.
+
+## Correção da lista de militares — 05/11/2026
+
+A estrutura antiga de DADOS usa Nome; parte dos registros reúne posto, quadro, RG e nome completo na mesma célula. O cadastro mais novo acrescentou Nome de guerra. A leitura anterior considerava só as colunas novas, ocultando os demais militares.
+
+A seleção agora lê os formatos antigo e novo e inclui todos os registros nomeados de DADOS. RG explícito no texto estruturado é separado quando há um único número válido e prefixo de posto reconhecido. Cadastro complementa o nome de guerra pelo RG, incluindo o campo ID Militar e diferenças de zeros à esquerda. Não importa militares extras existentes somente no Cadastro. As duas bases são apenas lidas.
+
+Nome de guerra ausente: exibe o nome disponível, com indicação na seleção e aviso; não presume sobrenome/abreviação. Se o RG também estiver ausente, usa identidade do registro de DADOS (linha e assinatura do nome/posto), sem inventar RG. Esse identificador é revalidado no servidor e preservado no JSON da movimentação, mantendo o histórico e o envio idempotente. Mudança do registro exige atualizar a seleção. Registros duplicados do mesmo RG são unificados, dando preferência ao que possui nome de guerra.
+
+Na planilha enviada anteriormente, a leitura local identificou 69 militares distintos: 44 com nome de guerra recuperado do cadastro e 25 apresentados pelo nome disponível. Esses números pertencem à cópia antiga, não são uma consulta à planilha de produção atual.
+
+Validação: 327 testes locais passaram; 20 cenários Chromium passaram (7 com cadastro novo, os mesmos 7 com estrutura antiga e 6 de Atendimento), usando Google simulado. Quatro novos testes verificam coexistência antigo/novo, complemento por RG sem importar pessoas extras, RG dentro do texto estruturado e movimentação sem RG sem inventar identificação. Atualizar WebApp.gs e Index.html juntos, publicar nova versão e clicar em Atualizar no Controle de Viaturas.

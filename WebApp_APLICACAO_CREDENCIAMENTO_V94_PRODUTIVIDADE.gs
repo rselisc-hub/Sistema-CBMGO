@@ -14025,12 +14025,32 @@ function basesViaturas_(){
   return {v:v,h:h};
 }
 function militaresControleViaturas_(){
-  var aba=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('DADOS');if(!aba||aba.getLastRow()<2)return {itens:[],aviso:'A aba DADOS está ausente ou sem militares.'};
-  var n=aba.getLastColumn(),cab=aba.getRange(1,1,1,n).getDisplayValues()[0],rg=-1,guerra=-1,posto=-1,id=-1;
-  cab.forEach(function(c,i){var k=normalizarTextoChavePSE_(c).replace(/[^A-Z0-9]/g,'');if(['RG','RGMILITAR','REGISTROGERAL'].indexOf(k)>=0)rg=i;if(k.indexOf('GUERRA')>=0)guerra=i;if(k.indexOf('POSTO')>=0||k.indexOf('GRADUACAO')>=0)posto=i;if(k==='IDMILITAR')id=i;});
-  if(rg<0||(guerra<0&&id<0))return {itens:[],aviso:'Confira as colunas RG e NOME DE GUERRA da aba DADOS.'};
-  var mapa={},faltantes=0;aba.getRange(2,1,aba.getLastRow()-1,n).getDisplayValues().forEach(function(r){var chave=rgVisitaPessoal_(r[rg]),nome=(guerra>=0?textoViatura_(r[guerra]):'')||(id>=0?extrairPostoENome(r[id]).nome:'');if(!chave||!nome){faltantes++;return;}if(mapa[chave]&&mapa[chave].nome!==nome){throw Error('RG duplicado com nomes diferentes na aba DADOS: '+chave);}mapa[chave]={rg:chave,nome:nome,posto:posto>=0?textoViatura_(r[posto]):''};});
-  return {itens:Object.keys(mapa).map(function(k){return mapa[k];}).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');}),aviso:faltantes?faltantes+' cadastro(s) sem RG/nome de guerra válido não puderam entrar na seleção.':''};
+  var ss=SpreadsheetApp.getActiveSpreadsheet(),aba=ss.getSheetByName('DADOS');if(!aba||aba.getLastRow()<2)return {itens:[],aviso:'A aba DADOS está ausente ou sem militares.'};
+  function chaveRg(v){return rgVisitaPessoal_(v).replace(/^0+(?=\d)/,'');}
+  function ler(base){if(!base||base.getLastRow()<2)return null;var n=base.getLastColumn(),cab=base.getRange(1,1,1,n).getDisplayValues()[0],m={rg:[],guerra:[],posto:[],id:[],nome:[]};cab.forEach(function(c,i){var k=normalizarTextoChavePSE_(c).replace(/[^A-Z0-9]/g,'');if(['RG','RGMILITAR','REGISTROGERAL'].indexOf(k)>=0||/^RG(?:BM|CBMGO)$/.test(k))m.rg.push(i);else if(k.indexOf('GUERRA')>=0)m.guerra.push(i);else if(k.indexOf('POSTO')>=0||k.indexOf('GRAD')>=0)m.posto.push(i);else if(k==='IDMILITAR'||k==='ID')m.id.push(i);else if(k==='NOME'||k.indexOf('COMPLETO')>=0)m.nome.push(i);});return {m:m,linhas:base.getRange(2,1,base.getLastRow()-1,n).getDisplayValues()};}
+  function valor(r,indices){for(var i=0;i<indices.length;i++){var v=textoViatura_(r[indices[i]]);if(v)return v;}return '';}
+  function registro(r,m){
+    var id=valor(r,m.id),info=id?extrairPostoENome(id):{nome:'',posto:''},rg=rgVisitaPessoal_(valor(r,m.rg)),nome=valor(r,m.nome),posto=valor(r,m.posto)||info.posto;
+    // Formato antigo explícito: POSTO / QUADRO / RG / NOME em uma única célula.
+    if(/^(?:CORONEL|TENENTE[ -]CORONEL|MAJOR|CAPITAO|ASPIRANTE|SUBTENENTE|SARGENTO|TENENTE|[123][º°O]?\s*(?:TENENTE|SARGENTO|SGT)|ST|CAP|MAJ|TC|CEL|ASP|CB|SD|SOLDADO|CABO)\s/.test(normalizarTextoChavePSE_(nome))){
+      var numeros=nome.match(/\b\d{3,8}\b/g)||[];
+      if(numeros.length===1&&(!rg||chaveRg(rg)===chaveRg(numeros[0]))){var pos=nome.indexOf(numeros[0]);if(!rg)rg=rgVisitaPessoal_(numeros[0]);if(!posto)posto=nome.slice(0,pos).trim();nome=nome.slice(pos+numeros[0].length).trim();}
+    }
+    return {rg:rg,guerra:valor(r,m.guerra)||info.nome,posto:posto,nome:nome};
+  }
+  var dados=ler(aba);if(!dados.m.rg.length&&!dados.m.nome.length&&!dados.m.id.length)return {itens:[],aviso:'Confira os cabeçalhos da aba DADOS.'};
+  var cadastro=ler(ss.getSheetByName('Cadastro')),aliases={},ambiguos={},mapa={},faltantes=0,semGuerra=0,semRg=0;
+  if(cadastro)cadastro.linhas.forEach(function(r){var x=registro(r,cadastro.m),k=chaveRg(x.rg);if(!k||!x.guerra)return;if(aliases[k]&&normalizarTextoChavePSE_(aliases[k].guerra)!==normalizarTextoChavePSE_(x.guerra)){ambiguos[k]=true;return;}aliases[k]=x;});
+  dados.linhas.forEach(function(r,i){var x=registro(r,dados.m),k=chaveRg(x.rg);var cad=ambiguos[k]?null:aliases[k],guerra=x.guerra||(cad&&cad.guerra)||'',nome=guerra||x.nome;
+    if(!nome){faltantes++;return;}var id=k?x.rg:'DADOS-'+(i+2)+'-'+hashCadastroDoc_(nome+'|'+x.posto).slice(0,16);if(!k)k=id;var novo={id:id,rg:x.rg,nome:nome,posto:x.posto||(cad&&cad.posto)||'',semNomeGuerra:!guerra,linhaDados:i+2};
+    if(!mapa[k]||(mapa[k].semNomeGuerra&&!novo.semNomeGuerra))mapa[k]=novo;
+  });
+  var itens=Object.keys(mapa).map(function(k){if(mapa[k].semNomeGuerra)semGuerra++;if(!mapa[k].rg)semRg++;return mapa[k];}).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');}),avisos=[];
+  if(semGuerra)avisos.push(semGuerra+' militar(es) sem nome de guerra cadastrado: exibidos pelo nome disponível, com indicação na lista.');
+  if(semRg)avisos.push(semRg+' militar(es) sem RG cadastrado, identificados pelo registro da aba DADOS.');
+  if(faltantes)avisos.push(faltantes+' registro(s) sem RG/nome válido não puderam entrar na seleção.');
+  if(Object.keys(ambiguos).length)avisos.push('Há nomes de guerra conflitantes para um mesmo RG no Cadastro; essas correspondências não foram presumidas.');
+  return {itens:itens,aviso:avisos.join(' ')};
 }
 function cadastroViaturas_(bases){return bases.v.getLastRow()<2?[]:bases.v.getRange(2,1,bases.v.getLastRow()-1,6).getDisplayValues().map(function(r,i){return {id:r[0],prefixo:r[1],placa:r[2],ativa:r[3]==='SIM',linha:i+2};});}
 function estadoInicialViatura_(){return {status:'DISPONÍVEL',responsavel:'',rg:'',cauteladaEm:'',cautelaId:'',ultimaDevolucao:'',devolvidaPor:''};}
@@ -14056,17 +14076,18 @@ function salvarCadastroViatura(dados,token){
   }finally{lock.releaseLock();}
 }
 function movimentarViatura(dados,token){
-  exigirPerfil_(token,['ATENDIMENTO','CONFERENCIA']);dados=dados||{};var id=textoViatura_(dados.viaturaId),op=textoViatura_(dados.operacao),rg=rgVisitaPessoal_(dados.rg),tentativa=textoViatura_(dados.operacaoId),obs=textoViatura_(dados.observacao);
-  if(!id||!rg||['CAUTELA','DEVOLUÇÃO'].indexOf(op)<0||!/^[A-Za-z0-9-]{10,80}$/.test(tentativa)||obs.length>1000||/^[=+@]/.test(obs))throw Error('Confira viatura, militar, operação e observação.');
+  exigirPerfil_(token,['ATENDIMENTO','CONFERENCIA']);dados=dados||{};var id=textoViatura_(dados.viaturaId),op=textoViatura_(dados.operacao),rg=rgVisitaPessoal_(dados.rg),militarId=textoViatura_(dados.militarId),tentativa=textoViatura_(dados.operacaoId),obs=textoViatura_(dados.observacao);
+  if(!id||(!rg&&!militarId)||militarId.length>100||['CAUTELA','DEVOLUÇÃO'].indexOf(op)<0||!/^[A-Za-z0-9-]{10,80}$/.test(tentativa)||obs.length>1000||/^[=+@]/.test(obs))throw Error('Confira viatura, militar, operação e observação.');
   var lock=LockService.getScriptLock();lock.waitLock(15000);try{
     var sessao=exigirPerfil_(token,['ATENDIMENTO','CONFERENCIA']),b=basesViaturas_(),cad=cadastroViaturas_(b),v=cad.filter(function(x){return x.id===id;})[0];if(!v)throw Error('Viatura não encontrada.');
     // Evento único é a gravação definitiva. Repetir pedido após perda da resposta não duplica evento.
-    if(b.h.getLastRow()>1){var repetidos=b.h.getRange(2,1,b.h.getLastRow()-1,1).createTextFinder(tentativa).matchEntireCell(true).findAll();if(repetidos.length){var anterior=b.h.getRange(repetidos[0].getRow(),1,1,11).getDisplayValues()[0];if(anterior[1]!==id||anterior[3]!==op||anterior[4]!==rg||anterior[6]!==String(sessao.rg)||anterior[8]!==obs)throw Error('Identificação de envio já utilizada com outros dados.');return {sucesso:true,viatura:objetoViatura_(v,estadosViaturas_(b,id)[id]),mensagem:'Movimentação já registrada; situação atual consultada.'};}}
-    var militar=militaresControleViaturas_().itens.filter(function(x){return x.rg===rg;})[0];if(!militar)throw Error('Militar não encontrado na aba DADOS. Atualize a lista.');
+    if(b.h.getLastRow()>1){var repetidos=b.h.getRange(2,1,b.h.getLastRow()-1,1).createTextFinder(tentativa).matchEntireCell(true).findAll();if(repetidos.length){var anterior=b.h.getRange(repetidos[0].getRow(),1,1,11).getDisplayValues()[0];if(anterior[1]!==id||anterior[3]!==op||(JSON.parse(anterior[10]).militarMovimentoId||anterior[4])!==(militarId||rg)||anterior[6]!==String(sessao.rg)||anterior[8]!==obs)throw Error('Identificação de envio já utilizada com outros dados.');return {sucesso:true,viatura:objetoViatura_(v,estadosViaturas_(b,id)[id]),mensagem:'Movimentação já registrada; situação atual consultada.'};}}
+    var militar=militaresControleViaturas_().itens.filter(function(x){return militarId?x.id===militarId:x.rg===rg;})[0];if(!militar)throw Error('Militar não encontrado na aba DADOS. Atualize a lista.');
     if(!v.ativa)throw Error('Viatura inativa.');var estado=estadosViaturas_(b,id)[id]||estadoInicialViatura_(),agora=dataHoraSaoPauloTexto_();
-    if(op==='CAUTELA'){if(estado.status!=='DISPONÍVEL')throw Error('Viatura já cautelada por '+estado.responsavel+'. Atualize a situação.');estado.status='CAUTELADA';estado.responsavel=militar.nome;estado.rg=rg;estado.cauteladaEm=agora;estado.cautelaId=tentativa;}
+    if(op==='CAUTELA'){if(estado.status!=='DISPONÍVEL')throw Error('Viatura já cautelada por '+estado.responsavel+'. Atualize a situação.');estado.status='CAUTELADA';estado.responsavel=militar.nome;estado.rg=militar.rg;estado.cauteladaEm=agora;estado.cautelaId=tentativa;}
     else{if(estado.status!=='CAUTELADA')throw Error('Não há cautela aberta para esta viatura.');if(textoViatura_(dados.cautelaId)!==estado.cautelaId)throw Error('A cautela mudou. Atualize a situação antes de devolver.');estado.status='DISPONÍVEL';estado.responsavel='';estado.rg='';estado.cauteladaEm='';estado.ultimaDevolucao=agora;estado.devolvidaPor=militar.nome;}
-    b.h.getRange(b.h.getLastRow()+1,1,1,11).setValues([[tentativa,id,agora,op,rg,militar.nome,String(sessao.rg),sessao.nome||String(sessao.rg),obs,estado.cautelaId,JSON.stringify(estado)]]);
+    estado.militarMovimentoId=militar.id;
+    b.h.getRange(b.h.getLastRow()+1,1,1,11).setValues([[tentativa,id,agora,op,militar.rg,militar.nome,String(sessao.rg),sessao.nome||String(sessao.rg),obs,estado.cautelaId,JSON.stringify(estado)]]);
     return {sucesso:true,viatura:objetoViatura_(v,estado),mensagem:op==='CAUTELA'?'Cautela registrada.':'Devolução registrada.'};
   }finally{lock.releaseLock();}
 }
