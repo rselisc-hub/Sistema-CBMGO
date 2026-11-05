@@ -14008,3 +14008,70 @@ function alterarFuncaoEscaladoGestor(dados,token){
     return {sucesso:true,funcao:funcao,mensagem:'Função atualizada para '+funcao+'. Escala PSE sincronizada.'};
   }finally{lock.releaseLock();}
 }
+
+// Controle de viaturas: eventos são a fonte única da situação, sem apagar movimentações.
+function textoViatura_(v){return String(v==null?'':v).trim();}
+function basesViaturas_(){
+  var ss=SpreadsheetApp.getActiveSpreadsheet(),v=ss.getSheetByName('VIATURAS_CADASTRO'),h=ss.getSheetByName('VIATURAS_MOVIMENTOS');
+  if(!v)v=ss.insertSheet('VIATURAS_CADASTRO');
+  if(v.getLastRow()===0){
+    var iniciais=[['AV-843','TGK0A44'],['AV-841','TGJ3E34'],['AV-840','TGJ2A14'],['AV-839','TGI7E74'],['AV-836','TGG6G44'],['AV-835','TGG2A04'],['AV-834','TGF5E54'],['AV-832','TGF1B44'],['AV-831','TGE3E34'],['AV-822','TFZ8A04'],['AV-821','TFZ4C24'],['AV-883','TFW4A69'],['AV-446','PRZ1136'],['AV-452','PRZ1336']];
+    v.getRange(1,1,iniciais.length+1,6).setValues([['ID','PREFIXO','PLACA','ATIVA','ATUALIZADO_EM','REGISTRADO_POR']].concat(iniciais.map(function(x){return ['VTR-'+x[0],x[0],x[1],'SIM',dataHoraSaoPauloTexto_(),'CADASTRO INICIAL'];})));
+  }
+  if(v.getRange(1,1).getDisplayValue()!=='ID')throw Error('Confira a estrutura de VIATURAS_CADASTRO; nenhum cadastro será substituído.');
+  if(!h)h=ss.insertSheet('VIATURAS_MOVIMENTOS');
+  if(h.getLastRow()===0)h.getRange(1,1,1,11).setValues([['OPERACAO_ID','VIATURA_ID','DATA_HORA','OPERACAO','MILITAR_RG','NOME_GUERRA','USUARIO_RG','USUARIO','OBSERVACAO','CAUTELA_ID','SITUACAO_JSON']]);
+  if(h.getRange(1,1).getDisplayValue()!=='OPERACAO_ID')throw Error('Confira a estrutura de VIATURAS_MOVIMENTOS.');
+  return {v:v,h:h};
+}
+function militaresControleViaturas_(){
+  var aba=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('DADOS');if(!aba||aba.getLastRow()<2)return {itens:[],aviso:'A aba DADOS está ausente ou sem militares.'};
+  var n=aba.getLastColumn(),cab=aba.getRange(1,1,1,n).getDisplayValues()[0],rg=-1,guerra=-1,posto=-1,id=-1;
+  cab.forEach(function(c,i){var k=normalizarTextoChavePSE_(c).replace(/[^A-Z0-9]/g,'');if(['RG','RGMILITAR','REGISTROGERAL'].indexOf(k)>=0)rg=i;if(k.indexOf('GUERRA')>=0)guerra=i;if(k.indexOf('POSTO')>=0||k.indexOf('GRADUACAO')>=0)posto=i;if(k==='IDMILITAR')id=i;});
+  if(rg<0||(guerra<0&&id<0))return {itens:[],aviso:'Confira as colunas RG e NOME DE GUERRA da aba DADOS.'};
+  var mapa={},faltantes=0;aba.getRange(2,1,aba.getLastRow()-1,n).getDisplayValues().forEach(function(r){var chave=rgVisitaPessoal_(r[rg]),nome=(guerra>=0?textoViatura_(r[guerra]):'')||(id>=0?extrairPostoENome(r[id]).nome:'');if(!chave||!nome){faltantes++;return;}if(mapa[chave]&&mapa[chave].nome!==nome){throw Error('RG duplicado com nomes diferentes na aba DADOS: '+chave);}mapa[chave]={rg:chave,nome:nome,posto:posto>=0?textoViatura_(r[posto]):''};});
+  return {itens:Object.keys(mapa).map(function(k){return mapa[k];}).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');}),aviso:faltantes?faltantes+' cadastro(s) sem RG/nome de guerra válido não puderam entrar na seleção.':''};
+}
+function cadastroViaturas_(bases){return bases.v.getLastRow()<2?[]:bases.v.getRange(2,1,bases.v.getLastRow()-1,6).getDisplayValues().map(function(r,i){return {id:r[0],prefixo:r[1],placa:r[2],ativa:r[3]==='SIM',linha:i+2};});}
+function estadoInicialViatura_(){return {status:'DISPONÍVEL',responsavel:'',rg:'',cauteladaEm:'',cautelaId:'',ultimaDevolucao:'',devolvidaPor:''};}
+function estadosViaturas_(bases,id){
+  var h=bases.h,result={},linhas={},lista=[];if(h.getLastRow()<2)return result;
+  if(id){var todas=h.getRange(2,2,h.getLastRow()-1,1).createTextFinder(id).matchEntireCell(true).findAll();if(todas.length)lista=[Math.max.apply(null,todas.map(function(c){return c.getRow();}))];}
+  else{h.getRange(2,2,h.getLastRow()-1,1).getDisplayValues().forEach(function(r,i){if(r[0])linhas[r[0]]=i+2;});lista=Object.keys(linhas).map(function(k){return linhas[k];});}
+  if(!lista.length)return result;var mapa=lerLinhasProtocolosRoteiro_(h,{v:lista},11);lista.forEach(function(l){var r=mapa[l],estado;try{estado=JSON.parse(r[10]);}catch(e){throw Error('Histórico de viatura inválido. Solicite conferência ao Gestor.');}if(!estado||['DISPONÍVEL','CAUTELADA'].indexOf(estado.status)<0)throw Error('Situação inválida no histórico da viatura.');result[r[1]]=estado;});return result;
+}
+function objetoViatura_(v,estado){return {id:v.id,prefixo:v.prefixo,placa:v.placa,ativa:v.ativa,estado:estado||estadoInicialViatura_()};}
+function obterControleViaturas(token){
+  var sessao=exigirPerfil_(token,['ATENDIMENTO','CONFERENCIA']),lock=LockService.getScriptLock();lock.waitLock(15000);
+  try{var b=basesViaturas_(),cad=cadastroViaturas_(b),estados=estadosViaturas_(b),militares=militaresControleViaturas_();return {sucesso:true,viaturas:cad.map(function(v){return objetoViatura_(v,estados[v.id]);}),militares:militares.itens,aviso:militares.aviso,podeGerenciar:String(sessao.perfil||'').toUpperCase()==='GESTOR',atualizadoEm:dataHoraSaoPauloTexto_()};}finally{lock.releaseLock();}
+}
+function salvarCadastroViatura(dados,token){
+  exigirPerfil_(token,['GESTOR']);dados=dados||{};var prefixo=textoViatura_(dados.prefixo).toUpperCase(),placa=textoViatura_(dados.placa).toUpperCase().replace(/[\s-]/g,''),id=textoViatura_(dados.id),ativa=dados.ativa===true;
+  if(!/^[A-Z0-9][A-Z0-9 -]{1,19}$/.test(prefixo)||!(/^[A-Z]{3}\d[A-Z0-9]\d{2}$/.test(placa)))throw Error('Informe prefixo e placa válidos.');
+  var lock=LockService.getScriptLock();lock.waitLock(15000);try{var sessao=exigirPerfil_(token,['GESTOR']),b=basesViaturas_(),cad=cadastroViaturas_(b),v=id?cad.filter(function(x){return x.id===id;})[0]:null;
+    if(id&&!v)throw Error('Viatura não encontrada. Atualize a consulta.');
+    if(cad.some(function(x){return x.id!==id&&(x.placa===placa||x.prefixo===prefixo);}))throw Error('Prefixo ou placa já cadastrados, inclusive entre as viaturas inativas.');
+    if(v){var estado=estadosViaturas_(b,v.id)[v.id]||estadoInicialViatura_();if(estado.status==='CAUTELADA')throw Error('Devolva a viatura antes de alterar o cadastro ou dar baixa.');}
+    var linha=[id||'VTR-'+Utilities.getUuid(),prefixo,placa,ativa?'SIM':'NÃO',dataHoraSaoPauloTexto_(),sessao.nome||sessao.rg];b.v.getRange(v?v.linha:b.v.getLastRow()+1,1,1,6).setValues([linha]);return {sucesso:true,mensagem:'Cadastro da viatura salvo.'};
+  }finally{lock.releaseLock();}
+}
+function movimentarViatura(dados,token){
+  exigirPerfil_(token,['ATENDIMENTO','CONFERENCIA']);dados=dados||{};var id=textoViatura_(dados.viaturaId),op=textoViatura_(dados.operacao),rg=rgVisitaPessoal_(dados.rg),tentativa=textoViatura_(dados.operacaoId),obs=textoViatura_(dados.observacao);
+  if(!id||!rg||['CAUTELA','DEVOLUÇÃO'].indexOf(op)<0||!/^[A-Za-z0-9-]{10,80}$/.test(tentativa)||obs.length>1000||/^[=+@]/.test(obs))throw Error('Confira viatura, militar, operação e observação.');
+  var lock=LockService.getScriptLock();lock.waitLock(15000);try{
+    var sessao=exigirPerfil_(token,['ATENDIMENTO','CONFERENCIA']),b=basesViaturas_(),cad=cadastroViaturas_(b),v=cad.filter(function(x){return x.id===id;})[0];if(!v)throw Error('Viatura não encontrada.');
+    // Evento único é a gravação definitiva. Repetir pedido após perda da resposta não duplica evento.
+    if(b.h.getLastRow()>1){var repetidos=b.h.getRange(2,1,b.h.getLastRow()-1,1).createTextFinder(tentativa).matchEntireCell(true).findAll();if(repetidos.length){var anterior=b.h.getRange(repetidos[0].getRow(),1,1,11).getDisplayValues()[0];if(anterior[1]!==id||anterior[3]!==op||anterior[4]!==rg||anterior[6]!==String(sessao.rg)||anterior[8]!==obs)throw Error('Identificação de envio já utilizada com outros dados.');return {sucesso:true,viatura:objetoViatura_(v,estadosViaturas_(b,id)[id]),mensagem:'Movimentação já registrada; situação atual consultada.'};}}
+    var militar=militaresControleViaturas_().itens.filter(function(x){return x.rg===rg;})[0];if(!militar)throw Error('Militar não encontrado na aba DADOS. Atualize a lista.');
+    if(!v.ativa)throw Error('Viatura inativa.');var estado=estadosViaturas_(b,id)[id]||estadoInicialViatura_(),agora=dataHoraSaoPauloTexto_();
+    if(op==='CAUTELA'){if(estado.status!=='DISPONÍVEL')throw Error('Viatura já cautelada por '+estado.responsavel+'. Atualize a situação.');estado.status='CAUTELADA';estado.responsavel=militar.nome;estado.rg=rg;estado.cauteladaEm=agora;estado.cautelaId=tentativa;}
+    else{if(estado.status!=='CAUTELADA')throw Error('Não há cautela aberta para esta viatura.');if(textoViatura_(dados.cautelaId)!==estado.cautelaId)throw Error('A cautela mudou. Atualize a situação antes de devolver.');estado.status='DISPONÍVEL';estado.responsavel='';estado.rg='';estado.cauteladaEm='';estado.ultimaDevolucao=agora;estado.devolvidaPor=militar.nome;}
+    b.h.getRange(b.h.getLastRow()+1,1,1,11).setValues([[tentativa,id,agora,op,rg,militar.nome,String(sessao.rg),sessao.nome||String(sessao.rg),obs,estado.cautelaId,JSON.stringify(estado)]]);
+    return {sucesso:true,viatura:objetoViatura_(v,estado),mensagem:op==='CAUTELA'?'Cautela registrada.':'Devolução registrada.'};
+  }finally{lock.releaseLock();}
+}
+function obterHistoricoViatura(id,token){
+  exigirPerfil_(token,['ATENDIMENTO','CONFERENCIA']);id=textoViatura_(id);var ss=SpreadsheetApp.getActiveSpreadsheet(),h=ss.getSheetByName('VIATURAS_MOVIMENTOS');if(!id||!h||h.getLastRow()<2)return {sucesso:true,itens:[]};
+  var linhas=h.getRange(2,2,h.getLastRow()-1,1).createTextFinder(id).matchEntireCell(true).findAll().map(function(c){return c.getRow();}).sort(function(a,b){return b-a;}).slice(0,100),mapa=lerLinhasProtocolosRoteiro_(h,{v:linhas},11);
+  return {sucesso:true,itens:linhas.map(function(l){var r=mapa[l];return {data:r[2],operacao:r[3],militar:r[5],usuario:r[7],observacao:r[8]};})};
+}
