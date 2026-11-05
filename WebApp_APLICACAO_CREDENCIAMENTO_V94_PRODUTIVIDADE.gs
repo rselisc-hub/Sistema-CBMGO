@@ -14024,26 +14024,32 @@ function basesViaturas_(){
   if(h.getRange(1,1).getDisplayValue()!=='OPERACAO_ID')throw Error('Confira a estrutura de VIATURAS_MOVIMENTOS.');
   return {v:v,h:h};
 }
+// Lê somente o negrito dentro da parte do nome; posto, quadro e RG ficam fora.
+function nomeGuerraNegritoViatura_(rich,nome){
+  if(!rich||!nome)return '';var texto=rich.getText(),inicio=texto.lastIndexOf(nome);if(inicio<0)return '';var fim=inicio+nome.length,partes=[],ultimo=-1;
+  rich.getRuns().forEach(function(run){if(run.getTextStyle().isBold()!==true)return;var a=Math.max(inicio,run.getStartIndex()),b=Math.min(fim,run.getEndIndex());if(b<=a)return;var trecho=texto.slice(a,b);if(!trecho)return;if(partes.length&&a>ultimo&&!/^\s*$/.test(texto.slice(ultimo,a)))partes.push(' ');else if(partes.length&&a>ultimo)partes.push(texto.slice(ultimo,a));partes.push(trecho);ultimo=b;});
+  return partes.join('').replace(/\s+/g,' ').trim();
+}
 function militaresControleViaturas_(){
   var ss=SpreadsheetApp.getActiveSpreadsheet(),aba=ss.getSheetByName('DADOS');if(!aba||aba.getLastRow()<2)return {itens:[],aviso:'A aba DADOS está ausente ou sem militares.'};
   function chaveRg(v){return rgVisitaPessoal_(v).replace(/^0+(?=\d)/,'');}
-  function ler(base){if(!base||base.getLastRow()<2)return null;var n=base.getLastColumn(),cab=base.getRange(1,1,1,n).getDisplayValues()[0],m={rg:[],guerra:[],posto:[],id:[],nome:[]};cab.forEach(function(c,i){var k=normalizarTextoChavePSE_(c).replace(/[^A-Z0-9]/g,'');if(['RG','RGMILITAR','REGISTROGERAL'].indexOf(k)>=0||/^RG(?:BM|CBMGO)$/.test(k))m.rg.push(i);else if(k.indexOf('GUERRA')>=0)m.guerra.push(i);else if(k.indexOf('POSTO')>=0||k.indexOf('GRAD')>=0)m.posto.push(i);else if(k==='IDMILITAR'||k==='ID')m.id.push(i);else if(k==='NOME'||k.indexOf('COMPLETO')>=0)m.nome.push(i);});return {m:m,linhas:base.getRange(2,1,base.getLastRow()-1,n).getDisplayValues()};}
+  function ler(base,comNegrito){if(!base||base.getLastRow()<2)return null;var n=base.getLastColumn(),cab=base.getRange(1,1,1,n).getDisplayValues()[0],m={rg:[],guerra:[],posto:[],id:[],nome:[]};cab.forEach(function(c,i){var k=normalizarTextoChavePSE_(c).replace(/[^A-Z0-9]/g,'');if(['RG','RGMILITAR','REGISTROGERAL'].indexOf(k)>=0||/^RG(?:BM|CBMGO)$/.test(k))m.rg.push(i);else if(k.indexOf('GUERRA')>=0)m.guerra.push(i);else if(k.indexOf('POSTO')>=0||k.indexOf('GRAD')>=0)m.posto.push(i);else if(k==='IDMILITAR'||k==='ID')m.id.push(i);else if(k==='NOME'||k.indexOf('COMPLETO')>=0)m.nome.push(i);});var negritos={};if(comNegrito)m.nome.forEach(function(c){var faixa=base.getRange(2,c+1,base.getLastRow()-1,1);if(typeof faixa.getRichTextValues==='function')negritos[c]=faixa.getRichTextValues();});return {m:m,linhas:base.getRange(2,1,base.getLastRow()-1,n).getDisplayValues(),negritos:negritos};}
   function valor(r,indices){for(var i=0;i<indices.length;i++){var v=textoViatura_(r[indices[i]]);if(v)return v;}return '';}
-  function registro(r,m){
+  function registro(r,m,rich){
     var id=valor(r,m.id),info=id?extrairPostoENome(id):{nome:'',posto:''},rg=rgVisitaPessoal_(valor(r,m.rg)),nome=valor(r,m.nome),posto=valor(r,m.posto)||info.posto;
     // Formato antigo explícito: POSTO / QUADRO / RG / NOME em uma única célula.
     if(/^(?:CORONEL|TENENTE[ -]CORONEL|MAJOR|CAPITAO|ASPIRANTE|SUBTENENTE|SARGENTO|TENENTE|[123][º°O]?\s*(?:TENENTE|SARGENTO|SGT)|ST|CAP|MAJ|TC|CEL|ASP|CB|SD|SOLDADO|CABO)\s/.test(normalizarTextoChavePSE_(nome))){
       var numeros=nome.match(/\b\d{3,8}\b/g)||[];
       if(numeros.length===1&&(!rg||chaveRg(rg)===chaveRg(numeros[0]))){var pos=nome.indexOf(numeros[0]);if(!rg)rg=rgVisitaPessoal_(numeros[0]);if(!posto)posto=nome.slice(0,pos).trim();nome=nome.slice(pos+numeros[0].length).trim();}
     }
-    return {rg:rg,guerra:valor(r,m.guerra)||info.nome,posto:posto,nome:nome};
+    var negrito=nomeGuerraNegritoViatura_(rich,nome);return {rg:rg,guerra:negrito||valor(r,m.guerra)||info.nome,posto:posto,nome:nome,negrito:!!negrito};
   }
-  var dados=ler(aba);if(!dados.m.rg.length&&!dados.m.nome.length&&!dados.m.id.length)return {itens:[],aviso:'Confira os cabeçalhos da aba DADOS.'};
-  var cadastro=ler(ss.getSheetByName('Cadastro')),aliases={},ambiguos={},mapa={},faltantes=0,semGuerra=0,semRg=0;
+  var dados=ler(aba,true);if(!dados.m.rg.length&&!dados.m.nome.length&&!dados.m.id.length)return {itens:[],aviso:'Confira os cabeçalhos da aba DADOS.'};
+  var cadastro=ler(ss.getSheetByName('Cadastro')),aliases={},ambiguos={},mapa={},prioridades={},faltantes=0,semGuerra=0,semRg=0;
   if(cadastro)cadastro.linhas.forEach(function(r){var x=registro(r,cadastro.m),k=chaveRg(x.rg);if(!k||!x.guerra)return;if(aliases[k]&&normalizarTextoChavePSE_(aliases[k].guerra)!==normalizarTextoChavePSE_(x.guerra)){ambiguos[k]=true;return;}aliases[k]=x;});
-  dados.linhas.forEach(function(r,i){var x=registro(r,dados.m),k=chaveRg(x.rg);var cad=ambiguos[k]?null:aliases[k],guerra=x.guerra||(cad&&cad.guerra)||'',nome=guerra||x.nome;
+  dados.linhas.forEach(function(r,i){var col=dados.m.nome.filter(function(c){return textoViatura_(r[c]);})[0],rich=dados.negritos[col]&&dados.negritos[col][i]&&dados.negritos[col][i][0],x=registro(r,dados.m,rich),k=chaveRg(x.rg);var cad=ambiguos[k]?null:aliases[k],guerra=x.guerra||(cad&&cad.guerra)||'',nome=guerra||x.nome;
     if(!nome){faltantes++;return;}var id=k?x.rg:'DADOS-'+(i+2)+'-'+hashCadastroDoc_(nome+'|'+x.posto).slice(0,16);if(!k)k=id;var novo={id:id,rg:x.rg,nome:nome,posto:x.posto||(cad&&cad.posto)||'',semNomeGuerra:!guerra,linhaDados:i+2};
-    if(!mapa[k]||(mapa[k].semNomeGuerra&&!novo.semNomeGuerra))mapa[k]=novo;
+    var prioridade=x.negrito?3:x.guerra?2:guerra?1:0;if(!mapa[k]||prioridade>prioridades[k]){mapa[k]=novo;prioridades[k]=prioridade;}
   });
   var itens=Object.keys(mapa).map(function(k){if(mapa[k].semNomeGuerra)semGuerra++;if(!mapa[k].rg)semRg++;return mapa[k];}).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');}),avisos=[];
   if(semGuerra)avisos.push(semGuerra+' militar(es) sem nome de guerra cadastrado: exibidos pelo nome disponível, com indicação na lista.');
