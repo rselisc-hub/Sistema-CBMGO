@@ -1181,9 +1181,12 @@ function obterIndicadoresGestor(token) {
   var conferenciaVerificacao = 0;
   var conf = ss.getSheetByName("CONFERENCIA_PROTOCOLOS");
   if (conf && conf.getLastRow() >= 2) {
-    var cv = conf.getRange(2,10,conf.getLastRow()-1,1).getDisplayValues();
-    cv.forEach(function(r) {
-      var estado = String(r[0] || "").trim().toUpperCase();
+    var cv = conf.getRange(2,9,conf.getLastRow()-1,2).getDisplayValues(),candidatos=[];
+    cv.forEach(function(r,i){var estado=normalizarMaiusculoConferencia_(r[1]);if(['DISPONÍVEL','DISPONIVEL','EM VERIFICAÇÃO','EM VERIFICACAO'].indexOf(estado)>=0&&['APROVADO','EXPIRADO'].indexOf(normalizarMaiusculoConferencia_(r[0]))>=0)candidatos.push(i+2);});
+    var detalhes=candidatos.length?lerLinhasProtocolosRoteiro_(conf,{fila:candidatos},27):{};
+    cv.forEach(function(r,i) {
+      if(detalhes[i+2]&&encerradoNaFilaConferencia_(objetoConferenciaDaLinha_(detalhes[i+2])))return;
+      var estado = String(r[1] || "").trim().toUpperCase();
       if (estado === "DISPONÍVEL" || estado === "DISPONIVEL") conferenciaDisponivel++;
       if (estado === "EM VERIFICAÇÃO" || estado === "EM VERIFICACAO") conferenciaVerificacao++;
     });
@@ -3719,6 +3722,15 @@ function chaveDataFilaConferenciaServidor_(x, agora) {
   return {grupo:2,mes:difMes,ordem:-ts};
 }
 
+// Status de um ciclo já finalizado não deve inflar a fila. Nova movimentação/reabertura preserva o retorno.
+function encerradoNaFilaConferencia_(x){
+  var status=normalizarMaiusculoConferencia_(x.statusSiapi);
+  if(['APROVADO','EXPIRADO'].indexOf(status)<0||!x.concluidoEm||x.novaMovimentacaoAposConclusao==='SIM')return false;
+  var mov=extrairDataHoraMovimentacaoConferencia_(x.dataHoraUltimaMovimentacao||x.movimentacao),fim=extrairDataHoraMovimentacaoConferencia_(x.concluidoEm);
+  var tm=mov?timestampConferenciaOrdenacao_({movimentacao:mov}):0,tf=fim?timestampConferenciaOrdenacao_({movimentacao:fim}):0;
+  return !(tm&&tf&&tm>tf);
+}
+
 function listarFilaConferencia(token) {
   var sessao = exigirPerfil_(token, ["CONFERENCIA"]);
   var meuRg = normalizarRgCadastro_(sessao.rg);
@@ -3770,6 +3782,7 @@ function listarFilaConferencia(token) {
       var estado = normalizarMaiusculoConferencia_(r[9]);
       if (estado !== 'DISPONÍVEL' && estado !== 'EM VERIFICAÇÃO') return;
       var x = objetoConferenciaDaLinha_(r);
+      if(encerradoNaFilaConferencia_(x))return;
 
       // Só contam registros operacionais válidos.
       if (estado === "DISPONÍVEL") {
@@ -3870,6 +3883,7 @@ function assumirProtocolosSelecionadosConferencia(protocolos, token) {
       }
 
       var anterior = objetoConferenciaDaLinha_(achado.r);
+      if(encerradoNaFilaConferencia_(anterior)){conflitos.push(protocolo+" (já finalizado como aprovado/expirado; consulte a Consulta Geral)");return;}
 
       if (anterior.estadoInterno !== "DISPONÍVEL") {
         if (anterior.estadoInterno === "EM VERIFICAÇÃO") {
@@ -3940,6 +3954,7 @@ function assumirProtocoloConferencia(protocolo, token) {
     if (!achado) throw new Error("Protocolo não encontrado.");
 
     var anterior = objetoConferenciaDaLinha_(achado.r);
+    if(encerradoNaFilaConferencia_(anterior))throw Error("Protocolo já finalizado como aprovado/expirado. Consulte a Consulta Geral.");
     var meuRg = normalizarRgCadastro_(sessao.rg);
 
     if (anterior.estadoInterno === "EM VERIFICAÇÃO") {
@@ -4240,10 +4255,10 @@ function concluirProtocoloConferencia(protocolo, statusSiapi, observacao, token)
     var agora = dataHoraSaoPauloTexto_();
     var ehDivisaoF7 =
       normalizarMaiusculoConferencia_(anterior.divisao) === "F-7";
-    var aprovado = statusSiapi === "APROVADO";
+    var encerraF7 = statusSiapi === "APROVADO" || statusSiapi === "EXPIRADO";
 
     var estadoFinal =
-      (ehDivisaoF7 && !aprovado)
+      (ehDivisaoF7 && !encerraF7)
         ? "DISPONÍVEL"
         : "CONCLUÍDO";
 
@@ -4260,7 +4275,7 @@ function concluirProtocoloConferencia(protocolo, statusSiapi, observacao, token)
     valores[9] = agora;         // col 18 - ATUALIZADO_EM
     valores[12] = observacao;   // col 21 - OBSERVAÇÃO
 
-    if (ehDivisaoF7 && !aprovado) {
+    if (ehDivisaoF7 && !encerraF7) {
       valores[2] = "";          // col 11 - RG_CONFERENTE
       valores[3] = "";          // col 12 - CONFERENTE
       valores[7] = "";          // col 16 - ASSUMIDO_EM
@@ -4275,7 +4290,7 @@ function concluirProtocoloConferencia(protocolo, statusSiapi, observacao, token)
     novo.atualizadoEm = agora;
     novo.observacao = observacao;
 
-    if (ehDivisaoF7 && !aprovado) {
+    if (ehDivisaoF7 && !encerraF7) {
       novo.rgConferente = "";
       novo.conferente = "";
       novo.assumidoEm = "";
@@ -4284,7 +4299,7 @@ function concluirProtocoloConferencia(protocolo, statusSiapi, observacao, token)
     var detalheConclusao =
       "Status verificado no SIAPI: " + statusSiapi + ".";
 
-    if (ehDivisaoF7 && !aprovado) {
+    if (ehDivisaoF7 && !encerraF7) {
       detalheConclusao +=
         " DIVISÃO F-7 permanece na fila de Conferência até nova verificação/aprovação.";
     }
@@ -4309,8 +4324,8 @@ function concluirProtocoloConferencia(protocolo, statusSiapi, observacao, token)
       item:novo,
       estadoAnterior:anterior.estadoInterno || "",
       rgAnterior:anterior.rgConferente || "",
-      permaneceNaFila:(ehDivisaoF7 && !aprovado),
-      mensagem:(ehDivisaoF7 && !aprovado)
+      permaneceNaFila:(ehDivisaoF7 && !encerraF7),
+      mensagem:(ehDivisaoF7 && !encerraF7)
         ? "DIVISÃO F-7: o protocolo permanecerá na fila até ser aprovado."
         : "Conferência concluída."
     };
