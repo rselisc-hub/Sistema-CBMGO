@@ -8772,10 +8772,14 @@
         origemPendencia: x.origem || (tipo === 'naoRealizadas' ? 'NÃO REALIZADA' : 'ATENDIMENTO')
       };
       var btn = document.getElementById('pend-modal-adicionar');
+      if(btn&&btn.disabled)return;
       if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Adicionando...'; }
       google.script.run
-        .withSuccessHandler(function() {
+        .withSuccessHandler(function(r) {
           if (btn) { btn.disabled = false; btn.innerHTML = 'Adicionar ao roteiro'; }
+          var confirmada=r&&r.sucesso&&(r.itensTela||[]).some(function(i){return String(i.protocolo||'')===String(x.protocolo||'')&&String(tipo==='atendimento'?i.origemSolicitacaoId:i.origemPendenciaId)===String(x.id);});
+          if(!confirmada){alert('Inclusão no rascunho não confirmada. O protocolo pode já estar distribuído nesta data. Confira ou escolha outra data.');return;}
+          pendenciasRoteiroCache[tipo]=(pendenciasRoteiroCache[tipo]||[]).filter(function(i){return String(i.id)!==String(x.id);});renderizarPendenciasRoteiro();
           var modalEl = document.getElementById('modal-pendencia-roteiro');
           var modal = bootstrap.Modal.getInstance(modalEl); if (modal) modal.hide();
           var campoData = document.getElementById('rot-data-roteiro');

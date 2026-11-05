@@ -4662,6 +4662,19 @@ function salvarRascunhosRoteiro(itens, dataRoteiro, token) {
   lock.waitLock(15000);
 
   try {
+    // Só a inclusão originada nas Pendências verifica reservas em outras datas.
+    var origensEntrada={};itens.forEach(function(x){['origemPendenciaId','origemSolicitacaoId'].forEach(function(k){var id=String(x[k]||'').trim();if(id){var chave=k+'|'+id.toUpperCase(),pr=normalizarProtocoloRoteiro_(x.protocolo);if(origensEntrada[chave]&&origensEntrada[chave]!==pr)throw Error('A mesma pendência não pode ser vinculada a dois protocolos.');origensEntrada[chave]=pr;}});});
+    if(Object.keys(origensEntrada).length&&aba.getLastRow()>1){
+      aba.getRange(2,15,aba.getLastRow()-1,7).getDisplayValues().forEach(function(r,i){
+        if(String(r[6]||'').trim().toUpperCase()!=='RASCUNHO')return;
+        var identificacao=null;
+        ['origemPendenciaId','origemSolicitacaoId'].forEach(function(k,j){var id=String(r[j]||'').trim().toUpperCase();
+          if(!id||!origensEntrada[k+'|'+id])return;
+          if(!identificacao)identificacao=aba.getRange(i+2,1,1,2).getDisplayValues()[0];
+          if(normalizarDataTextoRoteiro_(identificacao[0])!==dataTxt||origensEntrada[k+'|'+id]!==normalizarProtocoloRoteiro_(identificacao[1]))throw Error('Esta pendência já está reservada em outro rascunho. Atualize as Pendências.');
+        });
+      });
+    }
     // Busca somente os protocolos do lote, em vez de varrer a base inteira.
     var linhasRoteiro =
       localizarLinhasProtocolosRoteiro_(roteiro, 2, protocolos);
@@ -4760,6 +4773,10 @@ function salvarRascunhosRoteiro(itens, dataRoteiro, token) {
       // Já existe ativo no rascunho daquele dia:
       // não duplica, mas devolve para a tela e sinaliza.
       if (linhaAtiva) {
+        var vinculos=[String(item.origemPendenciaId||'').trim(),String(item.origemSolicitacaoId||'').trim()];
+        vinculos.forEach(function(id,j){var anterior=String(dadosAtivos[14+j]||'').trim();if(id&&anterior&&id.toUpperCase()!==anterior.toUpperCase())throw Error('O protocolo já está vinculado a outra pendência neste rascunho. Confira antes de substituir.');});
+        var mudou=false;vinculos.forEach(function(id,j){if(id&&!String(dadosAtivos[14+j]||'').trim()){dadosAtivos[14+j]=id;mudou=true;}});
+        if(mudou){if(item.origemPendencia)dadosAtivos[16]=String(item.origemPendencia);aba.getRange(linhaAtiva,15,1,3).setValues([dadosAtivos.slice(14,17)]);}
         jaRascunho++;
         retomados.push('T'+linhaAtiva);
         itensTela.push(itemRascunhoRoteiroDaLinha_(dadosAtivos));
@@ -7237,6 +7254,14 @@ function lerPendenciasRoteiro_(est) {
     });
   }
 
+  var rascunhoReserva=ss.getSheetByName('RASCUNHO_ROTEIRO'),reservadasPend={},reservadasSol={};
+  if(rascunhoReserva&&rascunhoReserva.getLastRow()>1){
+    rascunhoReserva.getRange(2,15,rascunhoReserva.getLastRow()-1,7).getDisplayValues().forEach(function(r){
+      if(String(r[6]||'').trim().toUpperCase()!=='RASCUNHO')return;
+      var p=String(r[0]||'').trim().toUpperCase(),s=String(r[1]||'').trim().toUpperCase();if(p)reservadasPend[p]=true;if(s)reservadasSol[s]=true;
+    });
+  }
+
   if (est.pendencias && est.pendencias.getLastRow() >= 2) {
     var pd = est.pendencias.getRange(
       2,
@@ -7252,7 +7277,7 @@ function lerPendenciasRoteiro_(est) {
 
       // Só some quando ESTA pendência específica já tiver sido usada
       // em uma nova distribuição.
-      if (idPendencia && pendenciasJaRedistribuidas[idPendencia]) return;
+      if (idPendencia && (pendenciasJaRedistribuidas[idPendencia]||reservadasPend[idPendencia.toUpperCase()])) return;
 
       vermelhas.push({
         id:r[0],
@@ -7291,7 +7316,7 @@ function lerPendenciasRoteiro_(est) {
 
       // Mesma regra: só desaparece quando a solicitação específica
       // já foi efetivamente distribuída.
-      if (idSolicitacao && solicitacoesJaDistribuidas[idSolicitacao]) return;
+      if (idSolicitacao && (solicitacoesJaDistribuidas[idSolicitacao]||reservadasSol[idSolicitacao.toUpperCase()])) return;
 
       azuis.push({
         id:r[0],
