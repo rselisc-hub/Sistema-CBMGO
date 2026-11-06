@@ -1328,8 +1328,9 @@ function salvarAfastamento(dados, token) {
   if(id&&aba.getLastRow()>=2){
     var ids=aba.getRange(2,1,aba.getLastRow()-1,1).getDisplayValues(),linha=-1;
     for(var i=0;i<ids.length;i++){if(String(ids[i][0]||"").trim()===id){linha=i+2;break;}}
-    if(linha>0){aba.getRange(linha,2,1,6).setValues([[rg,militar,dini,dfim,motivo,observacao]]);aba.getRange(linha,11).setValue(agora);aba.getRange(linha,12).setValue("ATIVO");return {sucesso:true,mensagem:"Afastamento atualizado com sucesso.",id:id};}
+    if(linha>0){if(String(aba.getRange(linha,12).getDisplayValues()[0][0]||"ATIVO").trim().toUpperCase()==="EXCLUÍDO")throw Error("Este afastamento foi excluído. Atualize a lista antes de editar.");aba.getRange(linha,2,1,6).setValues([[rg,militar,dini,dfim,motivo,observacao]]);aba.getRange(linha,11).setValue(agora);aba.getRange(linha,12).setValue("ATIVO");return {sucesso:true,mensagem:"Afastamento atualizado com sucesso.",id:id};}
   }
+  if(id)throw Error("Afastamento não encontrado. Atualize a lista antes de editar.");
   id=Utilities.getUuid();
   aba.appendRow([id,rg,militar,dini,dfim,motivo,observacao,String(sessao.rg||"").trim(),String(sessao.nome||"").trim(),agora,agora,"ATIVO"]);
   return {sucesso:true,mensagem:"Afastamento cadastrado com sucesso.",id:id};

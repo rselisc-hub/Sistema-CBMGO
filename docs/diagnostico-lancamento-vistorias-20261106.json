@@ -1,0 +1,65 @@
+{
+  "servicosGoogle": "simulados",
+  "resultados": [
+    {
+      "linhasBase": 1000,
+      "protocolos": 5,
+      "operacoes": {
+        "read": 6,
+        "search": 2,
+        "write": 18
+      },
+      "lancados": 5
+    },
+    {
+      "linhasBase": 1000,
+      "protocolos": 20,
+      "operacoes": {
+        "read": 6,
+        "search": 2,
+        "write": 46
+      },
+      "lancados": 20
+    },
+    {
+      "linhasBase": 1000,
+      "protocolos": 27,
+      "operacoes": {
+        "read": 6,
+        "search": 2,
+        "write": 62
+      },
+      "lancados": 27
+    },
+    {
+      "linhasBase": 10000,
+      "protocolos": 5,
+      "operacoes": {
+        "read": 6,
+        "search": 2,
+        "write": 18
+      },
+      "lancados": 5
+    },
+    {
+      "linhasBase": 10000,
+      "protocolos": 20,
+      "operacoes": {
+        "read": 6,
+        "search": 2,
+        "write": 46
+      },
+      "lancados": 20
+    },
+    {
+      "linhasBase": 10000,
+      "protocolos": 27,
+      "operacoes": {
+        "read": 6,
+        "search": 2,
+        "write": 62
+      },
+      "lancados": 27
+    }
+  ]
+}
