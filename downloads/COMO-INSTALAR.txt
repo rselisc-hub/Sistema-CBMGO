@@ -132,3 +132,6 @@ Atualize GS e HTML juntos. Escala Extra passa a ter “Contar para o ranking”,
 
 ATUALIZAÇÃO 06/11/2026 — EDITAR AFASTAMENTO
 Atualize GS e HTML juntos. Clique no lápis em Afastamentos cadastrados: o formulário passa a “Editar afastamento”. Ajuste os campos e clique “Salvar alterações”. O mesmo registro é atualizado. Não alteramos a distribuição ou a cópia SIAPI nesta revisão; os testes e o diagnóstico do lançamento estão em docs no GitHub.
+
+ATUALIZAÇÃO 06/11/2026 — DOCUMENTOS EXIGIDOS NO CREDENCIAMENTO
+Atualize GS e HTML juntos. Dentro de Credenciamento, abra “Documentos exigidos”. Busque o tipo/assunto, selecione o texto e clique “Copiar texto”. São 18 entradas e três anotações da planilha enviada. Ajustes são temporários; “Restaurar modelo” recupera o original. Não há nova aba no banco nem mudança nas filas de protocolos.

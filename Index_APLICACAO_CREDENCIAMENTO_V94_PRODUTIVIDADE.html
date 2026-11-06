@@ -1091,9 +1091,21 @@
       <button class="btn btn-outline-dark cred-nav-btn" id="cred-nav-consulta" onclick="abrirTelaCredenciamento('consulta')">
         <i class="bi bi-search me-1"></i>Consulta Geral
       </button>
+      <button class="btn btn-outline-danger cred-nav-btn" id="cred-nav-textos" onclick="abrirTextosCredenciamento()"><i class="bi bi-file-earmark-text me-1"></i>Documentos exigidos</button>
       <button class="btn btn-outline-secondary" onclick="atualizarCredenciamento()">
         <i class="bi bi-arrow-repeat me-1"></i>Atualizar
       </button>
+    </div>
+
+    <div id="cred-pane-textos" style="display:none;">
+      <div class="card card-custom p-4 mb-4">
+        <h5 class="fw-bold">DOCUMENTOS EXIGIDOS — CREDENCIAMENTO</h5>
+        <p class="text-muted">Selecione o tipo de credenciamento ou orientação para consultar e copiar. As alterações nesta tela não modificam o modelo original e duram somente durante este acesso.</p>
+        <div class="row g-2"><div class="col-md-7"><label for="cred-textos-busca" class="form-label">Buscar nos títulos e textos</label><input type="search" id="cred-textos-busca" class="form-control" placeholder="Ex.: extintores, brigadista, MEI…" oninput="renderizarListaTextosCredenciamento()"></div><div class="col-md-5"><label for="cred-textos-categoria" class="form-label">Assunto</label><select id="cred-textos-categoria" class="form-select" onchange="renderizarListaTextosCredenciamento()"><option value="">Todos os assuntos</option></select></div></div>
+        <div id="cred-textos-carregamento" class="small mt-3" role="status" aria-live="polite"></div>
+      </div>
+      <div class="row g-3"><div class="col-lg-5"><div class="card card-custom p-3"><div id="cred-textos-total" class="small text-muted mb-2"></div><div id="cred-textos-lista" class="list-group" style="max-height:65vh;overflow-y:auto;"></div></div></div>
+      <div class="col-lg-7"><div class="card card-custom p-4"><h5 id="cred-textos-titulo">Selecione um modelo</h5><div id="cred-textos-assunto" class="small text-muted mb-2"></div><div id="cred-textos-adaptado" class="small text-muted mb-2" style="display:none;">Conteúdo transcrito da planilha de referência.</div><label for="cred-textos-conteudo" class="form-label">Documentos exigidos / orientações</label><textarea class="form-control" id="cred-textos-conteudo" rows="15" disabled oninput="guardarAjusteTextoCredenciamento()"></textarea><div class="d-flex gap-2 flex-wrap mt-3"><button type="button" class="btn btn-primary" id="cred-textos-copiar" onclick="copiarTextoCredenciamento()" disabled>Copiar texto</button><button type="button" class="btn btn-outline-secondary" id="cred-textos-restaurar" onclick="restaurarTextoCredenciamento()" disabled>Restaurar modelo</button></div><div id="cred-textos-copia-status" class="small mt-2" role="status" aria-live="polite"></div></div></div></div>
     </div>
 
     <div id="cred-pane-alimentacao">
@@ -6235,7 +6247,7 @@
     }
 
     function marcarNavCredenciamento_(tela) {
-      ['alimentacao','analise','consulta'].forEach(function(x) {
+      ['alimentacao','analise','consulta','textos'].forEach(function(x) {
         var b = document.getElementById('cred-nav-' + x);
         if (!b) return;
         b.className = 'btn cred-nav-btn ' +
@@ -6250,16 +6262,18 @@
       credenciamentoTelaAtual = tela;
       marcarNavCredenciamento_(tela);
 
-      ['alimentacao','analise','consulta'].forEach(function(x) {
+      ['alimentacao','analise','consulta','textos'].forEach(function(x) {
         var el = document.getElementById('cred-pane-' + x);
         if (el) el.style.display = x === tela ? 'block' : 'none';
       });
 
       if (tela === 'analise') carregarFilaCredenciamento();
       if (tela === 'consulta') carregarConsultaCredenciamento();
+      if (tela === 'textos') carregarTextosCredenciamento(false);
     }
 
     function atualizarCredenciamento() {
+      if(credenciamentoTelaAtual==='textos'){carregarTextosCredenciamento(true);return;}
       google.script.run
         .withSuccessHandler(function(r) {
           r = r || {};
@@ -6868,6 +6882,47 @@
     function restaurarTextoPadrao(){var e=textosPadraoEstado;if(!e.selecionado)return;delete e.ajustes[e.selecionado];selecionarTextoPadrao(e.selecionado);}
     async function copiarTextoPadrao(){
       var campo=document.getElementById('textos-conteudo'),status=document.getElementById('textos-copia-status');if(campo.disabled||!campo.value){status.textContent='Selecione um modelo com texto para copiar.';return;}
+      var texto=campo.value,copiado=false;try{if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(texto);copiado=true;}}catch(e){}
+      if(!copiado){campo.focus();campo.select();try{copiado=document.execCommand('copy');}catch(e){}}
+      status.textContent=copiado?'Texto copiado.':'A cópia automática não foi permitida. O texto foi selecionado; use Ctrl+C ou o comando Copiar.';
+    }
+
+    var textosCredenciamentoEstado={token:null,modelos:null,ajustes:{},selecionado:null,enviando:false,sequencia:0};
+    function abrirTextosCredenciamento(){
+      if(!usuarioLogado||!usuarioLogado.permissoes||!usuarioLogado.permissoes.credenciamento){alert('Você não possui permissão para acessar o Credenciamento.');return;}
+      abrirTelaCredenciamento('textos');
+    }
+    function carregarTextosCredenciamento(forcar){
+      var token=sessaoToken,e=textosCredenciamentoEstado;
+      if(e.token!==token){e.token=token;e.modelos=null;e.ajustes={};e.selecionado=null;e.enviando=false;e.sequencia++;document.getElementById('cred-textos-busca').value='';document.getElementById('cred-textos-categoria').innerHTML='<option value="">Todos os assuntos</option>';document.getElementById('cred-textos-lista').textContent='';selecionarTextoCredenciamento(null);}
+      if(e.enviando)return;if(e.modelos&&!forcar){renderizarListaTextosCredenciamento();return;}
+      e.enviando=true;var seq=++e.sequencia;document.getElementById('cred-textos-carregamento').textContent='Carregando modelos…';
+      google.script.run.withSuccessHandler(function(r){
+        if(seq!==e.sequencia||token!==sessaoToken)return;e.enviando=false;e.modelos=(r&&r.modelos)||[];
+        e.modelos.forEach(function(x){x.busca=normalizarBuscaTextoCredenciamento_(x.categoria+' '+x.titulo+' '+x.texto);});
+        var select=document.getElementById('cred-textos-categoria'),atual=select.value;select.innerHTML='<option value="">Todos os assuntos</option>';
+        Array.from(new Set(e.modelos.map(function(x){return x.categoria;}))).sort(function(a,b){return a.localeCompare(b,'pt-BR');}).forEach(function(x){var o=document.createElement('option');o.value=x;o.textContent=x;select.appendChild(o);});select.value=atual;
+        document.getElementById('cred-textos-carregamento').textContent=e.modelos.length+' modelos disponíveis.';renderizarListaTextosCredenciamento();
+      }).withFailureHandler(function(err){if(seq!==e.sequencia||token!==sessaoToken)return;e.enviando=false;document.getElementById('cred-textos-carregamento').textContent='Não foi possível carregar os modelos. Use Atualizar para tentar novamente. '+String(err&&err.message||err||'');}).obterTextosCredenciamento(token);
+    }
+    function normalizarBuscaTextoCredenciamento_(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();}
+    function renderizarListaTextosCredenciamento(){
+      var e=textosCredenciamentoEstado,busca=normalizarBuscaTextoCredenciamento_(document.getElementById('cred-textos-busca').value).trim().split(/\s+/).filter(Boolean),categoria=document.getElementById('cred-textos-categoria').value;
+      var lista=(e.modelos||[]).filter(function(x){return (!categoria||x.categoria===categoria)&&busca.every(function(t){return x.busca.indexOf(t)!==-1;});});
+      var alvo=document.getElementById('cred-textos-lista');alvo.textContent='';document.getElementById('cred-textos-total').textContent=lista.length+' modelo(s) encontrado(s)';
+      if(!lista.length){alvo.textContent=e.enviando?'Carregando…':'Nenhum modelo encontrado.';return;}
+      lista.forEach(function(x){var b=document.createElement('button');b.type='button';b.className='list-group-item list-group-item-action'+(e.selecionado===x.id?' active':'');b.setAttribute('aria-pressed',e.selecionado===x.id?'true':'false');b.dataset.modelo=x.id;var titulo=document.createElement('div');titulo.className='fw-semibold';titulo.textContent=x.titulo;var categoria=document.createElement('small');categoria.textContent=x.categoria;b.appendChild(titulo);b.appendChild(categoria);var previa=document.createElement('div');previa.className='small mt-1';previa.style.opacity='0.85';previa.textContent=x.texto.replace(/\s+/g,' ').slice(0,140)+(x.texto.length>140?'…':'');b.appendChild(previa);b.addEventListener('click',function(){selecionarTextoCredenciamento(x.id);renderizarListaTextosCredenciamento();});alvo.appendChild(b);});
+    }
+    function selecionarTextoCredenciamento(id){
+      var e=textosCredenciamentoEstado,x=(e.modelos||[]).find(function(x){return x.id===id;});e.selecionado=x?x.id:null;
+      document.getElementById('cred-textos-titulo').textContent=x?x.titulo:'Selecione um modelo';document.getElementById('cred-textos-assunto').textContent=x?x.categoria:'';document.getElementById('cred-textos-adaptado').style.display=x&&x.adaptado?'block':'none';
+      var campo=document.getElementById('cred-textos-conteudo');campo.disabled=!x;campo.value=x?(Object.prototype.hasOwnProperty.call(e.ajustes,x.id)?e.ajustes[x.id]:x.texto):'';
+      document.getElementById('cred-textos-copiar').disabled=!x;document.getElementById('cred-textos-restaurar').disabled=!x;document.getElementById('cred-textos-copia-status').textContent='';
+    }
+    function guardarAjusteTextoCredenciamento(){var e=textosCredenciamentoEstado;if(e.selecionado)e.ajustes[e.selecionado]=document.getElementById('cred-textos-conteudo').value;document.getElementById('cred-textos-copia-status').textContent='Ajuste mantido somente neste acesso.';}
+    function restaurarTextoCredenciamento(){var e=textosCredenciamentoEstado;if(!e.selecionado)return;delete e.ajustes[e.selecionado];selecionarTextoCredenciamento(e.selecionado);}
+    async function copiarTextoCredenciamento(){
+      var campo=document.getElementById('cred-textos-conteudo'),status=document.getElementById('cred-textos-copia-status');if(campo.disabled||!campo.value){status.textContent='Selecione um modelo com texto para copiar.';return;}
       var texto=campo.value,copiado=false;try{if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(texto);copiado=true;}}catch(e){}
       if(!copiado){campo.focus();campo.select();try{copiado=document.execCommand('copy');}catch(e){}}
       status.textContent=copiado?'Texto copiado.':'A cópia automática não foi permitida. O texto foi selecionado; use Ctrl+C ou o comando Copiar.';
@@ -10350,6 +10405,7 @@
       ['ind-docs-origem','ind-docs-responsavel'].forEach(function(id){document.getElementById(id).innerHTML='<option value="">Todos</option>';});
       escaladosEdicaoFuncao=[];
       indOperacional.seq++;indOperacional.cache={};indOperacional.dados=null;indOperacional.emCurso=null;indOperacional.token=null;
+      textosCredenciamentoEstado.sequencia++;textosCredenciamentoEstado.token=null;textosCredenciamentoEstado.modelos=null;textosCredenciamentoEstado.ajustes={};textosCredenciamentoEstado.selecionado=null;textosCredenciamentoEstado.enviando=false;
       textosPadraoEstado.sequencia++;textosPadraoEstado.token=null;textosPadraoEstado.modelos=null;textosPadraoEstado.ajustes={};textosPadraoEstado.selecionado=null;textosPadraoEstado.enviando=false;
       sessaoToken = '';
       usuarioLogado = null;
