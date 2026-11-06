@@ -14083,7 +14083,7 @@ function estadosViaturas_(bases,id){
 }
 function objetoViatura_(v,estado){return {id:v.id,prefixo:v.prefixo,placa:v.placa,ativa:v.ativa,estado:estado||estadoInicialViatura_()};}
 function obterControleViaturas(token){
-  var sessao=exigirPerfil_(token,['ATENDIMENTO','CONFERENCIA']),lock=LockService.getScriptLock();lock.waitLock(15000);
+  var sessao=exigirPerfil_(token,['ATENDIMENTO','CONFERENCIA','VISTORIADOR']),lock=LockService.getScriptLock();lock.waitLock(15000);
   try{var b=basesViaturas_(),cad=cadastroViaturas_(b),estados=estadosViaturas_(b),militares=militaresControleViaturas_();return {sucesso:true,viaturas:cad.map(function(v){return objetoViatura_(v,estados[v.id]);}),militares:militares.itens,aviso:militares.aviso,podeGerenciar:String(sessao.perfil||'').toUpperCase()==='GESTOR',atualizadoEm:dataHoraSaoPauloTexto_()};}finally{lock.releaseLock();}
 }
 function salvarCadastroViatura(dados,token){
@@ -14097,13 +14097,16 @@ function salvarCadastroViatura(dados,token){
   }finally{lock.releaseLock();}
 }
 function movimentarViatura(dados,token){
-  exigirPerfil_(token,['ATENDIMENTO','CONFERENCIA']);dados=dados||{};var id=textoViatura_(dados.viaturaId),op=textoViatura_(dados.operacao),rg=rgVisitaPessoal_(dados.rg),militarId=textoViatura_(dados.militarId),tentativa=textoViatura_(dados.operacaoId),obs=textoViatura_(dados.observacao);
+  exigirPerfil_(token,['ATENDIMENTO','CONFERENCIA','VISTORIADOR']);dados=dados||{};var id=textoViatura_(dados.viaturaId),op=textoViatura_(dados.operacao),rg=rgVisitaPessoal_(dados.rg),militarId=textoViatura_(dados.militarId),tentativa=textoViatura_(dados.operacaoId),obs=textoViatura_(dados.observacao);
   if(!id||(!rg&&!militarId)||militarId.length>100||['CAUTELA','DEVOLUÇÃO'].indexOf(op)<0||!/^[A-Za-z0-9-]{10,80}$/.test(tentativa)||obs.length>1000||/^[=+@]/.test(obs))throw Error('Confira viatura, militar, operação e observação.');
   var lock=LockService.getScriptLock();lock.waitLock(15000);try{
-    var sessao=exigirPerfil_(token,['ATENDIMENTO','CONFERENCIA']),b=basesViaturas_(),cad=cadastroViaturas_(b),v=cad.filter(function(x){return x.id===id;})[0];if(!v)throw Error('Viatura não encontrada.');
+    var sessao=exigirPerfil_(token,['ATENDIMENTO','CONFERENCIA','VISTORIADOR']),b=basesViaturas_(),cad=cadastroViaturas_(b),v=cad.filter(function(x){return x.id===id;})[0];if(!v)throw Error('Viatura não encontrada.');
     // Evento único é a gravação definitiva. Repetir pedido após perda da resposta não duplica evento.
     if(b.h.getLastRow()>1){var repetidos=b.h.getRange(2,1,b.h.getLastRow()-1,1).createTextFinder(tentativa).matchEntireCell(true).findAll();if(repetidos.length){var anterior=b.h.getRange(repetidos[0].getRow(),1,1,11).getDisplayValues()[0];if(anterior[1]!==id||anterior[3]!==op||(JSON.parse(anterior[10]).militarMovimentoId||anterior[4])!==(militarId||rg)||anterior[6]!==String(sessao.rg)||anterior[8]!==obs)throw Error('Identificação de envio já utilizada com outros dados.');return {sucesso:true,viatura:objetoViatura_(v,estadosViaturas_(b,id)[id]),mensagem:'Movimentação já registrada; situação atual consultada.'};}}
     var militar=militaresControleViaturas_().itens.filter(function(x){return militarId?x.id===militarId:x.rg===rg;})[0];if(!militar)throw Error('Militar não encontrado na aba DADOS. Atualize a lista.');
+    var rgOperador=rgVisitaPessoal_(sessao.rg).replace(/^0+(?=\d)/,''),rgSelecionado=rgVisitaPessoal_(militar.rg).replace(/^0+(?=\d)/,'');
+    if(!rgOperador||!rgSelecionado)throw Error('É necessário RG válido do usuário e do militar para garantir que outra pessoa registre a movimentação. Complete o cadastro.');
+    if(rgOperador===rgSelecionado)throw Error('Você não pode registrar sua própria cautela ou devolução. Solicite o registro a outra pessoa.');
     if(!v.ativa)throw Error('Viatura inativa.');var estado=estadosViaturas_(b,id)[id]||estadoInicialViatura_(),agora=dataHoraSaoPauloTexto_();
     if(op==='CAUTELA'){if(estado.status!=='DISPONÍVEL')throw Error('Viatura já cautelada por '+estado.responsavel+'. Atualize a situação.');estado.status='CAUTELADA';estado.responsavel=militar.nome;estado.rg=militar.rg;estado.cauteladaEm=agora;estado.cautelaId=tentativa;}
     else{if(estado.status!=='CAUTELADA')throw Error('Não há cautela aberta para esta viatura.');if(textoViatura_(dados.cautelaId)!==estado.cautelaId)throw Error('A cautela mudou. Atualize a situação antes de devolver.');estado.status='DISPONÍVEL';estado.responsavel='';estado.rg='';estado.cauteladaEm='';estado.ultimaDevolucao=agora;estado.devolvidaPor=militar.nome;}
@@ -14113,7 +14116,7 @@ function movimentarViatura(dados,token){
   }finally{lock.releaseLock();}
 }
 function obterHistoricoViatura(id,token){
-  exigirPerfil_(token,['ATENDIMENTO','CONFERENCIA']);id=textoViatura_(id);var ss=SpreadsheetApp.getActiveSpreadsheet(),h=ss.getSheetByName('VIATURAS_MOVIMENTOS');if(!id||!h||h.getLastRow()<2)return {sucesso:true,itens:[]};
+  exigirPerfil_(token,['ATENDIMENTO','CONFERENCIA','VISTORIADOR']);id=textoViatura_(id);var ss=SpreadsheetApp.getActiveSpreadsheet(),h=ss.getSheetByName('VIATURAS_MOVIMENTOS');if(!id||!h||h.getLastRow()<2)return {sucesso:true,itens:[]};
   var linhas=h.getRange(2,2,h.getLastRow()-1,1).createTextFinder(id).matchEntireCell(true).findAll().map(function(c){return c.getRow();}).sort(function(a,b){return b-a;}).slice(0,100),mapa=lerLinhasProtocolosRoteiro_(h,{v:linhas},11);
   return {sucesso:true,itens:linhas.map(function(l){var r=mapa[l];return {data:r[2],operacao:r[3],militar:r[5],usuario:r[7],observacao:r[8]};})};
 }
