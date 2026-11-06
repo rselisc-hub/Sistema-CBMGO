@@ -2353,7 +2353,7 @@
           <div class="row g-3">
             <div class="col-md-4">
               <label class="form-label fw-bold">Data da vistoria *</label>
-              <input type="date" class="form-control" id="vd-edit-data">
+              <input type="date" class="form-control" id="vd-edit-data" onchange="atualizarOpcoesAfastamentoRoteiro_('edicao')">
             </div>
             <div class="col-md-4">
               <label class="form-label fw-bold">Vistoriador 1 *</label>
@@ -2594,7 +2594,7 @@
         <div class="modal-body">
           <div class="mb-3">
             <label class="form-label fw-bold">Data do roteiro *</label>
-            <input type="date" class="form-control" id="rot-modal-data-roteiro">
+            <input type="date" class="form-control" id="rot-modal-data-roteiro" onchange="atualizarOpcoesAfastamentoRoteiro_('distribuicao')">
             <div class="form-text">Vem preenchida com a data selecionada no Roteiro de Vistorias, mas pode ser alterada antes do lançamento.</div>
           </div>
           <div class="mb-3">
@@ -5670,8 +5670,8 @@
       var valorM1 = (x.rg1 || '') + '||' + (x.militar1Base || '');
       var valorM2 = x.rg2 ? ((x.rg2 || '') + '||' + (x.militar2Base || '')) : '';
 
-      document.getElementById('vd-edit-m1').innerHTML = opMilitares(valorM1);
-      document.getElementById('vd-edit-m2').innerHTML = opMilitares(valorM2);
+      document.getElementById('vd-edit-m1').innerHTML = opMilitares(valorM1,[dataAtualEdicao]);
+      document.getElementById('vd-edit-m2').innerHTML = opMilitares(valorM2,[dataAtualEdicao]);
       document.getElementById('vd-edit-periodo').value = x.periodo || 'DIA TODO';
 
       var reg = document.getElementById('vd-edit-regiao');
@@ -5700,7 +5700,7 @@
       vistoriaDiaIndiceEdicaoAtual = idx;
 
       if (militaresRoteiro.length && regioesRoteiro.length) {
-        preencherModalEdicaoVistoriaDia(x);
+        consultarAfastamentosSelecaoRoteiro_(function(){preencherModalEdicaoVistoriaDia(x);});
         return;
       }
 
@@ -5708,7 +5708,7 @@
         .withSuccessHandler(function(r) {
           militaresRoteiro = (r && r.militares) ? r.militares : [];
           regioesRoteiro = (r && r.regioes) ? r.regioes : [];
-          preencherModalEdicaoVistoriaDia(x);
+          consultarAfastamentosSelecaoRoteiro_(function(){preencherModalEdicaoVistoriaDia(x);});
         })
         .withFailureHandler(capturarErroServidor)
         .prepararRoteiroSiapi(sessaoToken);
@@ -5847,8 +5847,8 @@
         document.getElementById('vd-lote-resumo').textContent =
           selecionados.length + ' protocolo(s) selecionado(s)';
 
-        document.getElementById('vd-lote-m1').innerHTML = opMilitares('');
-        document.getElementById('vd-lote-m2').innerHTML = opMilitares('');
+        document.getElementById('vd-lote-m1').innerHTML = opMilitares('',selecionados.map(function(x){return x.dataIso||x.data||document.getElementById('vd-data').value;}));
+        document.getElementById('vd-lote-m2').innerHTML = opMilitares('',selecionados.map(function(x){return x.dataIso||x.data||document.getElementById('vd-data').value;}));
 
         bootstrap.Modal.getOrCreateInstance(
           document.getElementById('modal-vd-vistoriadores-lote')
@@ -5856,7 +5856,7 @@
       }
 
       if (militaresRoteiro.length) {
-        abrir();
+        consultarAfastamentosSelecaoRoteiro_(abrir);
         return;
       }
 
@@ -5864,7 +5864,7 @@
         .withSuccessHandler(function(r) {
           militaresRoteiro = (r && r.militares) ? r.militares : [];
           regioesRoteiro = (r && r.regioes) ? r.regioes : regioesRoteiro;
-          abrir();
+          consultarAfastamentosSelecaoRoteiro_(abrir);
         })
         .withFailureHandler(capturarErroServidor)
         .prepararRoteiroSiapi(sessaoToken);
@@ -8913,7 +8913,7 @@
           regioesRoteiro = (r && r.regioes) ? r.regioes : regioesRoteiro;
           document.getElementById('roteiro-status').className = 'alert alert-success mb-4';
           document.getElementById('roteiro-status').textContent =
-            'Pronto. ' + militaresRoteiro.length + ' militar(es) disponível(is) para seleção.';
+            'Pronto. ' + militaresRoteiro.length + ' vistoriador(es) cadastrado(s). A seleção respeita os afastamentos por data.';
           carregarRascunhosRoteiro();
         })
         .withFailureHandler(capturarErroServidor)
@@ -9582,10 +9582,25 @@
         );
     }
 
-    function opMilitares(valorSelecionado) {
+    var afastamentosSelecaoRoteiro=[],afastamentosSelecaoCarregando=false,afastamentosSelecaoSeq=0;
+    function consultarAfastamentosSelecaoRoteiro_(aoPronto){
+      if(afastamentosSelecaoCarregando)return;afastamentosSelecaoCarregando=true;
+      var seq=++afastamentosSelecaoSeq,token=sessaoToken;
+      google.script.run.withSuccessHandler(function(r){if(seq!==afastamentosSelecaoSeq||token!==sessaoToken)return;afastamentosSelecaoCarregando=false;if(!r||!r.sucesso||!Array.isArray(r.afastamentos)){alert('Não foi possível confirmar os afastamentos. Tente abrir a seleção novamente.');return;}afastamentosSelecaoRoteiro=r.afastamentos;aoPronto();}).withFailureHandler(function(err){if(seq!==afastamentosSelecaoSeq||token!==sessaoToken)return;afastamentosSelecaoCarregando=false;capturarErroServidor(err);}).obterAfastamentosSelecaoRoteiro(token);
+    }
+    function chaveDataAfastamentoSelecao_(v){
+      var s=String(v||'').trim(),m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/),a,mes,d;if(m){a=+m[1];mes=+m[2];d=+m[3];}else{m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(!m)return '';d=+m[1];mes=+m[2];a=+m[3];}var data=new Date(a,mes-1,d);if(data.getFullYear()!==a||data.getMonth()+1!==mes||data.getDate()!==d)return '';return a+'-'+('0'+mes).slice(-2)+'-'+('0'+d).slice(-2);
+    }
+    function rgSelecaoAfastamento_(rg){return String(rg||'').trim().replace(/\.0$/,'').replace(/\D/g,'').replace(/^0+(?=\d)/,'');}
+    function militarAfastadoSelecao_(rg,datas){var chave=rgSelecaoAfastamento_(rg);return !!chave&&afastamentosSelecaoRoteiro.some(function(a){if(rgSelecaoAfastamento_(a.rg)!==chave)return false;var ini=chaveDataAfastamentoSelecao_(a.dataInicial),fim=chaveDataAfastamentoSelecao_(a.dataFinal);return ini&&fim&&(datas||[]).some(function(d){var data=chaveDataAfastamentoSelecao_(d);return data&&data>=ini&&data<=fim;});});}
+    function atualizarOpcoesAfastamentoRoteiro_(tipo){var prefixo=tipo==='edicao'?'vd-edit':'rot-modal',data=document.getElementById(prefixo+'-data'+(tipo==='edicao'?'':'-roteiro')).value;[1,2].forEach(function(n){var campo=document.getElementById(prefixo+'-m'+n),antes=campo.value;campo.innerHTML=opMilitares(antes,[data]);});}
+
+    function opMilitares(valorSelecionado, datas) {
+      datas=datas||[(document.getElementById('rot-data-roteiro')||{}).value];
       var h = '<option value="">-- Selecione --</option>';
 
       militaresRoteiro.forEach(function(m) {
+        if(militarAfastadoSelecao_(m.rg,datas))return;
         var valor = (m.rg || '') + '||' + (m.nome || '');
         var selected = valor === valorSelecionado ? ' selected' : '';
 
@@ -10034,8 +10049,9 @@
         return parseInt(c.getAttribute('data-idx'), 10);
       });
 
-      document.getElementById('rot-modal-m1').innerHTML = opMilitares('');
-      document.getElementById('rot-modal-m2').innerHTML = opMilitares('');
+      consultarAfastamentosSelecaoRoteiro_(function(){
+      document.getElementById('rot-modal-m1').innerHTML = opMilitares('',[data]);
+      document.getElementById('rot-modal-m2').innerHTML = opMilitares('',[data]);
       var dataModalRoteiro = document.getElementById('rot-modal-data-roteiro');
       if (dataModalRoteiro) dataModalRoteiro.value = data;
       document.getElementById('rot-modal-periodo').value = 'DIA TODO';
@@ -10052,6 +10068,7 @@
       bootstrap.Modal.getOrCreateInstance(
         document.getElementById('modal-distribuicao-roteiro')
       ).show();
+      });
     }
 
 
@@ -10312,6 +10329,7 @@
 
 
     function limparSessaoLocal() {
+      afastamentosSelecaoSeq++;afastamentosSelecaoCarregando=false;afastamentosSelecaoRoteiro=[];
       controleViaturas.seq++;controleViaturas.histSeq++;controleViaturas={dados:null,seq:controleViaturas.seq,histSeq:controleViaturas.histSeq,enviando:false,tentativa:null,cadastro:false};controlesMovimentoViatura_(false);document.getElementById('vtr-gerenciar').hidden=true;document.getElementById('vtr-cad-salvar').disabled=false;
       ['vtr-militar','vtr-id','vtr-situacao-corpo','vtr-cad-lista','vtr-hist-lista','vtr-status','vtr-hist-status'].forEach(function(id){document.getElementById(id).textContent='';});
       ['vtr-obs','vtr-busca-militar','vtr-cad-id','vtr-cad-prefixo','vtr-cad-placa'].forEach(function(id){document.getElementById(id).value='';});

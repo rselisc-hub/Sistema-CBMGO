@@ -6536,20 +6536,26 @@ function garantirAbasEssenciaisRoteiroRapido_() {
   return {roteiro:roteiro, hist:hist};
 }
 
+function rgAfastamentoRoteiro_(valor){return rgVisitaPessoal_(valor).replace(/^0+(?=\d)/,'');}
+function linhasAfastamentosAtivosRoteiro_(){
+  var aba=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('AFASTAMENTOS');
+  return !aba||aba.getLastRow()<2?[]:aba.getRange(2,1,aba.getLastRow()-1,12).getDisplayValues().filter(function(r){return !/^EXCLU[IÍ]DO$/.test(String(r[11]||'ATIVO').trim().toUpperCase());});
+}
+function obterAfastamentosSelecaoRoteiro(token){
+  exigirPerfil_(token,['CONFERENCIA']);return {sucesso:true,afastamentos:linhasAfastamentosAtivosRoteiro_().map(function(r){return {rg:r[1],dataInicial:r[3],dataFinal:r[4]};})};
+}
 function mapaAfastamentosPorDataRoteiro_(itens) {
   var porData={},rgs=Object.create(null);
-  (itens||[]).forEach(function(item){var d=criarDataSegura(item.dataRoteiro);if(!d)return;porData[formatarDataTexto(d)]={};[item.rg1,item.rg2].forEach(function(rg){rg=String(rg||'').trim();if(rg)rgs[rg]=true;});});
+  (itens||[]).forEach(function(item){var d=criarDataSegura(item.dataRoteiro);if(!d)return;porData[formatarDataTexto(d)]={};[item.rg1,item.rg2].forEach(function(v){var rg=rgAfastamentoRoteiro_(v);if(rg)rgs[rg]=true;});});
   var datas=Object.keys(porData);if(!datas.length||!Object.keys(rgs).length)return porData;
-  var aba=garantirEstruturaAfastamentos_();if(aba.getLastRow()<2)return porData;
-  var candidatos=aba.getRange(2,1,aba.getLastRow()-1,12).getDisplayValues().filter(function(r){return rgs[String(r[1]||'').trim()]&&String(r[11]||'ATIVO').trim().toUpperCase()!=='EXCLUÍDO'&&datas.some(function(d){return dataDentroPeriodoAfastamento_(d,r[3],r[4]);});});
-  if(!candidatos.length)return porData;
-  // A regra de elegibilidade é a mesma da consulta, sem reler pessoal por militar/data.
-  var funcoes=obterMapaFuncoesPessoal_();
-  candidatos.sort(function(a,b){return String(a[2]||'').trim().localeCompare(String(b[2]||'').trim(),'pt-BR');}).forEach(function(r){
-    var rg=String(r[1]||'').trim(),nome=String(r[2]||'').trim(),f=funcoes[rg];
-    if(!(f&&f.funcoes.indexOf('VISTORIADOR')!==-1)&&!(nome&&!nomeExcluidoDasVistorias_(nome,nome)))return;
-    datas.forEach(function(d){if(dataDentroPeriodoAfastamento_(d,r[3],r[4]))porData[d][rg]={rg:rg,militar:nome,dataInicial:r[3],dataFinal:r[4],motivo:r[5],observacao:r[6]};});
+  garantirEstruturaAfastamentos_();
+  linhasAfastamentosAtivosRoteiro_().filter(function(r){return rgs[rgAfastamentoRoteiro_(r[1])]&&datas.some(function(d){return dataDentroPeriodoAfastamento_(d,r[3],r[4]);});}).sort(function(a,b){return String(a[2]||'').trim().localeCompare(String(b[2]||'').trim(),'pt-BR');}).forEach(function(r){
+    var rg=rgAfastamentoRoteiro_(r[1]);datas.forEach(function(d){if(dataDentroPeriodoAfastamento_(d,r[3],r[4]))porData[d][rg]={rg:String(r[1]||'').trim(),militar:String(r[2]||'').trim(),dataInicial:r[3],dataFinal:r[4],motivo:r[5],observacao:r[6]};});
   });return porData;
+}
+function validarAfastamentosEquipeRoteiro_(itens){
+  var mapa=mapaAfastamentosPorDataRoteiro_(itens);
+  (itens||[]).forEach(function(item){var d=criarDataSegura(item.dataRoteiro),chave=d?formatarDataTexto(d):'',afastados=mapa[chave]||{};[item.rg1,item.rg2].forEach(function(v){var a=afastados[rgAfastamentoRoteiro_(v)];if(a)throw Error((a.militar||v)+' está afastado em '+chave+' ('+a.motivo+').');});});
 }
 
 function finalizarRascunhosRoteiroRapido_(itens) {
@@ -6675,12 +6681,12 @@ function lancarDistribuicaoRoteiroSiapi(itens, token) {
       var rg1 = String(item.rg1 || "").trim();
       var rg2 = String(item.rg2 || "").trim();
 
-      if (rg1 && mapaAfastados[rg1]) {
-        var a1 = mapaAfastados[rg1];
+      if (rg1 && mapaAfastados[rgAfastamentoRoteiro_(rg1)]) {
+        var a1 = mapaAfastados[rgAfastamentoRoteiro_(rg1)];
         throw new Error((a1.militar || item.militar1 || rg1) + " está afastado em " + dataTexto + " (" + a1.motivo + ").");
       }
-      if (rg2 && mapaAfastados[rg2]) {
-        var a2 = mapaAfastados[rg2];
+      if (rg2 && mapaAfastados[rgAfastamentoRoteiro_(rg2)]) {
+        var a2 = mapaAfastados[rgAfastamentoRoteiro_(rg2)];
         throw new Error((a2.militar || item.militar2 || rg2) + " está afastado em " + dataTexto + " (" + a2.motivo + ").");
       }
 
@@ -8911,6 +8917,8 @@ function editarLancamentoVistoriaDia(dados, token) {
     throw new Error("Selecione o Vistoriador 1.");
   }
 
+  validarAfastamentosEquipeRoteiro_([{dataRoteiro:dados.dataRoteiro,rg1:dados.rg1,rg2:dados.rg2}]);
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var roteiro = ss.getSheetByName("ROTEIRO_VISTORIAS");
 
@@ -9139,6 +9147,7 @@ function atualizarVistoriadoresVistoriasDiaEmLote(itens, equipe, token) {
   }
 
   try {
+    validarAfastamentosEquipeRoteiro_(itens.map(function(item){return {dataRoteiro:item&&item.dataRoteiroOriginal,rg1:rg1,rg2:rg2};}));
     var atualizados = [];
     var ignorados = [];
     var hist = ss.getSheetByName("HISTORICO_VISTORIAS");
