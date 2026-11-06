@@ -126,3 +126,6 @@ VIATURAS — VISTORIADOR E REGISTRO POR OUTRA PESSOA (06/11/2026): atualizar Web
 
 ATUALIZAÇÃO 06/11/2026 — AFASTAMENTOS NA SELEÇÃO
 Atualize WebApp.gs e Index.html juntos. Titular e canga afastados ficam ocultos na data da vistoria (início e fim inclusivos). Fora do período reaparecem. Troca em lote considera todas as datas selecionadas. O servidor também revalida ao salvar. Distribuições antigas não são canceladas automaticamente.
+
+ATUALIZAÇÃO 06/11/2026 — ESCALA EXTRA NO RANKING
+Atualize GS e HTML juntos. Escala Extra passa a ter “Contar para o ranking”, marcada por padrão. Desmarque para excluir aquele lançamento da contagem. Extras antigos mantêm a regra anterior. A escolha fica em CONTROLE_ESCALAS, coluna O / CONTAR_RANKING, e permanece ao atualizar OS/SEI/RAI. Não altera pagamentos ou cotas.

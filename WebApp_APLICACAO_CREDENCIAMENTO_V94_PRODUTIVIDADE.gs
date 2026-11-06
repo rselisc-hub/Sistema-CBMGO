@@ -10187,10 +10187,11 @@ function recalcularRankingGeral(tipoOrdenacao, mesFiltro, somenteConsulta, milit
 
     var ultLinhaC = abaControle.getLastRow();
 
-    var dadosControle = abaControle.getRange(2, 1, ultLinhaC - 1, 13).getDisplayValues();
+    var dadosControle = abaControle.getRange(2, 1, ultLinhaC - 1, 15).getDisplayValues();
 
 
 
+    var possuiMarcadorRanking = String(abaControle.getRange(1,15).getDisplayValues()[0][0]||'').trim()==='CONTAR_RANKING';
     dadosControle.forEach(function(r) {
 
       var dataVal = r[0];
@@ -10201,11 +10202,10 @@ function recalcularRankingGeral(tipoOrdenacao, mesFiltro, somenteConsulta, milit
 
       var status = String(r[6] || "").toUpperCase();
 
-      var obs = String(r[11] || "").toUpperCase();
 
 
 
-      if (status === "ESCALADO" && obs.indexOf("EXTRA") === -1) {
+      if (status === "ESCALADO" && contaEscalaNoRanking_(r,possuiMarcadorRanking)) {
 
         var dObj = criarDataSegura(dataVal);
 
@@ -10699,6 +10699,20 @@ function lancarVoluntariosSelecionadosWeb_(listaSelecionados) {
 
 
 
+function contaEscalaNoRanking_(linha, possuiMarcador) {
+  var escolha=possuiMarcador?String(linha[14]||'').trim().toUpperCase():'';
+  if(escolha==='SIM')return true;
+  if(escolha==='NÃO'||escolha==='NAO')return false;
+  // Sem escolha registrada, mantém a regra histórica.
+  return String(linha[11]||'').toUpperCase().indexOf('EXTRA')===-1;
+}
+function garantirColunaRankingExtra_(aba) {
+  var cab=String(aba.getRange(1,15).getDisplayValues()[0][0]||'').trim();
+  if(cab==='CONTAR_RANKING')return;
+  if(cab||(aba.getLastRow()>1&&aba.getRange(2,15,aba.getLastRow()-1,1).getDisplayValues().some(function(r){return String(r[0]||'').trim()!=='';})))throw Error('Coluna O já está em uso. Nenhuma escala extra foi gravada.');
+  aba.getRange(1,15).setValue('CONTAR_RANKING');
+}
+
 function lancarOrdemServicoWeb_Conteudo_(dadosOS) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var abaControle = ss.getSheetByName("CONTROLE_ESCALAS");
@@ -10718,6 +10732,8 @@ function lancarOrdemServicoWeb_Conteudo_(dadosOS) {
     return "⚠️ ATENÇÃO: O militar " + dadosOS.nome + " já está escalado no dia " + dataFormatadaLimpa + " no turno " + turnoNome + ".";
   }
 
+  garantirColunaRankingExtra_(abaControle);
+
   var obsTexto = "EXTRA | OS: " + (dadosOS.os || "N/A") + " | SEI: " + (dadosOS.sei || "N/A") + " | RAI: " + (dadosOS.rai || "N/A");
   var hIni = dadosOS.horaIni || (turnoNome === "Vespertino" ? "13:00" : (turnoNome === "Noturno" ? "19:00" : "07:00"));
   var hFim = dadosOS.horaFim || (turnoNome === "Vespertino" ? "19:00" : (turnoNome === "Noturno" ? "01:00" : "13:00"));
@@ -10736,7 +10752,9 @@ function lancarOrdemServicoWeb_Conteudo_(dadosOS) {
     funcaoNome,
     dataFormatadaLimpa + "|" + dadosOS.rg + "|" + turnoNome,
     obsTexto,
-    "EXTRA"
+    "EXTRA",
+    "", // Coluna N reservada à função manual do gestor.
+    dadosOS.contarRanking === false ? "NÃO" : "SIM"
   ];
   var gruposFuncoes = {}; gruposFuncoes[chaveGrupoFuncaoPSE_(novaEscala)] = true;
   var ajustesFuncoes = planejarFuncoesPSE_(existentesFuncoes,[novaEscala],gruposFuncoes);

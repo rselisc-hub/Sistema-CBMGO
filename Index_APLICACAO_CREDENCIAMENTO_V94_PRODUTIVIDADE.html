@@ -3041,6 +3041,7 @@
                     <p class="small mb-2"><span class="badge bg-primary">AZUL</span> Segunda a Quinta-feira</p>
 
                     <p class="small mb-3"><span class="badge bg-danger">VERMELHO</span> Sexta-feira, Sábado e Domingo</p>
+                    <p class="small mb-0">Novas escalas extras contam quando “Contar para o ranking” estiver marcada. Extras antigos mantêm a regra anterior.</p>
 
                   </div>
 
@@ -3190,6 +3191,7 @@
 
                   <div class="col-md-2"><label class="form-label fw-bold small">Nº RAI</label><input type="text" class="form-control" id="extra-rai"></div>
 
+                  <div class="col-12"><div class="form-check"><input class="form-check-input" type="checkbox" id="extra-contar-ranking" checked><label class="form-check-label" for="extra-contar-ranking">Contar para o ranking</label></div><div class="form-text">Desmarque apenas quando esta escala não deva entrar na contagem do ranking.</div></div>
                   <div class="col-12 mt-3"><button id="btn-gravar-extra" class="btn btn-danger px-5 py-2" onclick="gravarOrdemServicoExtra()"><i class="bi bi-check-circle-fill me-1"></i> Gravar Escala Extra</button></div>
 
                 </div>
@@ -11164,11 +11166,11 @@
       var finalizar=iniciarEnvioEscalaGestor_('btn-gravar-extra','extra-');if(!finalizar)return;
       google.script.run
 
-        .withSuccessHandler(function(resp) {finalizar(resp);if(!/lançada com sucesso/i.test(String(resp)))return;escalaPSEGestorJaCarregada=false; document.getElementById('extra-rg').value = ''; document.getElementById('extra-nome').value = ''; document.getElementById('extra-militar-select').value = ''; var ranking=document.getElementById('conteudo-ranking');if(ranking&&ranking.offsetParent!==null)carregarRanking(); carregarUltimosOSEI(); })
+        .withSuccessHandler(function(resp) {finalizar(resp);if(!/lançada com sucesso/i.test(String(resp)))return;escalaPSEGestorJaCarregada=false; document.getElementById('extra-rg').value = ''; document.getElementById('extra-nome').value = ''; document.getElementById('extra-militar-select').value = ''; document.getElementById('extra-contar-ranking').checked = true; var ranking=document.getElementById('conteudo-ranking');if(ranking&&ranking.offsetParent!==null)carregarRanking(); carregarUltimosOSEI(); })
 
         .withFailureHandler(function(e){finalizar('Não foi possível confirmar. Os campos foram mantidos; confira a escala antes de repetir. '+String(e&&e.message||e||''));})
 
-        .lancarOrdemServicoWeb({ data: data, turno: turno, horaIni: hIni, horaFim: hFim, rg: rg, nome: nome, funcao: document.getElementById('extra-funcao').value, os: os, sei: sei, rai: rai }, sessaoToken);
+        .lancarOrdemServicoWeb({ data: data, turno: turno, horaIni: hIni, horaFim: hFim, rg: rg, nome: nome, funcao: document.getElementById('extra-funcao').value, contarRanking: document.getElementById('extra-contar-ranking').checked, os: os, sei: sei, rai: rai }, sessaoToken);
 
     }
 
